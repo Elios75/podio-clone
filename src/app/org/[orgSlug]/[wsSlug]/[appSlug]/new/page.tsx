@@ -1,0 +1,57 @@
+import { notFound } from "next/navigation";
+import { createClient } from "@/lib/supabase/server";
+import { ItemForm } from "../item-form";
+
+export default async function NewItemPage({
+  params,
+}: {
+  params: Promise<{ orgSlug: string; wsSlug: string; appSlug: string }>;
+}) {
+  const { orgSlug, wsSlug, appSlug } = await params;
+  const supabase = await createClient();
+
+  const { data: org } = await supabase
+    .from("organizations").select("id, slug").eq("slug", orgSlug).single();
+  if (!org) notFound();
+  const { data: ws } = await supabase
+    .from("workspaces").select("id, slug")
+    .eq("organization_id", org.id).eq("slug", wsSlug).single();
+  if (!ws) notFound();
+  const { data: app } = await supabase
+    .from("apps").select("id, name, slug, icon, item_name")
+    .eq("workspace_id", ws.id).eq("slug", appSlug).single();
+  if (!app) notFound();
+
+  const { data: fields } = await supabase
+    .from("app_fields")
+    .select("id, label, type, is_required, help_text, config")
+    .eq("app_id", app.id).eq("status", "active")
+    .order("position");
+
+  const { data: memberRows } = await supabase
+    .from("workspace_members")
+    .select("user_id, user_profiles:user_id(full_name)")
+    .eq("workspace_id", ws.id);
+  const members = (memberRows ?? []).map((m: any) => ({
+    user_id: m.user_id,
+    full_name: m.user_profiles?.full_name ?? null,
+  }));
+
+  const backHref = `/org/${orgSlug}/${wsSlug}/${app.slug}`;
+
+  return (
+    <main className="mx-auto max-w-xl p-8">
+      <h1 className="text-2xl font-semibold">
+        New {app.item_name.toLowerCase()} — {app.icon} {app.name}
+      </h1>
+      <div className="mt-6">
+        <ItemForm
+          appId={app.id}
+          fields={(fields ?? []) as any}
+          members={members}
+          backHref={backHref}
+        />
+      </div>
+    </main>
+  );
+}
