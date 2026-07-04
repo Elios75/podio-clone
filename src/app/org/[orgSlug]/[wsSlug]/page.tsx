@@ -180,6 +180,12 @@ export default async function WorkspacePage({
             App market
           </Link>
           <Link
+            href={`/org/${orgSlug}/${ws.slug}/new-app-from-csv`}
+            className="rounded-lg border border-slate-300 px-3 py-1.5 text-sm text-slate-600 hover:bg-slate-100"
+          >
+            From CSV
+          </Link>
+          <Link
             href={`/org/${orgSlug}/${ws.slug}/new-app`}
             className="rounded-lg bg-blue-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-700"
           >
