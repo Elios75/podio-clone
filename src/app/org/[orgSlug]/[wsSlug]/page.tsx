@@ -168,6 +168,12 @@ export default async function WorkspacePage({
         <h2 className="text-lg font-medium">Apps</h2>
         <div className="flex gap-2">
           <Link
+            href={`/org/${orgSlug}/${ws.slug}/files`}
+            className="rounded-lg border border-slate-300 px-3 py-1.5 text-sm text-slate-600 hover:bg-slate-100"
+          >
+            Files
+          </Link>
+          <Link
             href={`/org/${orgSlug}/${ws.slug}/market`}
             className="rounded-lg border border-slate-300 px-3 py-1.5 text-sm text-slate-600 hover:bg-slate-100"
           >

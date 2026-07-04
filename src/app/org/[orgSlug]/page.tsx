@@ -6,6 +6,7 @@ import { ApiKeysSection } from "./api-keys-section";
 import { WebhooksSection } from "./webhooks-section";
 import { MemberRoleSelect } from "@/components/member-role-select";
 import { SsoSettings } from "./sso-settings";
+import { EmailTemplatesSection } from "./email-templates-section";
 
 export default async function OrgPage({
   params,
@@ -40,6 +41,22 @@ export default async function OrgPage({
     .select("id, name, prefix, scopes, last_used_at, revoked_at, created_at")
     .eq("organization_id", org.id)
     .order("created_at", { ascending: false });
+
+  const { data: emailTemplates } = await supabase
+    .from("email_templates")
+    .select("id, name, subject, body_text")
+    .eq("organization_id", org.id)
+    .order("name");
+
+  // Storage usage (approximate; scoped by what RLS lets this user see)
+  const { data: fileSizes } = await supabase
+    .from("files")
+    .select("size_bytes")
+    .eq("organization_id", org.id)
+    .is("deleted_at", null)
+    .limit(5000);
+  const storageBytes = (fileSizes ?? []).reduce(
+    (a, f) => a + Number(f.size_bytes ?? 0), 0);
 
   const { data: hooks } = await supabase
     .from("webhooks")
@@ -123,7 +140,13 @@ export default async function OrgPage({
         hooks={(hooks ?? []) as any}
         deliveries={(hookDeliveries ?? []) as any}
       />
+      <EmailTemplatesSection orgId={org.id} templates={(emailTemplates ?? []) as any} />
       <SsoSettings orgId={org.id} settings={org.security_settings as any} />
+
+      <p className="mt-10 text-xs text-slate-400">
+        Storage used: {(storageBytes / 1024 / 1024).toFixed(1)} MB of 1024 MB
+        (free plan baseline — enforcement arrives with billing in Phase 13).
+      </p>
     </main>
   );
 }

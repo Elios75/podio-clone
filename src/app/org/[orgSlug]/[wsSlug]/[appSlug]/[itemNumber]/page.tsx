@@ -4,6 +4,7 @@ import { ItemForm } from "../item-form";
 import { CommentsSection } from "./comments-section";
 import { TasksSection } from "./tasks-section";
 import { ShareSection } from "./share-section";
+import { SendEmail } from "./send-email";
 
 export default async function ItemDetailPage({
   params,
@@ -188,6 +189,18 @@ export default async function ItemDetailPage({
   const relHref = (it: any) =>
     `/org/${it.apps?.workspaces?.organizations?.slug}/${it.apps?.workspaces?.slug}/${it.apps?.slug}/${it.item_number}`;
 
+  // Email composer: default recipient from the item's first email-field value,
+  // templates from the org
+  const emailField = (allFields ?? []).find((f) => f.type === "email");
+  const defaultTo = emailField
+    ? ((initialValues[emailField.id] as string) ?? null)
+    : null;
+  const { data: emailTemplates } = await supabase
+    .from("email_templates")
+    .select("id, name, subject, body_text")
+    .eq("organization_id", org.id)
+    .order("name");
+
   // Shares on this item
   const { data: shareRows } = await supabase
     .from("item_shares")
@@ -220,6 +233,14 @@ export default async function ItemDetailPage({
         Created {new Date(item.created_at).toLocaleString()} · Updated{" "}
         {new Date(item.updated_at).toLocaleString()}
       </p>
+      <div className="mt-3">
+        <SendEmail
+          itemId={item.id}
+          itemTitle={item.title ?? `${app.item_name} #${item.item_number}`}
+          defaultTo={defaultTo}
+          templates={(emailTemplates ?? []) as any}
+        />
+      </div>
       <div className="mt-6">
         <ItemForm
           appId={app.id}
