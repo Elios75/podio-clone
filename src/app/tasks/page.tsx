@@ -2,8 +2,14 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { TaskToggle } from "./task-toggle";
+import { LabelManager, LabelPicker } from "./task-labels";
 
-export default async function MyTasksPage() {
+export default async function MyTasksPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ label?: string }>;
+}) {
+  const { label: activeLabel } = await searchParams;
   const supabase = await createClient();
   const {
     data: { user },
@@ -44,8 +50,28 @@ export default async function MyTasksPage() {
     ])
   );
 
-  const open = (tasks ?? []).filter((t) => t.status === "open");
-  const done = (tasks ?? []).filter((t) => t.status === "completed").slice(0, 20);
+  // Personal labels + assignments
+  const { data: labels } = await supabase
+    .from("task_labels").select("id, name, color").order("name");
+  const allTaskIds = (tasks ?? []).map((t) => t.id);
+  const { data: links } = allTaskIds.length
+    ? await supabase
+        .from("task_label_links")
+        .select("task_id, label_id")
+        .in("task_id", allTaskIds)
+    : { data: [] as any[] };
+  const labelsByTask = new Map<string, string[]>();
+  for (const l of links ?? []) {
+    (labelsByTask.get(l.task_id) ?? labelsByTask.set(l.task_id, []).get(l.task_id)!)
+      .push(l.label_id);
+  }
+
+  const filtered = activeLabel
+    ? (tasks ?? []).filter((t) => (labelsByTask.get(t.id) ?? []).includes(activeLabel))
+    : tasks ?? [];
+
+  const open = filtered.filter((t) => t.status === "open");
+  const done = filtered.filter((t) => t.status === "completed").slice(0, 20);
 
   function TaskRow({ t }: { t: any }) {
     const link = t.target_type === "item" ? hrefByItem.get(t.target_id) : null;
@@ -63,11 +89,18 @@ export default async function MyTasksPage() {
             </Link>
           )}
         </div>
-        {t.due_at && (
-          <span className={`ml-auto shrink-0 text-xs ${overdue ? "font-medium text-red-500" : "text-slate-400"}`}>
-            {new Date(t.due_at).toLocaleDateString()}
-          </span>
-        )}
+        <span className="ml-auto flex shrink-0 items-center gap-2">
+          {t.due_at && (
+            <span className={`text-xs ${overdue ? "font-medium text-red-500" : "text-slate-400"}`}>
+              {new Date(t.due_at).toLocaleDateString()}
+            </span>
+          )}
+          <LabelPicker
+            taskId={t.id}
+            allLabels={labels ?? []}
+            assigned={labelsByTask.get(t.id) ?? []}
+          />
+        </span>
       </li>
     );
   }
@@ -78,6 +111,8 @@ export default async function MyTasksPage() {
         <h1 className="text-2xl font-semibold">My tasks</h1>
         <Link href="/home" className="text-sm text-slate-500 hover:underline">← Home</Link>
       </div>
+
+      <LabelManager labels={labels ?? []} activeLabel={activeLabel ?? null} />
 
       <h2 className="mt-6 text-sm font-medium uppercase tracking-wide text-slate-400">
         Open ({open.length})

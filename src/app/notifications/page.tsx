@@ -2,6 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { MarkAllRead } from "./mark-all-read";
+import { NotificationPrefs } from "./notification-prefs";
 
 export default async function NotificationsPage() {
   const supabase = await createClient();
@@ -9,6 +10,12 @@ export default async function NotificationsPage() {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
+
+  const { data: profile } = await supabase
+    .from("user_profiles")
+    .select("notification_prefs")
+    .eq("user_id", user.id)
+    .maybeSingle();
 
   const { data: notifications } = await supabase
     .from("notifications")
@@ -77,6 +84,11 @@ export default async function NotificationsPage() {
           </li>
         )}
       </ul>
+
+      <NotificationPrefs
+        userId={user.id}
+        prefs={(profile?.notification_prefs as Record<string, any>) ?? {}}
+      />
     </main>
   );
 }
