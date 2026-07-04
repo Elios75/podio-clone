@@ -295,6 +295,31 @@ const PATHS: Record<string, ReactNode> = {
 // `chain` is an alias for the existing chain-link glyph.
 PATHS.chain = PATHS.link;
 
+// Existing apps (and AI-generated definitions) store emoji in apps.icon.
+// Map the common ones to line-icon keys so EVERY app renders in the Podio
+// icon family; anything unmapped falls back to the default brick — never a
+// colorful emoji.
+const EMOJI_TO_KEY: Record<string, string> = {
+  "📋": "task", "✅": "task", "☑": "task", "✔": "task", "📝": "doc",
+  "📄": "doc", "📃": "doc", "📑": "doc", "🗒": "doc",
+  "🚀": "rocket", "💡": "idea", "📦": "brick", "🧱": "brick",
+  "🔗": "link", "👤": "contact", "👥": "people", "🧑‍💼": "contact",
+  "🤝": "contact", "📅": "meeting", "🗓": "meeting", "📆": "meeting",
+  "🎉": "event", "⭐": "event", "📊": "chart", "📈": "chart",
+  "📉": "chart", "⚙": "gear", "🔧": "wrench", "🛠": "tools",
+  "📞": "phone", "☎": "phone", "📱": "phone", "✉": "mail",
+  "📧": "mail", "📨": "mail", "🗺": "map", "📍": "map", "🏠": "map",
+  "🏢": "map", "🛒": "cart", "💰": "cart", "💵": "cart",
+  "🗂": "tray", "📁": "tray", "📂": "tray", "🏪": "store",
+  "🧑‍🎓": "contact", "🏫": "map", "🎓": "contact",
+};
+
+function normalizeEmoji(s: string): string {
+  // Strip variation selectors (️) and zero-width joiners' leftovers so
+  // "✉️" and "✉" both match.
+  return s.replace(/️/g, "").trim();
+}
+
 export function isPodioIconKey(icon: string | null): boolean {
   return icon !== null && icon in PATHS;
 }
@@ -306,11 +331,18 @@ export function PodioIcon({
   icon: string | null;
   className?: string;
 }) {
+  // Resolution order: icon key → emoji mapping → default brick.
   // null = app never chose an icon; Podio shows the default brick.
-  const key = icon ?? "brick";
+  let key = icon ?? "brick";
+  if (!PATHS[key]) {
+    key =
+      EMOJI_TO_KEY[key] ??
+      EMOJI_TO_KEY[normalizeEmoji(key)] ??
+      "brick";
+  }
   const paths = PATHS[key];
   if (!paths) {
-    // Legacy emoji-valued icons keep rendering as text.
+    // Unreachable in practice (brick always exists) — kept as a safety net.
     return <span className={className}>{icon}</span>;
   }
   return (

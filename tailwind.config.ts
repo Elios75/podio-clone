@@ -23,8 +23,11 @@ export default {
         },
       },
       fontFamily: {
+        // var() carries an inline fallback: without it, an undefined variable
+        // invalidates the whole font-family declaration and the browser
+        // falls back to serif.
         sans: [
-          "var(--font-source-sans)",
+          "var(--font-source-sans, 'Source Sans 3')",
           "Source Sans 3",
           "Source Sans Pro",
           "Segoe UI",

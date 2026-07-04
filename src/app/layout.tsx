@@ -3,9 +3,15 @@ import { Source_Sans_3 } from "next/font/google";
 import "./globals.css";
 import { SwRegister } from "./sw-register";
 
+// Podio's UI typeface is Source Sans (Pro → now "Source Sans 3").
+// We apply it two ways for robustness: the variable feeds Tailwind's
+// font-sans stack, and sourceSans.className on <body> sets the family
+// directly so the app never falls back to serif even if the CSS variable
+// is missing.
 const sourceSans = Source_Sans_3({
   subsets: ["latin"],
   variable: "--font-source-sans",
+  display: "swap",
 });
 
 export const metadata: Metadata = {
@@ -27,7 +33,7 @@ export default function RootLayout({
 }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="en" className={sourceSans.variable}>
-      <body className="font-sans">
+      <body className={`${sourceSans.className} font-sans`}>
         <SwRegister />
         {children}
       </body>
