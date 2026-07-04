@@ -4,13 +4,20 @@ import { createClient } from "@/lib/supabase/server";
 import { formatDuration, publicFileUrl, type CategoryOption } from "@/lib/fields";
 import { BoardView } from "./board-view";
 import { CalendarView } from "./calendar-view";
+import { ViewToolbar, type Filter, type Sort } from "./view-toolbar";
 
 export default async function AppPage({
   params,
   searchParams,
 }: {
   params: Promise<{ orgSlug: string; wsSlug: string; appSlug: string }>;
-  searchParams: Promise<{ view?: string; month?: string }>;
+  searchParams: Promise<{
+    view?: string;
+    month?: string;
+    f?: string;
+    s?: string;
+    viewId?: string;
+  }>;
 }) {
   const { orgSlug, wsSlug, appSlug } = await params;
   const sp = await searchParams;
@@ -41,7 +48,7 @@ export default async function AppPage({
     .select("id, item_number, title, created_at")
     .eq("app_id", app.id).eq("is_deleted", false)
     .order("created_at", { ascending: false })
-    .limit(100);
+    .limit(500);
 
   const itemIds = (items ?? []).map((i) => i.id);
   const { data: values } = itemIds.length
@@ -149,15 +156,96 @@ export default async function AppPage({
     }
   }
 
+  // ----- Saved views + filters/sort -----
+  const { data: savedViews } = await supabase
+    .from("app_views")
+    .select("id, name, layout, visibility, filters, sort")
+    .eq("app_id", app.id)
+    .order("name");
+
+  const activeView = sp.viewId
+    ? (savedViews ?? []).find((v) => v.id === sp.viewId) ?? null
+    : null;
+
+  function parseJson<T>(raw: string | undefined, fallback: T): T {
+    if (!raw) return fallback;
+    try {
+      return JSON.parse(raw) as T;
+    } catch {
+      return fallback;
+    }
+  }
+  const filters = parseJson<Filter[]>(sp.f, (activeView?.filters as Filter[]) ?? []);
+  const sort = parseJson<Sort[]>(sp.s, (activeView?.sort as Sort[]) ?? []);
+
   // ----- View selection -----
+  const savedLayout =
+    activeView?.layout === "card"
+      ? "board"
+      : activeView?.layout === "calendar"
+      ? "calendar"
+      : activeView
+      ? "table"
+      : null;
   const view =
-    sp.view === "board" || sp.view === "calendar" ? sp.view : "table";
+    sp.view === "board" || sp.view === "calendar"
+      ? sp.view
+      : sp.view === "table"
+      ? "table"
+      : savedLayout ?? "table";
   const baseHref = `/org/${orgSlug}/${wsSlug}/${app.slug}`;
+
+  // ----- Apply filters + sort (in-memory over the EAV values; move to SQL at scale) -----
+  const dayOf = (d: string) => new Date(d).toISOString().slice(0, 10);
+  function matchesFilter(itemId: string, flt: Filter): boolean {
+    const v = valueMap.get(itemId)?.get(flt.field_id);
+    if (flt.op === "is_empty") return !v;
+    if (flt.op === "not_empty") return !!v;
+    if (!v) return false;
+    switch (flt.op) {
+      case "contains":
+        return (v.value_text ?? "").toLowerCase().includes(String(flt.value ?? "").toLowerCase());
+      case "equals":
+        return v.value_text === flt.value;
+      case "is":
+        return v.value_text === flt.value || v.ref_user_id === flt.value;
+      case "is_not":
+        return v.value_text !== flt.value && v.ref_user_id !== flt.value;
+      case "eq": return Number(v.value_number) === Number(flt.value);
+      case "gt": return Number(v.value_number) > Number(flt.value);
+      case "gte": return Number(v.value_number) >= Number(flt.value);
+      case "lt": return Number(v.value_number) < Number(flt.value);
+      case "lte": return Number(v.value_number) <= Number(flt.value);
+      case "on": return !!v.value_date && dayOf(v.value_date) === flt.value;
+      case "before": return !!v.value_date && dayOf(v.value_date) < flt.value;
+      case "after": return !!v.value_date && dayOf(v.value_date) > flt.value;
+      default: return true;
+    }
+  }
+
+  let visibleItems = (items ?? []).filter((it) =>
+    filters.every((flt) => (flt.field_id && flt.op ? matchesFilter(it.id, flt) : true))
+  );
+
+  if (sort[0]?.field_id) {
+    const { field_id, dir } = sort[0];
+    const mul = dir === "desc" ? -1 : 1;
+    visibleItems = [...visibleItems].sort((a, b) => {
+      const va = valueMap.get(a.id)?.get(field_id);
+      const vb = valueMap.get(b.id)?.get(field_id);
+      const ka = va?.value_number ?? va?.value_date ?? va?.value_text ?? "";
+      const kb = vb?.value_number ?? vb?.value_date ?? vb?.value_text ?? "";
+      if (ka === kb) return 0;
+      if (ka === "" || ka === null) return 1; // empties last
+      if (kb === "" || kb === null) return -1;
+      return (ka > kb ? 1 : -1) * mul;
+    });
+  }
   const categoryField = fields.find((f) => f.type === "category");
   const dateField = fields.find((f) => f.type === "date");
 
   // Board data: each item's current option for the first category field
-  const boardCards = (items ?? []).map((item) => ({
+  const boardCards = visibleItems.map((item) => ({
     id: item.id,
     item_number: item.item_number,
     title: item.title,
@@ -174,7 +262,7 @@ export default async function AppPage({
       : new Date().toISOString().slice(0, 7);
   const cardsByDay: Record<string, { item_number: number; title: string | null }[]> = {};
   if (dateField) {
-    for (const item of items ?? []) {
+    for (const item of visibleItems) {
       const v = valueMap.get(item.id)?.get(dateField.id);
       if (!v?.value_date) continue;
       const day = new Date(v.value_date).toISOString().slice(0, 10);
@@ -184,6 +272,16 @@ export default async function AppPage({
       });
     }
   }
+
+  // Members for contact-field filter values
+  const { data: memberRows } = await supabase
+    .from("workspace_members")
+    .select("user_id, user_profiles:user_id(full_name)")
+    .eq("workspace_id", ws.id);
+  const members = (memberRows ?? []).map((m: any) => ({
+    user_id: m.user_id,
+    full_name: m.user_profiles?.full_name ?? null,
+  }));
 
   const tabCls = (active: boolean) =>
     `rounded-lg px-3 py-1.5 text-sm ${
@@ -220,6 +318,22 @@ export default async function AppPage({
         )}
       </div>
 
+      <ViewToolbar
+        appId={app.id}
+        baseHref={baseHref}
+        layout={view}
+        fields={fields as any}
+        members={members}
+        savedViews={(savedViews ?? []).map((v) => ({
+          id: v.id,
+          name: v.name,
+          visibility: v.visibility,
+        }))}
+        activeViewId={activeView?.id ?? null}
+        initialFilters={filters}
+        initialSort={sort}
+      />
+
       {view === "board" && categoryField && (
         <div className="mt-6">
           <BoardView
@@ -254,7 +368,7 @@ export default async function AppPage({
             </tr>
           </thead>
           <tbody>
-            {(items ?? []).map((item) => (
+            {visibleItems.map((item) => (
               <tr key={item.id} className="border-b border-slate-100 hover:bg-slate-50">
                 <td className="px-4 py-3 text-slate-400">
                   <Link
@@ -269,7 +383,7 @@ export default async function AppPage({
                 ))}
               </tr>
             ))}
-            {(items ?? []).length === 0 && (
+            {visibleItems.length === 0 && (
               <tr>
                 <td colSpan={1 + fields.length}
                   className="px-4 py-10 text-center text-slate-400">
