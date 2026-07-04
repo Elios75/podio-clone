@@ -90,6 +90,8 @@ export function AppEditor({
   const [saved, setSaved] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [dragIndex, setDragIndex] = useState<number | null>(null);
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [deleteConfirm, setDeleteConfirm] = useState("");
 
   const numberTokens = fields
     .filter((f) => NUMERIC_TYPES.includes(f.type) && f.type !== "calculation" && f.external_id)
@@ -199,6 +201,17 @@ export function AppEditor({
     router.refresh();
   }
 
+  async function deleteApp() {
+    setError(null);
+    const { data, error: rpcError } = await supabase.rpc("delete_app", {
+      p_app: app.id,
+      p_confirm_name: deleteConfirm,
+    });
+    if (rpcError) return setError(rpcError.message);
+    router.push(wsHref);
+    router.refresh();
+  }
+
   return (
     <div className="space-y-6">
       {/* App settings */}
@@ -221,10 +234,44 @@ export function AppEditor({
             Save settings
           </button>
           <button onClick={archiveApp}
-            className="rounded-lg border border-red-200 px-3 py-1.5 text-xs text-red-600 hover:bg-red-50">
+            className="rounded-lg border border-amber-200 px-3 py-1.5 text-xs text-amber-700 hover:bg-amber-50">
             Archive app
           </button>
+          <button onClick={() => setDeleteOpen(!deleteOpen)}
+            className="rounded-lg border border-red-200 px-3 py-1.5 text-xs text-red-600 hover:bg-red-50">
+            Delete permanently
+          </button>
         </div>
+
+        {deleteOpen && (
+          <div className="mt-3 rounded-lg border border-red-300 bg-red-50 p-3">
+            <p className="text-xs text-red-800">
+              This permanently deletes the app and <strong>all its items,
+              values, comments, tasks, views, and automations</strong>. This
+              cannot be undone. Type the app name <strong>{app.name}</strong> to
+              confirm:
+            </p>
+            <div className="mt-2 flex items-center gap-2">
+              <input
+                value={deleteConfirm}
+                onChange={(e) => setDeleteConfirm(e.target.value)}
+                placeholder={app.name}
+                className="flex-1 rounded-lg border border-red-300 px-3 py-1.5 text-sm focus:border-red-500 focus:outline-none"
+              />
+              <button
+                onClick={deleteApp}
+                disabled={deleteConfirm !== app.name}
+                className="rounded-lg bg-red-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-40"
+              >
+                Delete forever
+              </button>
+              <button onClick={() => { setDeleteOpen(false); setDeleteConfirm(""); }}
+                className="rounded-lg border border-slate-300 px-3 py-1.5 text-sm hover:bg-slate-100">
+                Cancel
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Fields */}
