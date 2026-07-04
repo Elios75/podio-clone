@@ -25,7 +25,7 @@ export default async function EditAppPage({
 
   const { data: fields } = await supabase
     .from("app_fields")
-    .select("id, label, type, help_text, is_required, is_hidden, is_primary, position, config")
+    .select("id, external_id, label, type, help_text, is_required, is_hidden, is_primary, position, config")
     .eq("app_id", app.id).eq("status", "active")
     .order("position");
 

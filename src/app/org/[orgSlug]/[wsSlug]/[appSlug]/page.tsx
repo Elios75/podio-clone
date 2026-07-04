@@ -88,13 +88,24 @@ export default async function AppPage({
 
     switch (field.type) {
       case "category": {
-        const opt = ((field.config?.options ?? []) as CategoryOption[]).find(
-          (o) => o.id === v.value_text
-        );
-        return opt ? (
-          <span className="rounded px-2 py-0.5 text-xs font-medium text-white"
-            style={{ backgroundColor: opt.color }}>
-            {opt.label}
+        const options = (field.config?.options ?? []) as CategoryOption[];
+        const ids: string[] = Array.isArray(v.value)
+          ? v.value
+          : v.value_text
+          ? [v.value_text]
+          : [];
+        const opts = ids
+          .map((id) => options.find((o) => o.id === id))
+          .filter(Boolean) as CategoryOption[];
+        return opts.length ? (
+          <span className="flex flex-wrap gap-1">
+            {opts.map((opt) => (
+              <span key={opt.id}
+                className="rounded px-2 py-0.5 text-xs font-medium text-white"
+                style={{ backgroundColor: opt.color }}>
+                {opt.label}
+              </span>
+            ))}
           </span>
         ) : <span className="text-slate-300">—</span>;
       }
@@ -154,7 +165,11 @@ export default async function AppPage({
           </a>
         ) : <span className="text-slate-300">—</span>;
       case "calculation":
-        return <span className="text-slate-300">ƒ</span>;
+        return v.value_number != null ? (
+          <span className="font-medium">{Number(v.value_number).toLocaleString()}</span>
+        ) : (
+          <span className="text-slate-300">ƒ</span>
+        );
       default:
         return <span className="line-clamp-1">{v.value_text}</span>;
     }
@@ -212,7 +227,8 @@ export default async function AppPage({
       case "equals":
         return v.value_text === flt.value;
       case "is":
-        return v.value_text === flt.value || v.ref_user_id === flt.value;
+        return v.value_text === flt.value || v.ref_user_id === flt.value
+          || (Array.isArray(v.value) && v.value.includes(flt.value));
       case "is_not":
         return v.value_text !== flt.value && v.ref_user_id !== flt.value;
       case "eq": return Number(v.value_number) === Number(flt.value);

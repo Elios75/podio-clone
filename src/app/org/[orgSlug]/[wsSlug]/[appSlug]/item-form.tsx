@@ -20,6 +20,9 @@ type Field = {
     options?: CategoryOption[];
     related_app_id?: string;
     formula?: string;
+    multiple?: boolean;
+    end_date?: boolean;
+    default?: any;
   };
 };
 
@@ -178,14 +181,50 @@ export function ItemForm({
           </div>
         );
       }
-      case "date":
+      case "date": {
+        const v = values[f.id] ?? {};
         return (
-          <input type="date" required={f.is_required}
-            value={values[f.id]?.start ?? ""}
-            onChange={(e) => set(f.id, e.target.value ? { start: e.target.value } : null)}
-            className="rounded-lg border border-slate-300 px-3 py-2 text-sm" />
+          <div className="flex items-center gap-2">
+            <input type="date" required={f.is_required}
+              value={v.start ?? ""}
+              onChange={(e) =>
+                set(f.id, e.target.value ? { ...v, start: e.target.value } : null)}
+              className="rounded-lg border border-slate-300 px-3 py-2 text-sm" />
+            {f.config.end_date && (
+              <>
+                <span className="text-xs text-slate-400">→</span>
+                <input type="date" value={v.end ?? ""}
+                  min={v.start ?? undefined}
+                  onChange={(e) => set(f.id, { ...v, end: e.target.value || undefined })}
+                  className="rounded-lg border border-slate-300 px-3 py-2 text-sm" />
+              </>
+            )}
+          </div>
         );
-      case "category":
+      }
+      case "category": {
+        if (f.config.multiple) {
+          const selected: string[] = Array.isArray(values[f.id]) ? values[f.id] : [];
+          return (
+            <div className="flex flex-wrap gap-2">
+              {(f.config.options ?? []).map((o) => {
+                const on = selected.includes(o.id);
+                return (
+                  <button key={o.id} type="button"
+                    onClick={() =>
+                      set(f.id, on
+                        ? selected.filter((x) => x !== o.id)
+                        : [...selected, o.id])}
+                    className={`rounded-full border px-3 py-1 text-xs font-medium ${
+                      on ? "text-white" : "text-slate-600 border-slate-300 hover:bg-slate-50"}`}
+                    style={on ? { backgroundColor: o.color, borderColor: o.color } : {}}>
+                    {o.label}
+                  </button>
+                );
+              })}
+            </div>
+          );
+        }
         return (
           <select required={f.is_required} value={values[f.id] ?? ""}
             onChange={(e) => set(f.id, e.target.value || null)}
@@ -196,6 +235,7 @@ export function ItemForm({
             ))}
           </select>
         );
+      }
       case "contact":
         return (
           <select required={f.is_required} value={values[f.id] ?? ""}
@@ -251,12 +291,23 @@ export function ItemForm({
           </div>
         );
       }
-      case "calculation":
+      case "calculation": {
+        const v = values[f.id];
         return (
-          <p className="rounded-lg bg-slate-50 px-3 py-2 text-sm text-slate-400">
-            Computed field{f.config.formula ? ` — formula: ${f.config.formula}` : ""} (engine ships in Phase 6)
+          <p className="rounded-lg bg-slate-50 px-3 py-2 text-sm">
+            {typeof v === "number" ? (
+              <span className="font-medium">= {v.toLocaleString()}</span>
+            ) : (
+              <span className="text-slate-400">Computed on save</span>
+            )}
+            {f.config.formula && (
+              <span className="ml-2 font-mono text-xs text-slate-400">
+                {f.config.formula}
+              </span>
+            )}
           </p>
         );
+      }
       default:
         return null;
     }

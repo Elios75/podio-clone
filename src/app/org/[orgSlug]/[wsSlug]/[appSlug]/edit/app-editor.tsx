@@ -13,6 +13,7 @@ import {
 type EditField = {
   id: string | null; // null = new field
   key: string;
+  external_id: string | null;
   label: string;
   type: FieldType;
   help_text: string;
@@ -20,8 +21,14 @@ type EditField = {
   is_hidden: boolean;
   is_primary: boolean;
   options: CategoryOption[];
+  multiple: boolean;      // category
+  endDate: boolean;       // date
+  formula: string;        // calculation
+  defaultValue: string;   // text/number
   origType: FieldType | null;
 };
+
+const NUMERIC_TYPES = ["number", "money", "progress", "duration", "calculation"];
 
 export function AppEditor({
   app,
@@ -49,6 +56,7 @@ export function AppEditor({
     initialFields.map((f) => ({
       id: f.id,
       key: f.id,
+      external_id: f.external_id ?? null,
       label: f.label,
       type: f.type,
       help_text: f.help_text ?? "",
@@ -56,12 +64,24 @@ export function AppEditor({
       is_hidden: f.is_hidden,
       is_primary: f.is_primary,
       options: f.config?.options ?? [],
+      multiple: f.config?.multiple ?? false,
+      endDate: f.config?.end_date ?? false,
+      formula: f.config?.formula ?? "",
+      defaultValue:
+        f.config?.default !== undefined && f.config?.default !== null
+          ? String(f.config.default)
+          : "",
       origType: f.type,
     }))
   );
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [dragIndex, setDragIndex] = useState<number | null>(null);
+
+  const numberTokens = fields
+    .filter((f) => NUMERIC_TYPES.includes(f.type) && f.type !== "calculation" && f.external_id)
+    .map((f) => ({ token: `{${f.external_id}}`, label: f.label }));
 
   function upd(key: string, patch: Partial<EditField>) {
     setFields(fields.map((f) => (f.key === key ? { ...f, ...patch } : f)));
@@ -117,16 +137,28 @@ export function AppEditor({
     }
 
     setSaving(true);
-    const payload = fields.map((f) => ({
-      id: f.id,
-      label: f.label,
-      type: f.type,
-      help_text: f.help_text,
-      is_required: f.is_required,
-      is_hidden: f.is_hidden,
-      is_primary: f.is_primary,
-      config: f.type === "category" ? { options: f.options } : {},
-    }));
+    const payload = fields.map((f) => {
+      const config: any = {};
+      if (f.type === "category") {
+        config.options = f.options;
+        config.multiple = f.multiple;
+      }
+      if (f.type === "date") config.end_date = f.endDate;
+      if (f.type === "calculation") config.formula = f.formula;
+      if (["text", "number"].includes(f.type) && f.defaultValue !== "") {
+        config.default = f.type === "number" ? Number(f.defaultValue) : f.defaultValue;
+      }
+      return {
+        id: f.id,
+        label: f.label,
+        type: f.type,
+        help_text: f.help_text,
+        is_required: f.is_required,
+        is_hidden: f.is_hidden,
+        is_primary: f.is_primary,
+        config,
+      };
+    });
     const { data, error: rpcError } = await supabase.rpc("update_app_schema", {
       p_app: app.id,
       p_fields: payload,
@@ -179,8 +211,25 @@ export function AppEditor({
         {fields.map((f, i) => {
           const cnt = f.id ? countByField[f.id] ?? 0 : 0;
           return (
-            <div key={f.key} className="rounded-lg border border-slate-200 bg-white p-3">
+            <div
+              key={f.key}
+              draggable
+              onDragStart={() => setDragIndex(i)}
+              onDragOver={(e) => e.preventDefault()}
+              onDrop={() => {
+                if (dragIndex === null || dragIndex === i) return;
+                const next = [...fields];
+                const [moved] = next.splice(dragIndex, 1);
+                next.splice(i, 0, moved);
+                setFields(next);
+                setDragIndex(null);
+              }}
+              className={`rounded-lg border bg-white p-3 ${
+                dragIndex === i ? "border-blue-400 opacity-60" : "border-slate-200"
+              }`}
+            >
               <div className="flex items-center gap-2">
+                <span className="cursor-grab text-slate-300" title="Drag to reorder">⠿</span>
                 <div className="flex flex-col">
                   <button onClick={() => move(i, -1)} className="text-xs text-slate-400 hover:text-slate-700">▲</button>
                   <button onClick={() => move(i, 1)} className="text-xs text-slate-400 hover:text-slate-700">▼</button>
@@ -231,6 +280,61 @@ export function AppEditor({
                   title field
                 </label>
               </div>
+
+              {["text", "number"].includes(f.type) && (
+                <div className="mt-2 pl-8">
+                  <input
+                    placeholder={`Default value (optional)`}
+                    value={f.defaultValue}
+                    type={f.type === "number" ? "number" : "text"}
+                    onChange={(e) => upd(f.key, { defaultValue: e.target.value })}
+                    className="w-64 rounded border border-slate-300 px-2 py-1 text-xs"
+                  />
+                </div>
+              )}
+
+              {f.type === "date" && (
+                <label className="mt-2 flex items-center gap-1.5 pl-8 text-xs text-slate-600">
+                  <input type="checkbox" checked={f.endDate}
+                    onChange={(e) => upd(f.key, { endDate: e.target.checked })} />
+                  Allow an end date (date range)
+                </label>
+              )}
+
+              {f.type === "calculation" && (
+                <div className="mt-2 space-y-1 pl-8">
+                  <input
+                    placeholder="Formula, e.g. {deal-value-1} * 0.2"
+                    value={f.formula}
+                    onChange={(e) => upd(f.key, { formula: e.target.value })}
+                    className="w-full rounded border border-slate-300 px-2 py-1 font-mono text-xs"
+                  />
+                  <p className="text-[11px] text-slate-400">
+                    Tokens:{" "}
+                    {numberTokens.length > 0
+                      ? numberTokens.map((t) => (
+                          <button key={t.token} type="button"
+                            onClick={() => upd(f.key, { formula: f.formula + t.token })}
+                            className="mr-1 rounded bg-slate-100 px-1 font-mono hover:bg-blue-100"
+                            title={t.label}>
+                            {t.token}
+                          </button>
+                        ))
+                      : "add number/money/progress fields first"}
+                    {" "}Operators: + − × ÷ and parentheses. Recomputes on every save.
+                  </p>
+                </div>
+              )}
+
+              {f.type === "category" && (
+                <div className="mt-2 space-y-1 pl-8">
+                  <label className="flex items-center gap-1.5 text-xs text-slate-600">
+                    <input type="checkbox" checked={f.multiple}
+                      onChange={(e) => upd(f.key, { multiple: e.target.checked })} />
+                    Allow multiple selections
+                  </label>
+                </div>
+              )}
 
               {f.type === "category" && (
                 <div className="mt-2 space-y-1 pl-8">

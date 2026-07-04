@@ -54,6 +54,14 @@ export default async function NewItemPage({
     relatedItemsByField[rf.id] = relItems ?? [];
   }
 
+  // Default values from field config
+  const defaults: Record<string, any> = {};
+  for (const f of fields as any[]) {
+    if (f.config?.default !== undefined && f.config?.default !== null && f.config?.default !== "") {
+      defaults[f.id] = f.config.default;
+    }
+  }
+
   const backHref = `/org/${orgSlug}/${wsSlug}/${app.slug}`;
 
   return (
@@ -67,6 +75,7 @@ export default async function NewItemPage({
           fields={(fields ?? []) as any}
           members={members}
           relatedItemsByField={relatedItemsByField}
+          initialValues={defaults}
           backHref={backHref}
         />
       </div>
