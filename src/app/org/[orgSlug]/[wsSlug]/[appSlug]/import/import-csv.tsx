@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { parseCsv } from "@/lib/csv";
@@ -150,15 +151,12 @@ export function ImportCsv({
         <p className="text-sm text-green-800">
           Import finished: {progress.done} imported, {progress.errors} skipped.
         </p>
-        <button
-          onClick={() => {
-            router.push(backHref);
-            router.refresh();
-          }}
-          className="mt-3 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
+        <Link
+          href={backHref}
+          className="mt-3 inline-block rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
         >
           View items
-        </button>
+        </Link>
       </div>
     );
   }
@@ -177,20 +175,34 @@ export function ImportCsv({
         </label>
       ) : (
         <>
-          <p className="text-sm text-slate-500">
-            {rows.length - 1} rows detected. Map columns to fields:
-          </p>
+          {(() => {
+            const mappedCount = Object.values(mapping).filter(Boolean).length;
+            return (
+              <p className="text-sm">
+                <span className="text-slate-500">{rows.length - 1} rows detected · </span>
+                <span className={mappedCount === 0 ? "font-medium text-red-600" : "font-medium text-green-700"}>
+                  {mappedCount} of {rows[0].length} column{rows[0].length === 1 ? "" : "s"} mapped
+                </span>
+                {mappedCount === 0 && (
+                  <span className="text-slate-500"> — pick a field for each column below, or the import will be empty.</span>
+                )}
+              </p>
+            );
+          })()}
           <div className="space-y-2 rounded-lg border border-slate-200 bg-white p-4">
-            {rows[0].map((header, i) => (
-              <div key={i} className="flex items-center gap-3 text-sm">
+            {rows[0].map((header, i) => {
+              const unmapped = !mapping[i];
+              return (
+              <div key={i} className={`flex items-center gap-3 rounded px-1 text-sm ${unmapped ? "bg-amber-50" : ""}`}>
                 <span className="w-40 truncate font-medium">{header}</span>
                 <span className="text-xs text-slate-400">
                   e.g. “{rows[1]?.[i]?.slice(0, 25) ?? ""}”
                 </span>
+                {unmapped && <span className="text-xs text-amber-600">will be skipped</span>}
                 <select
                   value={mapping[i] ?? ""}
                   onChange={(e) => setMapping({ ...mapping, [i]: e.target.value })}
-                  className="ml-auto rounded border border-slate-300 px-2 py-1 text-sm"
+                  className={`ml-auto rounded border px-2 py-1 text-sm ${unmapped ? "border-amber-300" : "border-slate-300"}`}
                 >
                   <option value="">— skip —</option>
                   {importable.map((f) => (
@@ -198,9 +210,31 @@ export function ImportCsv({
                   ))}
                 </select>
               </div>
-            ))}
+              );
+            })}
+            {importable.length === 0 && (
+              <p className="text-sm text-amber-600">
+                This app has no importable fields yet. Add fields via “Edit app”
+                first, or use “From CSV” on the workspace to build the app from
+                this file.
+              </p>
+            )}
           </div>
 
+          {(() => {
+            const used = Object.values(mapping).filter(Boolean);
+            const dupes = used.filter((v, i) => used.indexOf(v) !== i);
+            if (dupes.length === 0) return null;
+            const names = [...new Set(dupes)]
+              .map((id) => importable.find((f) => f.id === id)?.label)
+              .filter(Boolean);
+            return (
+              <p className="text-sm text-amber-600">
+                ⚠ Multiple columns are mapped to the same field ({names.join(", ")}).
+                Only one will be kept per row — give each column its own field.
+              </p>
+            );
+          })()}
           <div className="flex items-center gap-3">
             <button
               onClick={runImport}
