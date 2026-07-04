@@ -2,13 +2,18 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { formatDuration, publicFileUrl, type CategoryOption } from "@/lib/fields";
+import { BoardView } from "./board-view";
+import { CalendarView } from "./calendar-view";
 
 export default async function AppPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ orgSlug: string; wsSlug: string; appSlug: string }>;
+  searchParams: Promise<{ view?: string; month?: string }>;
 }) {
   const { orgSlug, wsSlug, appSlug } = await params;
+  const sp = await searchParams;
   const supabase = await createClient();
 
   const { data: org } = await supabase
@@ -144,6 +149,49 @@ export default async function AppPage({
     }
   }
 
+  // ----- View selection -----
+  const view =
+    sp.view === "board" || sp.view === "calendar" ? sp.view : "table";
+  const baseHref = `/org/${orgSlug}/${wsSlug}/${app.slug}`;
+  const categoryField = fields.find((f) => f.type === "category");
+  const dateField = fields.find((f) => f.type === "date");
+
+  // Board data: each item's current option for the first category field
+  const boardCards = (items ?? []).map((item) => ({
+    id: item.id,
+    item_number: item.item_number,
+    title: item.title,
+    optionId:
+      (categoryField &&
+        valueMap.get(item.id)?.get(categoryField.id)?.value_text) ??
+      null,
+  }));
+
+  // Calendar data: items bucketed by the first date field's day
+  const monthStr =
+    sp.month && /^\d{4}-\d{2}$/.test(sp.month)
+      ? sp.month
+      : new Date().toISOString().slice(0, 7);
+  const cardsByDay: Record<string, { item_number: number; title: string | null }[]> = {};
+  if (dateField) {
+    for (const item of items ?? []) {
+      const v = valueMap.get(item.id)?.get(dateField.id);
+      if (!v?.value_date) continue;
+      const day = new Date(v.value_date).toISOString().slice(0, 10);
+      (cardsByDay[day] ??= []).push({
+        item_number: item.item_number,
+        title: item.title,
+      });
+    }
+  }
+
+  const tabCls = (active: boolean) =>
+    `rounded-lg px-3 py-1.5 text-sm ${
+      active
+        ? "bg-slate-900 font-medium text-white"
+        : "border border-slate-300 text-slate-600 hover:bg-slate-100"
+    }`;
+
   return (
     <main className="p-8">
       <div className="flex items-center justify-between">
@@ -151,13 +199,50 @@ export default async function AppPage({
           {app.icon} {app.name}
         </h1>
         <Link
-          href={`/org/${orgSlug}/${wsSlug}/${app.slug}/new`}
+          href={`${baseHref}/new`}
           className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
         >
           + New {app.item_name.toLowerCase()}
         </Link>
       </div>
 
+      <div className="mt-4 flex items-center gap-2">
+        <Link href={baseHref} className={tabCls(view === "table")}>Table</Link>
+        {categoryField ? (
+          <Link href={`${baseHref}?view=board`} className={tabCls(view === "board")}>Board</Link>
+        ) : (
+          <span className="rounded-lg border border-slate-200 px-3 py-1.5 text-sm text-slate-300" title="Add a Category field to use the board">Board</span>
+        )}
+        {dateField ? (
+          <Link href={`${baseHref}?view=calendar`} className={tabCls(view === "calendar")}>Calendar</Link>
+        ) : (
+          <span className="rounded-lg border border-slate-200 px-3 py-1.5 text-sm text-slate-300" title="Add a Date field to use the calendar">Calendar</span>
+        )}
+      </div>
+
+      {view === "board" && categoryField && (
+        <div className="mt-6">
+          <BoardView
+            fieldId={categoryField.id}
+            options={(categoryField.config?.options ?? []) as CategoryOption[]}
+            cards={boardCards}
+            baseHref={baseHref}
+          />
+        </div>
+      )}
+
+      {view === "calendar" && dateField && (
+        <div className="mt-6">
+          <CalendarView
+            monthStr={monthStr}
+            cardsByDay={cardsByDay}
+            baseHref={baseHref}
+            viewQuery="view=calendar"
+          />
+        </div>
+      )}
+
+      {view === "table" && (
       <div className="mt-6 overflow-x-auto rounded-lg border border-slate-200 bg-white">
         <table className="w-full text-left text-sm">
           <thead className="border-b border-slate-200 bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
@@ -195,6 +280,7 @@ export default async function AppPage({
           </tbody>
         </table>
       </div>
+      )}
     </main>
   );
 }
