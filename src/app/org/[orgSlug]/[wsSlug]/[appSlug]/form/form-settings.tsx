@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 
-type Field = { id: string; label: string; type: string };
+type Field = { id: string; external_id: string; label: string; type: string };
 
 const FORM_EXCLUDED = ["relationship", "contact", "image", "file", "calculation"];
 
@@ -34,6 +34,14 @@ export function FormSettings({
     webform?.field_ids ?? eligible.map((f) => f.id)
   );
   const [isActive, setIsActive] = useState(webform?.is_active ?? true);
+  const [redirectUrl, setRedirectUrl] = useState(webform?.settings?.redirect_url ?? "");
+  const [accentColor, setAccentColor] = useState(webform?.settings?.theme?.accent_color ?? "");
+  const [bgColor, setBgColor] = useState(webform?.settings?.theme?.background_color ?? "");
+  const [customCss, setCustomCss] = useState(webform?.settings?.custom_css ?? "");
+  const [allowedDomains, setAllowedDomains] = useState(
+    (webform?.settings?.allowed_domains ?? []).join(", ")
+  );
+  const [showAdvanced, setShowAdvanced] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
@@ -57,7 +65,18 @@ export function FormSettings({
       description,
       field_ids: fieldIds,
       is_active: isActive,
-      settings: { success_message: successMsg },
+      settings: {
+        success_message: successMsg,
+        ...(redirectUrl.trim() ? { redirect_url: redirectUrl.trim() } : {}),
+        ...(accentColor || bgColor
+          ? { theme: { ...(accentColor ? { accent_color: accentColor } : {}),
+                       ...(bgColor ? { background_color: bgColor } : {}) } }
+          : {}),
+        ...(customCss.trim() ? { custom_css: customCss } : {}),
+        ...(allowedDomains.trim()
+          ? { allowed_domains: allowedDomains.split(",").map((d: string) => d.trim()).filter(Boolean) }
+          : {}),
+      },
       ...(webform ? {} : { slug: `${appSlug}-${Math.random().toString(36).slice(2, 8)}` }),
     };
     const { error: upError } = webform
@@ -83,6 +102,27 @@ export function FormSettings({
           >
             Copy
           </button>
+        </div>
+      )}
+
+      {publicUrl && (
+        <div className="rounded-lg border border-slate-200 bg-white p-4 space-y-2">
+          <p className="text-sm font-medium">Embed on your site</p>
+          <pre className="overflow-x-auto rounded bg-slate-900 p-3 text-xs text-slate-100">
+{`<iframe src="${publicUrl}" width="100%" height="640" frameborder="0"></iframe>`}
+          </pre>
+          <button
+            onClick={() => navigator.clipboard.writeText(
+              `<iframe src="${publicUrl}" width="100%" height="640" frameborder="0"></iframe>`)}
+            className="rounded border border-slate-300 px-2 py-1 text-xs hover:bg-slate-100">
+            Copy embed code
+          </button>
+          <p className="text-xs text-slate-400">
+            Prefill via URL parameters using field external ids, e.g.{" "}
+            <code className="rounded bg-slate-100 px-1">
+              {publicUrl}?{(fields.find((f) => fieldIds.includes(f.id))?.external_id) ?? "field-id"}=value
+            </code>
+          </p>
         </div>
       )}
 
@@ -127,6 +167,65 @@ export function FormSettings({
             Relationship, contact, file, and calculation fields can't appear on
             public forms yet.
           </p>
+        )}
+
+        <button onClick={() => setShowAdvanced(!showAdvanced)}
+          className="text-xs font-medium text-blue-600 hover:underline">
+          {showAdvanced ? "▾ Hide" : "▸ Show"} appearance & behavior
+        </button>
+        {showAdvanced && (
+          <div className="space-y-3 rounded-lg border border-slate-200 bg-slate-50 p-3">
+            <div>
+              <label className="block text-xs font-medium text-slate-600">
+                Redirect URL after submit (optional — replaces the success message)
+              </label>
+              <input placeholder="https://yoursite.com/thanks" value={redirectUrl}
+                onChange={(e) => setRedirectUrl(e.target.value)}
+                className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm font-mono" />
+            </div>
+            <div className="flex flex-wrap gap-4">
+              <div>
+                <label className="block text-xs font-medium text-slate-600">Button color</label>
+                <div className="mt-1 flex items-center gap-2">
+                  <input type="color" value={accentColor || "#2563eb"}
+                    onChange={(e) => setAccentColor(e.target.value)}
+                    className="h-8 w-12 cursor-pointer rounded border border-slate-300" />
+                  {accentColor && (
+                    <button onClick={() => setAccentColor("")}
+                      className="text-xs text-slate-400 hover:text-red-500">reset</button>
+                  )}
+                </div>
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-slate-600">Page background</label>
+                <div className="mt-1 flex items-center gap-2">
+                  <input type="color" value={bgColor || "#f8fafc"}
+                    onChange={(e) => setBgColor(e.target.value)}
+                    className="h-8 w-12 cursor-pointer rounded border border-slate-300" />
+                  {bgColor && (
+                    <button onClick={() => setBgColor("")}
+                      className="text-xs text-slate-400 hover:text-red-500">reset</button>
+                  )}
+                </div>
+              </div>
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-slate-600">
+                Custom CSS (scoped to the form page; target .podio-form-card)
+              </label>
+              <textarea rows={3} value={customCss} onChange={(e) => setCustomCss(e.target.value)}
+                placeholder=".podio-form-card { border-radius: 0; }"
+                className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-xs font-mono" />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-slate-600">
+                Allowed embed domains (comma-separated, informational for now)
+              </label>
+              <input placeholder="yoursite.com, app.yoursite.com" value={allowedDomains}
+                onChange={(e) => setAllowedDomains(e.target.value)}
+                className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" />
+            </div>
+          </div>
         )}
 
         <label className="flex items-center gap-2 text-sm">

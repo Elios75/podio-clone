@@ -35,6 +35,7 @@ export async function apiCall(req: Request, action: string, params: Record<strin
     const msg = error.message ?? "request failed";
     const status = msg.includes("invalid api key") ? 401
       : msg.includes("lacks write scope") ? 403
+      : msg.includes("rate limit exceeded") ? 429
       : msg.includes("not found") ? 404
       : 400;
     return NextResponse.json({ error: msg }, { status });

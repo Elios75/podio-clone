@@ -4,7 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
-import { parseCsv } from "@/lib/csv";
+import { readTabular } from "@/lib/spreadsheet";
 import { slugify } from "@/lib/slug";
 import type { CategoryOption } from "@/lib/fields";
 
@@ -54,10 +54,8 @@ export function ImportCsv({
   const [error, setError] = useState<string | null>(null);
 
   function handleFile(file: File) {
-    const reader = new FileReader();
-    reader.onload = () => {
-      const parsed = parseCsv(String(reader.result));
-      if (parsed.length < 2) return setError("CSV needs a header row plus at least one data row.");
+    readTabular(file).then((parsed) => {
+      if (parsed.length < 2) return setError("The file needs a header row plus at least one data row.");
       setRows(parsed);
       // Auto-match to an existing field by label; otherwise default to
       // "create a new field", type-inferred from the column data.
@@ -76,8 +74,7 @@ export function ImportCsv({
       });
       setMapping(auto);
       setError(null);
-    };
-    reader.readAsText(file);
+    }).catch((e) => setError(String(e?.message ?? e)));
   }
 
   function shapeValue(field: Field, raw: string): any {
@@ -258,7 +255,7 @@ export function ImportCsv({
           Click to choose a .csv file
           <input
             type="file"
-            accept=".csv,text/csv"
+            accept=".csv,.xlsx,.xls,text/csv"
             className="hidden"
             onChange={(e) => e.target.files?.[0] && handleFile(e.target.files[0])}
           />

@@ -15,6 +15,7 @@ export function SaveTemplateButton({ appId, appName }: { appId: string; appName:
   const [open, setOpen] = useState(false);
   const [name, setName] = useState(`${appName} template`);
   const [category, setCategory] = useState("");
+  const [includeSamples, setIncludeSamples] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -25,6 +26,7 @@ export function SaveTemplateButton({ appId, appName }: { appId: string; appName:
       p_name: name,
       p_category: category || null,
       p_visibility: "org",
+      p_include_samples: includeSamples,
     });
     if (rpcError) return setError(rpcError.message);
     setSaved(true);
@@ -54,6 +56,11 @@ export function SaveTemplateButton({ appId, appName }: { appId: string; appName:
             <option value="">category…</option>
             {CATEGORIES.map((c) => <option key={c} value={c}>{c.replace("_", " ")}</option>)}
           </select>
+          <label className="flex items-center gap-1 text-xs text-slate-500">
+            <input type="checkbox" checked={includeSamples}
+              onChange={(e) => setIncludeSamples(e.target.checked)} />
+            samples
+          </label>
           <button onClick={save}
             className="rounded bg-blue-600 px-2 py-1 text-xs font-medium text-white">
             Save

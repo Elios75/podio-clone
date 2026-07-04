@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { toCsv, downloadCsv } from "@/lib/csv";
+import { downloadXlsx } from "@/lib/spreadsheet";
 import { formatDuration, type CategoryOption } from "@/lib/fields";
 
 type Field = { id: string; label: string; type: string; config: { options?: CategoryOption[] } };
@@ -19,8 +20,7 @@ export function ExportButton({
   const supabase = createClient();
   const [busy, setBusy] = useState(false);
 
-  async function exportCsv() {
-    setBusy(true);
+  async function buildRows(): Promise<string[][]> {
     const { data: items } = await supabase
       .from("items")
       .select("id, item_number, title, created_at")
@@ -75,21 +75,45 @@ export function ExportButton({
       ...exportFields.map((f) => cell(f, it.id)),
       new Date(it.created_at).toISOString().slice(0, 10),
     ]);
+    return [header, ...rows];
+  }
 
-    downloadCsv(
-      `${appName.toLowerCase().replace(/\s+/g, "-")}-export.csv`,
-      toCsv([header, ...rows])
-    );
-    setBusy(false);
+  const baseName = () => appName.toLowerCase().replace(/\s+/g, "-");
+
+  async function exportCsv() {
+    setBusy(true);
+    try {
+      downloadCsv(`${baseName()}-export.csv`, toCsv(await buildRows()));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function exportXlsx() {
+    setBusy(true);
+    try {
+      await downloadXlsx(`${baseName()}-export.xlsx`, await buildRows(), appName.slice(0, 31));
+    } finally {
+      setBusy(false);
+    }
   }
 
   return (
-    <button
-      onClick={exportCsv}
-      disabled={busy}
-      className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-600 hover:bg-slate-100 disabled:opacity-50"
-    >
-      {busy ? "Exporting…" : "Export"}
-    </button>
+    <span className="inline-flex overflow-hidden rounded-lg border border-slate-300">
+      <button
+        onClick={exportCsv}
+        disabled={busy}
+        className="px-3 py-2 text-sm text-slate-600 hover:bg-slate-100 disabled:opacity-50"
+      >
+        {busy ? "Exporting…" : "Export CSV"}
+      </button>
+      <button
+        onClick={exportXlsx}
+        disabled={busy}
+        className="border-l border-slate-300 px-3 py-2 text-sm text-slate-600 hover:bg-slate-100 disabled:opacity-50"
+      >
+        XLSX
+      </button>
+    </span>
   );
 }

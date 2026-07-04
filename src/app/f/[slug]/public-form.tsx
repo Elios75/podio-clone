@@ -7,9 +7,13 @@ import { CURRENCIES } from "@/lib/fields";
 const inputCls =
   "w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none";
 
-export function PublicForm({ slug, form }: { slug: string; form: any }) {
+export function PublicForm({
+  slug, form, prefill, accent,
+}: {
+  slug: string; form: any; prefill?: Record<string, any>; accent?: string;
+}) {
   const supabase = createClient();
-  const [values, setValues] = useState<Record<string, any>>({});
+  const [values, setValues] = useState<Record<string, any>>(prefill ?? {});
   const [email, setEmail] = useState("");
   const [submitted, setSubmitted] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -28,6 +32,10 @@ export function PublicForm({ slug, form }: { slug: string; form: any }) {
     });
     setSending(false);
     if (rpcError) return setError(rpcError.message);
+    if (form.redirect_url && /^https?:\/\//i.test(form.redirect_url)) {
+      window.location.href = form.redirect_url;
+      return;
+    }
     setSubmitted(true);
   }
 
@@ -155,7 +163,8 @@ export function PublicForm({ slug, form }: { slug: string; form: any }) {
 
       {error && <p className="text-sm text-red-600">{error}</p>}
       <button type="submit" disabled={sending}
-        className="w-full rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50">
+        style={accent ? { backgroundColor: accent } : undefined}
+        className="w-full rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-medium text-white hover:opacity-90 disabled:opacity-50">
         {sending ? "Submitting…" : "Submit"}
       </button>
     </form>

@@ -47,7 +47,9 @@ The builder is create-only. Podio's core promise is *modify anytime*.
 
 ## Phase 12 — Automation & platform depth
 
-> **Status: Phase 12a shipped** (migration 35): date-reached / comment-added / task-completed / manual triggers; http_request + update_related_item actions; dry-run test mode; run-log detail viewer. Remaining: scheduled flows, inbound-webhook trigger, PDF/approval/loop actions, flow versioning UI, webform depth, API v1.1, marketplace depth, XLSX import/export.
+> **Status: Phase 12a shipped** (migration 35): date-reached / comment-added / task-completed / manual triggers; http_request + update_related_item actions; dry-run test mode; run-log detail viewer.
+>
+> **Phase 12b shipped** (migration 36): webform depth (theme/custom CSS, redirect URL, URL-param prefill via external_ids, embed snippet, allowed-domains stored); API v1.1 (per-key rate limiting w/ 429s, automatic webhook verification handshake, /api/v1/workspaces + /api/v1/tasks endpoints, hosted docs at /developers); marketplace depth (ratings + reviews UI, install with sample data, version bump on re-save, public publishing flow); XLSX import/export via SheetJS (export button + both import flows accept .xlsx). Remaining in Phase 12: scheduled flows, inbound-webhook trigger, PDF/approval/loop actions, flow versioning UI, form captcha + file uploads, embed-domain enforcement, org backup export.
 
 - Triggers: **date-reached** (cron scans date fields), scheduled flows, task-completed (RPC exists, no automation hook), comment-added, manual "run now" button, inbound-webhook trigger.
 - Actions: HTTP request (via `pg_net`, mirroring webhook delivery), **PDF generation** from item + template, approval step (approve/reject task gating the flow), update-related-item, loop over related items.

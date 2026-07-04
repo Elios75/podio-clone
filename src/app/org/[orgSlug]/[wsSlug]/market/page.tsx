@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { InstallButton } from "./install-button";
+import { TemplateCard } from "./template-card";
 
 export default async function MarketPage({
   params,
@@ -18,11 +18,30 @@ export default async function MarketPage({
     .eq("organization_id", org.id).eq("slug", wsSlug).single();
   if (!ws) notFound();
 
+  const { data: { user } } = await supabase.auth.getUser();
+  const { data: membership } = user
+    ? await supabase
+        .from("organization_members")
+        .select("role")
+        .eq("organization_id", org.id).eq("user_id", user.id)
+        .maybeSingle()
+    : { data: null };
+  const isOrgAdmin = ["owner", "admin"].includes(membership?.role ?? "");
+
   // RLS returns public templates + this org's templates
   const { data: templates } = await supabase
     .from("app_templates")
-    .select("id, name, description, category, visibility, install_count, definition")
+    .select("id, organization_id, name, description, category, visibility, version, install_count, rating_avg, definition")
     .order("install_count", { ascending: false });
+
+  const tplIds = (templates ?? []).map((t) => t.id);
+  const { data: reviews } = tplIds.length
+    ? await supabase
+        .from("template_reviews")
+        .select("id, template_id, rating, review, created_at")
+        .in("template_id", tplIds)
+        .order("created_at", { ascending: false })
+    : { data: [] as any[] };
 
   return (
     <main className="mx-auto max-w-2xl p-8">
@@ -33,37 +52,16 @@ export default async function MarketPage({
 
       <ul className="mt-6 space-y-3">
         {(templates ?? []).map((t: any) => (
-          <li key={t.id} className="rounded-lg border border-slate-200 bg-white p-4">
-            <div className="flex items-center gap-2">
-              <span className="text-lg">{t.definition?.app?.icon ?? "📋"}</span>
-              <span className="font-medium">{t.name}</span>
-              {t.category && (
-                <span className="rounded bg-slate-100 px-2 py-0.5 text-xs text-slate-600">
-                  {t.category}
-                </span>
-              )}
-              <span className="rounded bg-slate-100 px-2 py-0.5 text-xs text-slate-500">
-                {t.visibility === "public" ? "Public" : "Organization"}
-              </span>
-              <span className="ml-auto text-xs text-slate-400">
-                {t.install_count} install{t.install_count === 1 ? "" : "s"}
-              </span>
-            </div>
-            {t.description && (
-              <p className="mt-1 text-sm text-slate-500">{t.description}</p>
-            )}
-            <p className="mt-1 text-xs text-slate-400">
-              {(t.definition?.fields ?? []).length} fields
-            </p>
-            <div className="mt-2">
-              <InstallButton
-                templateId={t.id}
-                wsId={ws.id}
-                orgSlug={orgSlug}
-                wsSlug={wsSlug}
-              />
-            </div>
-          </li>
+          <TemplateCard
+            key={t.id}
+            template={t}
+            reviews={(reviews ?? []).filter((r: any) => r.template_id === t.id)}
+            wsId={ws.id}
+            orgSlug={orgSlug}
+            wsSlug={wsSlug}
+            isOrgAdmin={isOrgAdmin}
+            isOwnOrg={t.organization_id === org.id}
+          />
         ))}
         {(templates ?? []).length === 0 && (
           <li className="rounded-lg border border-dashed border-slate-300 p-8 text-center text-sm text-slate-400">

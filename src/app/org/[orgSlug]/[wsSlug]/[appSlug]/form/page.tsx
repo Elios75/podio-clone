@@ -25,7 +25,7 @@ export default async function FormPage({
 
   const { data: fields } = await supabase
     .from("app_fields")
-    .select("id, label, type")
+    .select("id, external_id, label, type")
     .eq("app_id", app.id).eq("status", "active")
     .order("position");
 

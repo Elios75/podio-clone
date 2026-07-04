@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
-import { parseCsv } from "@/lib/csv";
+import { readTabular } from "@/lib/spreadsheet";
 import { slugify } from "@/lib/slug";
 import { CATEGORY_COLORS, type CategoryOption } from "@/lib/fields";
 
@@ -87,11 +87,9 @@ export function AppFromCsv({
   const [running, setRunning] = useState(false);
 
   function handleFile(file: File) {
-    const reader = new FileReader();
-    reader.onload = () => {
-      const parsed = parseCsv(String(reader.result));
+    readTabular(file).then((parsed) => {
       if (parsed.length < 2)
-        return setError("CSV needs a header row plus at least one data row.");
+        return setError("The file needs a header row plus at least one data row.");
       const dataRows = parsed.slice(1, 201); // sample up to 200 rows for inference
       const cols: Column[] = parsed[0].map((header, i) => {
         const samples = dataRows.map((r) => r[i] ?? "");
@@ -109,10 +107,9 @@ export function AppFromCsv({
       });
       setColumns(cols);
       setRows(parsed);
-      setAppName(file.name.replace(/\.csv$/i, "").replace(/[_-]+/g, " "));
+      setAppName(file.name.replace(/\.(csv|xlsx|xls)$/i, "").replace(/[_-]+/g, " "));
       setError(null);
-    };
-    reader.readAsText(file);
+    }).catch((e) => setError(String(e?.message ?? e)));
   }
 
   function updCol(i: number, patch: Partial<Column>) {
@@ -238,7 +235,7 @@ export function AppFromCsv({
       <div>
         <label className="block cursor-pointer rounded-lg border-2 border-dashed border-slate-300 p-12 text-center text-sm text-slate-500 hover:border-blue-400">
           Choose a .csv file — columns become fields, rows become items
-          <input type="file" accept=".csv,text/csv" className="hidden"
+          <input type="file" accept=".csv,.xlsx,.xls,text/csv" className="hidden"
             onChange={(e) => e.target.files?.[0] && handleFile(e.target.files[0])} />
         </label>
         <p className="mt-2 text-xs text-slate-400">
