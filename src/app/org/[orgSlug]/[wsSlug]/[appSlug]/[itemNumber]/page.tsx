@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { ItemForm } from "../item-form";
 import { CommentsSection } from "./comments-section";
 import { TasksSection } from "./tasks-section";
+import { ShareSection } from "./share-section";
 
 export default async function ItemDetailPage({
   params,
@@ -152,6 +153,13 @@ export default async function ItemDetailPage({
     }));
   }
 
+  // Shares on this item
+  const { data: shareRows } = await supabase
+    .from("item_shares")
+    .select("id, email, access, revoked_at, created_at")
+    .eq("item_id", item.id)
+    .order("created_at", { ascending: false });
+
   // Tasks on this item
   const { data: taskRows } = await supabase
     .from("tasks")
@@ -224,6 +232,8 @@ export default async function ItemDetailPage({
         attachmentsByComment={attachmentsByComment}
         reactionsByComment={reactionsByComment}
       />
+
+      <ShareSection itemId={item.id} shares={(shareRows ?? []) as any} />
     </main>
   );
 }

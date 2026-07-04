@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { DashboardTiles, type TileData } from "./dashboard-tiles";
 
 export default async function WorkspacePage({
   params,
@@ -37,6 +38,87 @@ export default async function WorkspacePage({
     .eq("is_archived", false)
     .order("name");
 
+  // ----- Dashboard tiles + aggregates -----
+  const { data: tileRows } = await supabase
+    .from("dashboard_tiles")
+    .select("*")
+    .eq("workspace_id", ws.id)
+    .order("position");
+
+  const appIds = (apps ?? []).map((a) => a.id);
+  const { data: wsFields } = appIds.length
+    ? await supabase
+        .from("app_fields")
+        .select("id, app_id, label, type, config")
+        .in("app_id", appIds)
+        .eq("status", "active")
+    : { data: [] as any[] };
+
+  const tiles: TileData[] = [];
+  for (const t of tileRows ?? []) {
+    const cfg = t.config ?? {};
+    if (t.kind === "count") {
+      const { count } = await supabase
+        .from("items")
+        .select("id", { count: "exact", head: true })
+        .eq("app_id", t.app_id)
+        .eq("is_deleted", false);
+      tiles.push({ id: t.id, title: t.title, kind: t.kind, value: count ?? 0 });
+    } else if (t.kind === "sum" || t.kind === "avg") {
+      const { data: nums } = await supabase
+        .from("item_field_values")
+        .select("value_number")
+        .eq("field_id", cfg.number_field_id)
+        .not("value_number", "is", null)
+        .limit(2000);
+      const list = (nums ?? []).map((n) => Number(n.value_number));
+      const sum = list.reduce((a, b) => a + b, 0);
+      tiles.push({
+        id: t.id, title: t.title, kind: t.kind,
+        value: t.kind === "sum" ? sum : list.length ? sum / list.length : 0,
+      });
+    } else if (t.kind === "grouped") {
+      const groupField = (wsFields ?? []).find((f) => f.id === cfg.group_field_id);
+      const options: any[] = groupField?.config?.options ?? [];
+      const { data: groupVals } = await supabase
+        .from("item_field_values")
+        .select("item_id, value_text")
+        .eq("field_id", cfg.group_field_id)
+        .limit(2000);
+      let numByItem = new Map<string, number>();
+      if (cfg.number_field_id) {
+        const { data: numVals } = await supabase
+          .from("item_field_values")
+          .select("item_id, value_number")
+          .eq("field_id", cfg.number_field_id)
+          .limit(2000);
+        numByItem = new Map((numVals ?? []).map((v) => [v.item_id, Number(v.value_number ?? 0)]));
+      }
+      const groups = options.map((o) => {
+        const rows = (groupVals ?? []).filter((g) => g.value_text === o.id);
+        return {
+          label: o.label,
+          color: o.color,
+          value: cfg.number_field_id
+            ? rows.reduce((a, r) => a + (numByItem.get(r.item_id) ?? 0), 0)
+            : rows.length,
+        };
+      });
+      tiles.push({ id: t.id, title: t.title, kind: t.kind, groups });
+    }
+  }
+
+  const appInfos = (apps ?? []).map((a) => ({
+    id: a.id,
+    name: a.name,
+    numberFields: (wsFields ?? [])
+      .filter((f) => f.app_id === a.id && ["number", "money", "progress", "duration"].includes(f.type))
+      .map((f) => ({ id: f.id, label: f.label })),
+    categoryFields: (wsFields ?? [])
+      .filter((f) => f.app_id === a.id && f.type === "category")
+      .map((f) => ({ id: f.id, label: f.label })),
+  }));
+
   const { data: activityRows } = await supabase
     .from("activity_events")
     .select("id, event_type, actor_id, payload, created_at")
@@ -68,14 +150,27 @@ export default async function WorkspacePage({
         <p className="mt-1 text-sm text-slate-500">{ws.description}</p>
       )}
 
+      <h2 className="mt-8 text-lg font-medium">Dashboard</h2>
+      <div className="mt-3">
+        <DashboardTiles wsId={ws.id} apps={appInfos} tiles={tiles} />
+      </div>
+
       <div className="mt-8 flex items-center justify-between">
         <h2 className="text-lg font-medium">Apps</h2>
-        <Link
-          href={`/org/${orgSlug}/${ws.slug}/new-app`}
-          className="rounded-lg bg-blue-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-700"
-        >
-          + New app
-        </Link>
+        <div className="flex gap-2">
+          <Link
+            href={`/org/${orgSlug}/${ws.slug}/market`}
+            className="rounded-lg border border-slate-300 px-3 py-1.5 text-sm text-slate-600 hover:bg-slate-100"
+          >
+            App market
+          </Link>
+          <Link
+            href={`/org/${orgSlug}/${ws.slug}/new-app`}
+            className="rounded-lg bg-blue-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-700"
+          >
+            + New app
+          </Link>
+        </div>
       </div>
       {(apps ?? []).length === 0 ? (
         <div className="mt-3 rounded-lg border border-dashed border-slate-300 p-8 text-center text-sm text-slate-500">
