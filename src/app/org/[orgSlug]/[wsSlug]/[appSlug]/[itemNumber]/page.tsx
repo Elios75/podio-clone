@@ -2,6 +2,7 @@ import { notFound, redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { ItemForm } from "../item-form";
 import { CommentsSection } from "./comments-section";
+import { TasksSection } from "./tasks-section";
 
 export default async function ItemDetailPage({
   params,
@@ -115,6 +116,55 @@ export default async function ItemDetailPage({
     .eq("user_id", user.id)
     .maybeSingle();
 
+  // Attachments on comments
+  const commentIds = (commentRows ?? []).map((c) => c.id);
+  const { data: attachRows } = commentIds.length
+    ? await supabase
+        .from("file_attachments")
+        .select("id, target_id, files:file_id(id, name, storage_path)")
+        .eq("target_type", "comment")
+        .in("target_id", commentIds)
+    : { data: [] as any[] };
+  const attachmentsByComment: Record<string, any[]> = {};
+  for (const a of attachRows ?? []) {
+    (attachmentsByComment[a.target_id] ??= []).push({
+      id: a.id,
+      name: (a as any).files?.name,
+      path: (a as any).files?.storage_path,
+    });
+  }
+
+  // Reactions
+  const { data: reactionRows } = commentIds.length
+    ? await supabase
+        .from("comment_reactions")
+        .select("comment_id, user_id, emoji")
+        .in("comment_id", commentIds)
+    : { data: [] as any[] };
+  const reactionsByComment: Record<string, { emoji: string; count: number; mine: boolean }[]> = {};
+  for (const cid of commentIds) {
+    const rows = (reactionRows ?? []).filter((r) => r.comment_id === cid);
+    const emojis = [...new Set(rows.map((r) => r.emoji))];
+    reactionsByComment[cid] = emojis.map((emoji) => ({
+      emoji,
+      count: rows.filter((r) => r.emoji === emoji).length,
+      mine: rows.some((r) => r.emoji === emoji && r.user_id === user.id),
+    }));
+  }
+
+  // Tasks on this item
+  const { data: taskRows } = await supabase
+    .from("tasks")
+    .select("id, title, status, due_at, assignee_id")
+    .eq("target_type", "item")
+    .eq("target_id", item.id)
+    .order("created_at");
+  const taskAssignees = [...new Set((taskRows ?? []).map((t) => t.assignee_id).filter(Boolean))];
+  const { data: assigneeProfiles } = taskAssignees.length
+    ? await supabase.from("user_profiles").select("user_id, full_name").in("user_id", taskAssignees)
+    : { data: [] as any[] };
+  const assigneeName = new Map((assigneeProfiles ?? []).map((p) => [p.user_id, p.full_name]));
+
   return (
     <main className="mx-auto max-w-xl p-8">
       <p className="text-xs text-slate-400">
@@ -139,8 +189,24 @@ export default async function ItemDetailPage({
         />
       </div>
 
+      <TasksSection
+        itemId={item.id}
+        orgId={org.id}
+        wsId={ws.id}
+        members={members}
+        tasks={(taskRows ?? []).map((t) => ({
+          id: t.id,
+          title: t.title,
+          status: t.status,
+          due_at: t.due_at,
+          assignee_name: t.assignee_id ? assigneeName.get(t.assignee_id) ?? null : null,
+        }))}
+      />
+
       <CommentsSection
         itemId={item.id}
+        orgId={org.id}
+        wsId={ws.id}
         currentUserId={user.id}
         comments={(commentRows ?? []).map((c) => ({
           ...c,
@@ -155,6 +221,8 @@ export default async function ItemDetailPage({
           payload: a.payload,
         }))}
         isFollowing={!!followRow}
+        attachmentsByComment={attachmentsByComment}
+        reactionsByComment={reactionsByComment}
       />
     </main>
   );

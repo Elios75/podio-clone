@@ -33,9 +33,10 @@ export default async function OrgLayout({
           <Link href="/home" className="text-xs text-slate-400 hover:text-slate-600">
             ← All organizations
           </Link>
-          <Link href="/notifications" className="text-sm" title="Notifications">
-            🔔
-          </Link>
+          <span className="flex gap-2">
+            <Link href="/tasks" className="text-sm" title="My tasks">✓</Link>
+            <Link href="/notifications" className="text-sm" title="Notifications">🔔</Link>
+          </span>
         </div>
         <h2 className="mt-2 truncate text-lg font-semibold">{org.name}</h2>
 

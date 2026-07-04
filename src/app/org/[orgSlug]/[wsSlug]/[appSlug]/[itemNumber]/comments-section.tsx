@@ -13,6 +13,14 @@ type Comment = {
   author_name: string | null;
 };
 type Member = { user_id: string; full_name: string | null };
+type Attachment = { id: string; name: string; path: string };
+type Reaction = { emoji: string; count: number; mine: boolean };
+
+const EMOJIS = ["👍", "❤️", "🎉"];
+
+function fileUrl(path: string) {
+  return `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/podio-files/${path}`;
+}
 type Activity = {
   id: string;
   event_type: string;
@@ -23,18 +31,26 @@ type Activity = {
 
 export function CommentsSection({
   itemId,
+  orgId,
+  wsId,
   currentUserId,
   comments,
   members,
   activity,
   isFollowing,
+  attachmentsByComment,
+  reactionsByComment,
 }: {
   itemId: string;
+  orgId: string;
+  wsId: string;
   currentUserId: string;
   comments: Comment[];
   members: Member[];
   activity: Activity[];
   isFollowing: boolean;
+  attachmentsByComment: Record<string, Attachment[]>;
+  reactionsByComment: Record<string, Reaction[]>;
 }) {
   const router = useRouter();
   const supabase = createClient();
@@ -44,6 +60,7 @@ export function CommentsSection({
   const [editBody, setEditBody] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [posting, setPosting] = useState(false);
+  const [pendingFile, setPendingFile] = useState<File | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   // Live updates: refresh when anyone comments on this item
@@ -80,15 +97,69 @@ export function CommentsSection({
     setError(null);
     if (!body.trim()) return;
     setPosting(true);
-    const { error: rpcError } = await supabase.rpc("add_comment", {
+    const { data: comment, error: rpcError } = await supabase.rpc("add_comment", {
       p_item: itemId,
       p_body: body,
       p_mentions: mentionIds,
     });
+    if (rpcError) {
+      setPosting(false);
+      return setError(rpcError.message);
+    }
+
+    // Attach pending file to the new comment
+    if (pendingFile && comment) {
+      const path = `comments/${comment.id}/${crypto.randomUUID()}-${pendingFile.name}`;
+      const { error: upError } = await supabase.storage
+        .from("podio-files")
+        .upload(path, pendingFile);
+      if (!upError) {
+        const { data: fileRow } = await supabase
+          .from("files")
+          .insert({
+            organization_id: orgId,
+            workspace_id: wsId,
+            storage_path: path,
+            name: pendingFile.name,
+            mime_type: pendingFile.type,
+            size_bytes: pendingFile.size,
+            uploaded_by: currentUserId,
+          })
+          .select()
+          .single();
+        if (fileRow) {
+          await supabase.from("file_attachments").insert({
+            file_id: fileRow.id,
+            target_type: "comment",
+            target_id: comment.id,
+            attached_by: currentUserId,
+          });
+        }
+      }
+    }
+
     setPosting(false);
-    if (rpcError) return setError(rpcError.message);
     setBody("");
     setMentionIds([]);
+    setPendingFile(null);
+    router.refresh();
+  }
+
+  async function toggleReaction(commentId: string, emoji: string, mine: boolean) {
+    if (mine) {
+      await supabase
+        .from("comment_reactions")
+        .delete()
+        .eq("comment_id", commentId)
+        .eq("user_id", currentUserId)
+        .eq("emoji", emoji);
+    } else {
+      await supabase.from("comment_reactions").insert({
+        comment_id: commentId,
+        user_id: currentUserId,
+        emoji,
+      });
+    }
     router.refresh();
   }
 
@@ -193,6 +264,35 @@ export function CommentsSection({
               ) : (
                 <p className="mt-1 whitespace-pre-wrap text-sm">{c.body}</p>
               )}
+
+              {/* Attachments */}
+              {(attachmentsByComment[c.id] ?? []).map((a) => (
+                <a key={a.id} href={fileUrl(a.path)} target="_blank"
+                  className="mt-2 inline-flex items-center gap-1 rounded border border-slate-200 bg-slate-50 px-2 py-1 text-xs text-blue-600 hover:underline">
+                  📎 {a.name}
+                </a>
+              ))}
+
+              {/* Reactions */}
+              <div className="mt-2 flex gap-1">
+                {EMOJIS.map((emoji) => {
+                  const r = (reactionsByComment[c.id] ?? []).find((x) => x.emoji === emoji);
+                  return (
+                    <button
+                      key={emoji}
+                      onClick={() => toggleReaction(c.id, emoji, r?.mine ?? false)}
+                      className={`rounded-full border px-2 py-0.5 text-xs ${
+                        r?.mine
+                          ? "border-blue-300 bg-blue-50"
+                          : "border-slate-200 hover:bg-slate-50"
+                      } ${r?.count ? "" : "opacity-40 hover:opacity-100"}`}
+                    >
+                      {emoji}
+                      {r?.count ? ` ${r.count}` : ""}
+                    </button>
+                  );
+                })}
+              </div>
             </div>
           ))}
           {comments.length === 0 && (
@@ -210,6 +310,14 @@ export function CommentsSection({
             className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
           />
           <div className="mt-2 flex items-center gap-2">
+            <label className="cursor-pointer rounded border border-slate-300 px-2 py-1 text-xs text-slate-500 hover:bg-slate-50">
+              📎 {pendingFile ? pendingFile.name.slice(0, 20) : "Attach"}
+              <input
+                type="file"
+                className="hidden"
+                onChange={(e) => setPendingFile(e.target.files?.[0] ?? null)}
+              />
+            </label>
             <select
               value=""
               onChange={(e) => e.target.value && addMention(e.target.value)}
