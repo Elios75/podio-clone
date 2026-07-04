@@ -4,10 +4,18 @@ import { AppBuilder } from "./app-builder";
 
 export default async function NewAppPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ orgSlug: string; wsSlug: string }>;
+  searchParams: Promise<{
+    name?: string;
+    item?: string;
+    type?: string;
+    icon?: string;
+  }>;
 }) {
   const { orgSlug, wsSlug } = await params;
+  const sp = await searchParams;
   const supabase = await createClient();
 
   const { data: org } = await supabase
@@ -45,6 +53,12 @@ export default async function NewAppPage({
           orgSlug={org.slug}
           wsSlug={ws.slug}
           workspaceApps={workspaceApps ?? []}
+          initialName={sp.name ?? ""}
+          initialItemName={sp.item ?? "Item"}
+          initialIcon={sp.icon ?? "📋"}
+          initialType={
+            sp.type === "event" || sp.type === "contact" ? sp.type : "standard"
+          }
         />
       </div>
     </main>

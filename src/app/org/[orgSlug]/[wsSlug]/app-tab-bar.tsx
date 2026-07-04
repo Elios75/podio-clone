@@ -1,4 +1,6 @@
 import Link from "next/link";
+import { PodioIcon } from "@/components/podio-icon";
+import { AddAppChooser } from "./add-app-chooser";
 
 // Podio app tab bar: icon-over-label tabs; the active app sits on a white
 // rounded card. Shared by the workspace overview and app pages.
@@ -39,18 +41,12 @@ export function AppTabBar({
               : "text-podio-secondary hover:bg-[#E4E4E4]"
           }`}
         >
-          <span className="text-2xl leading-none">{a.icon ?? "📋"}</span>
+          <PodioIcon icon={a.icon} className="h-6 w-6 text-2xl leading-none" />
           <span className="w-full truncate">{a.name}</span>
         </Link>
       ))}
       <span className="mx-2 h-10 w-px shrink-0 self-center bg-[#DADADA]" />
-      <Link
-        href={`/org/${orgSlug}/${wsSlug}/new-app`}
-        className="flex w-20 shrink-0 flex-col items-center gap-1 px-2 py-3 text-[13px] uppercase text-podio-disabled hover:text-podio-secondary"
-      >
-        <span className="text-2xl leading-none">⊕</span>
-        Add app
-      </Link>
+      <AddAppChooser orgSlug={orgSlug} wsSlug={wsSlug} />
     </nav>
   );
 }

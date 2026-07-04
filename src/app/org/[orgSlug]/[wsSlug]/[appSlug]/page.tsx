@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { formatDuration, type CategoryOption } from "@/lib/fields";
+import { PodioIcon } from "@/components/podio-icon";
 import { AppTabBar } from "../app-tab-bar";
 import { BoardView } from "./board-view";
 import { CalendarView } from "./calendar-view";
@@ -325,8 +326,9 @@ export default async function AppPage({
       <div className="flex flex-col lg:flex-row lg:items-stretch">
         {/* Left views pane */}
         <aside className="w-full shrink-0 border-b border-podio-border bg-white p-4 lg:w-72 lg:border-b-0 lg:border-r">
-          <h1 className="text-xl font-semibold text-podio-teal">
-            {app.icon} {app.name}
+          <h1 className="flex items-center gap-2 text-xl font-semibold text-podio-teal">
+            <PodioIcon icon={app.icon} className="h-6 w-6 shrink-0" />
+            <span className="min-w-0 truncate">{app.name}</span>
           </h1>
           {app.description && (
             <p className="mt-2 text-sm text-podio-secondary">{app.description}</p>

@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { PodioIcon, isPodioIconKey } from "@/components/podio-icon";
 
 const NODE_W = 150;
 const NODE_H = 46;
@@ -219,6 +220,9 @@ export default async function RelationshipMapPage({
             ))}
 
             {nodes.map((node) => {
+              // Known icon keys render as PodioIcon SVGs (via foreignObject);
+              // legacy emoji strings stay inline in the <text> label.
+              const lineIcon = isPodioIconKey(node.icon);
               const box = (
                 <g key={node.id}>
                   <rect
@@ -232,16 +236,29 @@ export default async function RelationshipMapPage({
                     strokeWidth={1.5}
                     strokeDasharray={node.external ? "4 3" : undefined}
                   />
+                  {lineIcon && (
+                    <foreignObject
+                      x={node.cx - NODE_W / 2 + 7}
+                      y={(node.external ? node.cy - 4.5 : node.cy) - 8}
+                      width={16}
+                      height={16}
+                    >
+                      <PodioIcon
+                        icon={node.icon}
+                        className="h-4 w-4 text-[#6E7A7A]"
+                      />
+                    </foreignObject>
+                  )}
                   <text
-                    x={node.cx}
+                    x={lineIcon ? node.cx + 8 : node.cx}
                     y={node.external ? node.cy : node.cy + 4.5}
                     textAnchor="middle"
                     fontSize={13}
                     fontWeight={600}
                     fill={node.external ? "#6E7A7A" : "#15808D"}
                   >
-                    {node.icon ? `${node.icon} ` : ""}
-                    {truncate(node.name, 16)}
+                    {!lineIcon && node.icon ? `${node.icon} ` : ""}
+                    {truncate(node.name, lineIcon ? 14 : 16)}
                   </text>
                   {node.external && (
                     <text

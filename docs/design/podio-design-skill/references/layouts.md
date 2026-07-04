@@ -181,7 +181,142 @@ overflow), chip stack (one chip per line, left-aligned), footer.
 </article>
 ```
 
-## 7. Chip component
+## 7. Workspace activity page (the workspace landing)
+
+Reference: the workspace-overview screenshot. Opening a workspace shows the
+**Activity** tab of the app tab bar — never a grid of app cards (apps live
+only in the tab bar). Two-zone body on the page grey:
+
+- **Left (~2/3)**: a white workspace card, then the composer + feed panel.
+- **Right (~1/3) rail**: dashboard tiles ("Add tile"), then any secondary
+  panels (calendar widget, tools, members).
+
+The workspace card: workspace name in **teal** (text-podio-teal, 22-24px
+semibold), a 🔧 wrench button at the top right (admin menu, §9), a row of
+member photos (h-12 w-12 rounded-full; real avatar images when available,
+initials on chrome-grey circles as fallback), and an **⊕ INVITE** control
+right-aligned below the avatars (circled + icon + uppercase INVITE label,
+ink text, hover teal).
+
+The composer: full-width textarea "Share something. Use @ to mention
+individuals.", then an icon row 📎 (attach file) 🔗 (share link) ❓ (ask a
+question) in secondary grey (active state teal), with the solid-teal
+**Share** button right-aligned. Attachments appear as small bordered chips;
+question posts get a ❓ marker in the feed. The composer/feed panel ends with
+a full-width footer strip (`bg-podio-row-alt`, top border): right-aligned
+"✉️ Create a status via email" hint + a 🔔 Unfollow/Follow toggle.
+
+**Fresh workspace** (no apps yet — reference screenshot): tab bar shows only
+Activity + ADD APP; the feed always ends with a genesis row "⚡ `<creator>`
+created the `<name>` workspace" + date. Right rail order: "`<name>` Tasks"
+panel (teal title + open count; centered "No tasks to show" in meta grey with
+generous padding when empty; uppercase "+ CREATE TASK" footer link), then
+"`<name>` Calendar" panel (upcoming dated entries or "Nothing scheduled"),
+then Dashboard, then a dashed-border "+ ADD TILE" tile (uppercase meta text).
+
+## 8. Wrench admin menu (workspace)
+
+Reference: the wrench-menu screenshot. Clicking 🔧 on the workspace card opens
+a white dropdown (w-64, rounded-lg, border-podio-border, shadow, anchored top
+right). Rows are icon + label, 15px ink text, hover:bg-podio-row-hover.
+Destructive rows (Leave workspace, Delete workspace) in red with red icons.
+A "Go to…" section header row (text-podio-meta on bg-podio-row-alt) separates
+navigation shortcuts.
+
+Menu contents (map to the clone's routes):
+
+| Item | Target |
+|---|---|
+| Manage members | `<ws>/settings#members` |
+| Manage apps | `<ws>/settings#apps` |
+| Workspace settings | `<ws>/settings` |
+| Share in App Market | `<ws>/market` |
+| Leave workspace (red) | `<ws>/settings#danger` |
+| Delete workspace (red) | `<ws>/settings#danger` |
+| *Go to…* | — |
+| Workspace tasks | `<ws>/tasks` |
+| Workspace calendar | `/calendar` |
+| Workspace files | `<ws>/files` |
+| Workspace contacts | `<ws>/settings#members` |
+
+## 9. Modal dialog (e.g. "Create a new workspace")
+
+Reference: the create-workspace screenshot. Podio modals are plain white
+sheets over a dimmed page — no rounded-xl, no heavy shadow theatrics:
+
+- Overlay: `fixed inset-0 z-40 bg-black/40`; dialog `w-full max-w-xl bg-white
+  p-8 rounded shadow-lg` centered.
+- Title in **teal**, 24-26px, weight 500-600 ("Create a new workspace"), with
+  a thin grey ✕ button at the top right.
+- Form rows: label column left (ink, semibold, ~15px) + control right, roomy
+  vertical spacing (space-y-6).
+- Radio options: bold ink option name + `– grey description` on the same line
+  ("Private – not visible for others, invite only" / "Open – visible and open
+  for all employees to join").
+- Footer, right-aligned, two buttons touching Podio-style: **Cancel** on grey
+  (`bg-podio-row-hover text-podio-ink`) and the primary action on solid teal
+  (`bg-podio-teal text-white`), both `px-6 py-2.5 font-semibold rounded-sm`.
+
+```jsx
+{open && (
+  <div className="fixed inset-0 z-40 flex items-start justify-center bg-black/40 p-4 pt-24"
+    onClick={() => setOpen(false)}>
+    <div className="w-full max-w-xl rounded bg-white p-8 shadow-lg"
+      onClick={(e) => e.stopPropagation()}>
+      <div className="flex items-start">
+        <h2 className="text-2xl font-medium text-podio-teal">Create a new workspace</h2>
+        <button onClick={() => setOpen(false)}
+          className="ml-auto text-2xl leading-none text-podio-disabled hover:text-podio-ink">✕</button>
+      </div>
+      {/* label-left form rows, space-y-6 */}
+      <div className="mt-8 flex justify-end">
+        <button className="rounded-sm bg-podio-row-hover px-6 py-2.5 font-semibold text-podio-ink">Cancel</button>
+        <button className="rounded-sm bg-podio-teal px-6 py-2.5 font-semibold text-white hover:bg-podio-teal-dark">Create</button>
+      </div>
+    </div>
+  </div>
+)}
+```
+
+Three canonical instances (reference screenshots for all three):
+
+**Create a new workspace** — teal title; "Workspace name" row with "Type a
+name" input; "Access settings" radios; Cancel + Create footer. On success it
+chains straight into…
+
+**Invite your employees to the `<name>` space** (post-creation step) — title
+in **ink** (not teal) semibold; a people-picker input (👤 icon, "Pick
+connections or type email addresses", picked people as grey chips) with a
+grey **Address book** button beside it; a bordered message box with a ✏️ icon
+and a prefilled editable invitation ("Hi, I've set up a workspace on Podio
+for us - so we can work on `<name>`. …"); a `Role : Regular member ⌄` inline
+dropdown (Admin / Regular member / Light member / Guest); footer right:
+quiet "Skip for now" text link + solid teal **Add to `<name>`**. Adding
+members also notifies them.
+
+**Add app** chooser (from the tab bar's ADD APP tile, especially when the
+workspace has no apps yet) — teal "Add app" title; two large equal option
+cards on `bg-podio-row-alt` with a thin border (hover teal): big icon (🛠️ /
+🏪), semibold ink option name ("Create your own app" / "Go to the App
+Market"), grey description ("Go to the app template to create it yourself in
+minutes." / "Pick one of the predefined app templates made by people who work
+just like you."), separated by a plain "or". Card = whole-surface link.
+"Create your own app" chains into…
+
+**Create New App** — a different header treatment: title in **ink** on a
+white header ROW with a bottom border (not floating teal) + grey ✕; a left
+tab rail (General active on white; Advanced on `bg-podio-row-alt`,
+grey/disabled until built); body rows: "App Name" and "Item Name" labels with
+a red `*` (Item Name = the record type, e.g. Customer, Job); "App Type"
+radios with bold ink names + grey descriptions: Standard "– the Podio
+default, useful for all types of apps" / Event "– enables RSVP, event
+notifications and online meeting tools" / Contact "– manage your contacts in
+this app"; "App Icon" — a bordered square button showing the current
+monochrome line icon (see tokens.md → Iconography) with a ⌄ segment opening
+an icon grid; footer right: grey Cancel + solid teal "Create App", touching.
+Type preseeds the builder (event → Date field, contact → Phone + Email).
+
+## 10. Chip component
 
 ```jsx
 function Chip({ label, bg, text }: { label: string; bg: string; text: string }) {
@@ -197,3 +332,59 @@ function Chip({ label, bg, text }: { label: string; bg: string; text: string }) 
 Pick `bg`/`text` pairs from the chip table in `tokens.md`. Persist a color per
 category option (or derive from option index) so colors are stable across
 sheet cells, cards, and view-group dots.
+
+## 11. App Market
+
+Reference: the two App Market screenshots. Two-zone layout:
+
+- **Left category sidebar** (light grey panel): a search row at the top
+  (input + a bordered ▸ submit button), then link lists under section
+  headings — "My organizations" (org row with its logo), "Functional", and
+  "Industry". Rows are ink text, ~44px tall, separated by hairline dividers;
+  no icons.
+- **Main column** (white): "Podio App Market" ink title row, then section
+  header rows ("Recommended packs", "Recommended apps") separated by
+  dividers.
+
+**Pack cards** (3-up): white card with a diagonal teal **PACK** ribbon
+across the top-right corner; ink semibold title; one-line grey description
+(truncated with …); a **capability-icon strip** — the monochrome line icons
+of the apps included in the pack, laid on a subtle grey gradient band;
+star rating in teal (★ filled / outline empty); footer: touching buttons —
+solid teal **Get Pack** + grey **More info**.
+
+**App entries** (3-up grid, lighter than cards — no border): line icon +
+ink semibold app name inline; grey truncated description; teal stars; teal
+**Get App** + grey **More info**; below, a meta row "📖 Included in
+`<Pack>`" where the pack name is a teal link.
+
+**Pagination**: a row of small bordered square buttons — First · Prev ·
+1…9 · Next · Last — active page with a darker border/ink number.
+
+"Get Pack"/"Get App" = the install flow: pick one of your workspaces, then
+install the template(s) into it (the clone's `install_app_template`, with
+the sample-data option). Categories map to `app_templates.category`.
+
+## 12. Chat panel
+
+Reference: the two chat screenshots. Chat opens from the 💬 icon at the far
+right of the global bar as a **right slide-over that pushes the page
+content** (the layout shrinks; it does not overlay-dim).
+
+Structure, right-docked and full height:
+
+- A narrow **avatar strip** (~72px, `bg-[#ECECEC]`): a person icon at top,
+  then recent-conversation avatars (rounded-full, greyed when inactive); the
+  open conversation's avatar gets a small left-pointing arrow notch; "…"
+  overflow and a tray icon at the bottom.
+- The **panel column** (white): top row = 🔍 "Search connections" input with
+  a ✕ close at the right; below, connection rows — avatar + ink name +
+  right-aligned presence dot (solid green = online, grey outline = offline),
+  hairline dividers, ~72px rows.
+- **Conversation view** (after picking someone): header row with ⊕ (new
+  conversation) and … actions + ✕ close; a name row "`<Name>` ○" with the
+  presence ring and a 🔒 lock at the far right (private 1:1); a grey meta
+  line "Started on July 4 2026 2:05 PM" — messages are always timestamped;
+  composer = bordered "Add a message" input with 📎 attach-file and 🔗
+  share-link icon buttons beneath (same icon row grammar as the workspace
+  composer).

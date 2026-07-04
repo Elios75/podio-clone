@@ -5,6 +5,8 @@ import { DashboardTiles, type TileData } from "./dashboard-tiles";
 import { MemberRoleSelect } from "@/components/member-role-select";
 import { StatusComposer } from "./status-composer";
 import { AppTabBar } from "./app-tab-bar";
+import { WorkspaceHeader } from "./workspace-header";
+import { FollowToggle } from "./follow-toggle";
 
 export default async function WorkspacePage({
   params,
@@ -23,7 +25,7 @@ export default async function WorkspacePage({
 
   const { data: ws } = await supabase
     .from("workspaces")
-    .select("id, name, slug, description, privacy, created_at")
+    .select("id, name, slug, description, privacy, created_at, created_by")
     .eq("organization_id", org.id)
     .eq("slug", wsSlug)
     .single();
@@ -31,8 +33,22 @@ export default async function WorkspacePage({
 
   const { data: members } = await supabase
     .from("workspace_members")
-    .select("id, role, user_id, user_profiles:user_id(full_name)")
+    .select("id, role, user_id, user_profiles:user_id(full_name, avatar_url)")
     .eq("workspace_id", ws.id);
+
+  // Org members not yet in this workspace (for the INVITE control)
+  const memberIds = new Set((members ?? []).map((m: any) => m.user_id));
+  const { data: orgMemberRows } = await supabase
+    .from("organization_members")
+    .select("user_id, user_profiles:user_id(full_name)")
+    .eq("organization_id", org.id)
+    .limit(100);
+  const invitable = (orgMemberRows ?? [])
+    .filter((m: any) => !memberIds.has(m.user_id))
+    .map((m: any) => ({
+      user_id: m.user_id,
+      full_name: m.user_profiles?.full_name ?? null,
+    }));
 
   const { data: apps } = await supabase
     .from("apps")
@@ -124,10 +140,39 @@ export default async function WorkspacePage({
 
   const { data: statusRows } = await supabase
     .from("status_posts")
-    .select("id, body, created_by, created_at")
+    .select("id, body, body_rich, created_by, created_at")
     .eq("workspace_id", ws.id)
     .order("created_at", { ascending: false })
     .limit(5);
+
+  // Files/links attached to those status posts (composer 📎/🔗)
+  const statusIds = (statusRows ?? []).map((s) => s.id);
+  const { data: statusAttachRows } = statusIds.length
+    ? await supabase
+        .from("file_attachments")
+        .select("target_id, files:file_id(id, name, storage_path, external_url)")
+        .eq("target_type", "status_post")
+        .in("target_id", statusIds)
+    : { data: [] as any[] };
+  const attachPaths = (statusAttachRows ?? [])
+    .map((a: any) => a.files?.storage_path)
+    .filter(Boolean) as string[];
+  const { data: signedArr } = attachPaths.length
+    ? await supabase.storage.from("podio-files").createSignedUrls(attachPaths, 3600)
+    : { data: [] as any[] };
+  const signedByPath: Record<string, string> = {};
+  for (const s of signedArr ?? []) if (s.signedUrl) signedByPath[s.path] = s.signedUrl;
+  const attachmentsByStatus: Record<string, { name: string; url: string | null }[]> = {};
+  for (const a of statusAttachRows ?? []) {
+    (attachmentsByStatus[(a as any).target_id] ??= []).push({
+      name: (a as any).files?.name ?? "file",
+      url:
+        (a as any).files?.external_url ??
+        ((a as any).files?.storage_path
+          ? signedByPath[(a as any).files.storage_path] ?? null
+          : null),
+    });
+  }
 
   const { data: activityRows } = await supabase
     .from("activity_events")
@@ -136,7 +181,11 @@ export default async function WorkspacePage({
     .order("created_at", { ascending: false })
     .limit(20);
   const feedActorIds = [
-    ...new Set((activityRows ?? []).map((a) => a.actor_id).filter(Boolean)),
+    ...new Set(
+      [...(activityRows ?? []).map((a) => a.actor_id), ws.created_by].filter(
+        Boolean
+      )
+    ),
   ];
   const { data: feedProfiles } = feedActorIds.length
     ? await supabase
@@ -147,6 +196,46 @@ export default async function WorkspacePage({
   const actorName = new Map(
     (feedProfiles ?? []).map((p) => [p.user_id, p.full_name])
   );
+  const creatorName = ws.created_by
+    ? actorName.get(ws.created_by) ?? "Someone"
+    : "Someone";
+
+  // ----- Right-rail: open tasks + upcoming calendar entries -----
+  const {
+    data: openTasks,
+    count: openTaskCount,
+  } = await supabase
+    .from("tasks")
+    .select("id, title, due_at", { count: "exact" })
+    .eq("workspace_id", ws.id)
+    .is("completed_at", null)
+    .order("created_at", { ascending: false })
+    .limit(5);
+
+  const { data: upcomingTasks } = await supabase
+    .from("tasks")
+    .select("id, title, due_at")
+    .eq("workspace_id", ws.id)
+    .not("due_at", "is", null)
+    .gte("due_at", new Date().toISOString())
+    .order("due_at", { ascending: true })
+    .limit(5);
+
+  // ----- Follow state for the composer footer -----
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  let followMuted = false;
+  if (user) {
+    const { data: followRow } = await supabase
+      .from("follows")
+      .select("muted")
+      .eq("user_id", user.id)
+      .eq("target_type", "workspace")
+      .eq("target_id", ws.id)
+      .maybeSingle();
+    followMuted = followRow?.muted ?? false;
+  }
 
   return (
     <main className="min-h-screen bg-podio-page pb-10">
@@ -167,45 +256,32 @@ export default async function WorkspacePage({
       <div className="grid grid-cols-1 gap-4 px-4 pt-4 md:px-6 lg:grid-cols-3">
         {/* ------- Left: workspace card, composer, feed ------- */}
         <div className="space-y-4 lg:col-span-2">
-          <section className="rounded border border-podio-border bg-white p-4 shadow-sm">
-            <div className="flex items-center gap-3">
-              <h1 className="text-2xl font-semibold text-podio-ink">{ws.name}</h1>
-              <span className="rounded bg-podio-row-alt px-2 py-0.5 text-xs text-podio-secondary">
-                {ws.privacy}
-              </span>
-            </div>
-            {ws.description && (
-              <p className="mt-1 text-sm text-podio-secondary">{ws.description}</p>
-            )}
-            <div className="mt-3 flex items-center gap-1.5">
-              {(members ?? []).slice(0, 8).map((m: any) => (
-                <span
-                  key={m.id}
-                  title={m.user_profiles?.full_name ?? undefined}
-                  className="flex h-8 w-8 items-center justify-center rounded-full bg-podio-chrome text-xs font-semibold text-podio-ink"
-                >
-                  {(m.user_profiles?.full_name ?? "?")
-                    .split(" ")
-                    .map((p: string) => p[0])
-                    .slice(0, 2)
-                    .join("")}
-                </span>
-              ))}
-              {(members ?? []).length > 8 && (
-                <span className="text-xs text-podio-meta">
-                  +{(members ?? []).length - 8}
-                </span>
-              )}
-            </div>
-          </section>
+          <WorkspaceHeader
+            orgSlug={orgSlug}
+            wsSlug={ws.slug}
+            wsId={ws.id}
+            name={ws.name}
+            privacy={ws.privacy}
+            description={ws.description}
+            members={(members ?? []).map((m: any) => ({
+              id: m.id,
+              user_id: m.user_id,
+              full_name: m.user_profiles?.full_name ?? null,
+              avatar_url: m.user_profiles?.avatar_url ?? null,
+            }))}
+            invitable={invitable}
+          />
 
           <section className="rounded border border-podio-border bg-white p-4 shadow-sm">
-            <StatusComposer wsId={ws.id} />
+            <StatusComposer wsId={ws.id} orgId={org.id} />
             {(statusRows ?? []).length > 0 && (
               <ul className="mt-4 space-y-1.5">
                 {(statusRows ?? []).map((s: any) => (
                   <li key={s.id}
                     className="rounded bg-podio-row-alt px-3 py-2 text-sm">
+                    {s.body_rich?.kind === "question" && (
+                      <span className="mr-1" title="Question">❓</span>
+                    )}
                     <span className="font-semibold text-podio-ink">
                       {actorName.get(s.created_by) ?? "Someone"}:
                     </span>{" "}
@@ -213,6 +289,23 @@ export default async function WorkspacePage({
                     <span className="ml-2 text-xs text-podio-meta">
                       {new Date(s.created_at).toLocaleString()}
                     </span>
+                    {(attachmentsByStatus[s.id] ?? []).length > 0 && (
+                      <span className="mt-1 flex flex-wrap gap-1.5">
+                        {(attachmentsByStatus[s.id] ?? []).map((f, i) =>
+                          f.url ? (
+                            <a key={i} href={f.url} target="_blank" rel="noreferrer"
+                              className="rounded border border-podio-border bg-white px-2 py-0.5 text-xs text-podio-teal hover:bg-podio-row-hover">
+                              📎 {f.name}
+                            </a>
+                          ) : (
+                            <span key={i}
+                              className="rounded border border-podio-border bg-white px-2 py-0.5 text-xs text-podio-meta">
+                              📎 {f.name}
+                            </span>
+                          )
+                        )}
+                      </span>
+                    )}
                   </li>
                 ))}
               </ul>
@@ -236,19 +329,114 @@ export default async function WorkspacePage({
                   </span>
                 </li>
               ))}
-              {(activityRows ?? []).length === 0 && (
-                <li className="px-1 text-sm text-podio-meta">
-                  No activity yet — it will appear here as your team works in the
-                  apps above.
-                </li>
-              )}
+              {/* Genesis entry — always the last row of the feed */}
+              <li className="flex items-center gap-2 px-1 py-1.5 text-sm text-podio-secondary">
+                <span aria-hidden="true">⚡</span>
+                <span className="truncate">
+                  <span className="font-semibold text-podio-ink">
+                    {creatorName}
+                  </span>{" "}
+                  created the{" "}
+                  <span className="font-semibold text-podio-ink">
+                    {ws.name}
+                  </span>{" "}
+                  workspace
+                </span>
+                <span className="ml-auto shrink-0 text-xs text-podio-meta">
+                  {new Date(ws.created_at).toLocaleDateString()}
+                </span>
+              </li>
             </ul>
+
+            {/* Footer bar: post-by-email hint + follow toggle */}
+            <div className="-mx-4 -mb-4 mt-4 flex items-center justify-end gap-4 rounded-b border-t border-podio-border bg-podio-row-alt px-3 py-2 text-sm">
+              <span
+                className="text-podio-secondary"
+                title="Post by email — wire an inbound address in docs/EMAIL.md"
+              >
+                ✉️ Create a status via email
+              </span>
+              {user && (
+                <FollowToggle
+                  userId={user.id}
+                  wsId={ws.id}
+                  initialMuted={followMuted}
+                />
+              )}
+            </div>
           </section>
         </div>
 
-        {/* ------- Right rail: dashboard tiles, quick links, members ------- */}
+        {/* ------- Right rail: tasks, calendar, dashboard, tools, members ------- */}
         <div className="space-y-4">
+          <section className="rounded border border-podio-border bg-white shadow-sm">
+            <div className="p-4">
+              <h2 className="font-semibold text-podio-teal">
+                {ws.name} Tasks{" "}
+                <span className="font-normal text-podio-meta">
+                  {openTaskCount ?? 0}
+                </span>
+              </h2>
+              {(openTasks ?? []).length > 0 ? (
+                <ul className="mt-2 space-y-1">
+                  {(openTasks ?? []).map((t: any) => (
+                    <li
+                      key={t.id}
+                      className="flex items-center justify-between gap-2 text-sm"
+                    >
+                      <span className="truncate text-podio-ink">{t.title}</span>
+                      {t.due_at && (
+                        <span className="shrink-0 text-xs text-podio-meta">
+                          {new Date(t.due_at).toLocaleDateString()}
+                        </span>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="py-16 text-center text-sm text-podio-meta">
+                  No tasks to show
+                </p>
+              )}
+            </div>
+            <Link
+              href={`/org/${orgSlug}/${ws.slug}/tasks`}
+              className="block border-t border-podio-border px-4 py-2.5 text-xs font-semibold uppercase tracking-wide text-podio-secondary hover:text-podio-teal"
+            >
+              + Create task
+            </Link>
+          </section>
+
           <section className="rounded border border-podio-border bg-white p-4 shadow-sm">
+            <h2 className="font-semibold text-podio-teal">
+              {ws.name} Calendar
+            </h2>
+            {(upcomingTasks ?? []).length > 0 ? (
+              <ul className="mt-2 space-y-1">
+                {(upcomingTasks ?? []).map((t: any) => (
+                  <li key={t.id} className="flex items-center gap-2 text-sm">
+                    <span className="shrink-0 text-xs text-podio-meta">
+                      {new Date(t.due_at).toLocaleDateString()}
+                    </span>
+                    <span className="truncate text-podio-ink">{t.title}</span>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="mt-2 text-sm text-podio-meta">Nothing scheduled</p>
+            )}
+            <Link
+              href="/calendar"
+              className="mt-3 inline-block text-xs text-podio-teal hover:underline"
+            >
+              Open calendar
+            </Link>
+          </section>
+
+          <section
+            id="dashboard"
+            className="rounded border border-podio-border bg-white p-4 shadow-sm"
+          >
             <h2 className="font-semibold text-podio-teal">Dashboard</h2>
             <div className="mt-3">
               <DashboardTiles wsId={ws.id} apps={appInfos} tiles={tiles} />
@@ -309,6 +497,14 @@ export default async function WorkspacePage({
               ))}
             </ul>
           </section>
+
+          {/* Add-tile affordance — jumps up to the Dashboard panel */}
+          <a
+            href="#dashboard"
+            className="flex h-28 w-full items-center justify-center rounded border-2 border-dashed border-podio-border text-sm font-semibold uppercase tracking-wide text-podio-meta hover:border-podio-meta hover:text-podio-secondary"
+          >
+            + Add tile
+          </a>
         </div>
       </div>
     </main>

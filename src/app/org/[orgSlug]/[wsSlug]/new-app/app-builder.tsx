@@ -87,25 +87,52 @@ function AiFormulaAssist({
   );
 }
 
+function draftField(label: string, type: FieldType, required = false): DraftField {
+  return {
+    key: crypto.randomUUID(),
+    label,
+    type,
+    required,
+    options: [],
+    relatedAppId: "",
+    formula: "",
+  };
+}
+
 export function AppBuilder({
   wsId,
   orgSlug,
   wsSlug,
   workspaceApps,
+  initialName = "",
+  initialItemName = "Item",
+  initialIcon = "📋",
+  initialType = "standard",
 }: {
   wsId: string;
   orgSlug: string;
   wsSlug: string;
   workspaceApps: { id: string; name: string }[];
+  initialName?: string;
+  initialItemName?: string;
+  initialIcon?: string;
+  initialType?: "standard" | "event" | "contact";
 }) {
   const router = useRouter();
   const supabase = createClient();
-  const [name, setName] = useState("");
-  const [icon, setIcon] = useState("📋");
-  const [itemName, setItemName] = useState("Item");
-  const [fields, setFields] = useState<DraftField[]>([
-    { key: crypto.randomUUID(), label: "Title", type: "text", required: true, options: [], relatedAppId: "", formula: "" },
-  ]);
+  const [name, setName] = useState(initialName);
+  const [icon, setIcon] = useState(initialIcon);
+  const [itemName, setItemName] = useState(initialItemName);
+  const [fields, setFields] = useState<DraftField[]>(() => {
+    // Default fields, plus type-specific seeds from the Create New App modal.
+    const seeded = [draftField("Title", "text", true)];
+    if (initialType === "event") {
+      seeded.push(draftField("Date", "date"));
+    } else if (initialType === "contact") {
+      seeded.push(draftField("Phone", "phone"), draftField("Email", "email"));
+    }
+    return seeded;
+  });
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 

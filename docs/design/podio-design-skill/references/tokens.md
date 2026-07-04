@@ -73,6 +73,19 @@ font-family: "Source Sans 3", "Source Sans Pro", "Segoe UI", system-ui, sans-ser
 - Tab labels in the app bar: 13px, secondary color, `tracking-normal` —
   "ADD APP" style items uppercase and disabled-grey.
 
+## Iconography
+
+Podio's icons are **monochrome outline glyphs**, never colorful emoji. In the
+clone use the `PodioIcon` component (`src/components/podio-icon.tsx`): inline
+24px SVGs, `stroke: currentColor`, strokeWidth ~1.6, `fill: none`, round
+caps — colored by the text color of their context (usually
+`text-podio-secondary`). App icons are stored as keys (`brick`, `task`,
+`rocket`, `meeting`, `tray`, `idea`, `link`, `contact`, `event`, `doc`,
+`chart`, `gear`, `phone`, `mail`, `map`, `cart`); `PodioIcon` falls back to
+rendering legacy emoji strings as text. The default app icon is the brick.
+When adding new UI, never introduce colorful emoji for app/tool iconography —
+extend `PODIO_ICONS` instead.
+
 ## Spacing & shape
 
 - Radius: `rounded` (4px) almost everywhere; active app tab card `rounded-lg`.

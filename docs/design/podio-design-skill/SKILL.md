@@ -54,8 +54,31 @@ JSX/Tailwind for each pattern:
    horizontal scroll affordance)
 5. Card / "Dig" view (3-up cards: title, grey excerpt panel, chip stack,
    `05/18/2026 by Name` + 💬 count footer)
-6. Category chips (pastel background + dark saturated text; solid orange/red
-   reserved for priority-like options)
+6. Workspace activity landing (two-zone: workspace card with teal name,
+   member photos + ⊕ INVITE, composer with 📎/🔗/❓ + teal Share, feed left;
+   dashboard tiles + panels in the right rail — apps appear ONLY in the tab
+   bar, never as a card grid on the page)
+7. Wrench admin menu (🔧 dropdown: Manage members/apps, Workspace settings,
+   Share in App Market, red Leave/Delete rows, "Go to…" shortcuts)
+8. Modal dialogs (teal title + ✕, label-left form rows, radios with grey
+   inline descriptions, grey Cancel + solid teal primary): create-workspace →
+   chained invite-employees step (people picker + Address book, prefilled
+   message, Role dropdown, "Add to <name>"), the two-card "Add app" chooser
+   (Create your own app *or* Go to the App Market), and Create New App
+   (ink header row, General/Advanced tab rail, App/Item Name*, app-type
+   radios Standard/Event/Contact, monochrome icon picker)
+9. Iconography & font (tokens.md): app/tool icons are monochrome outline
+   SVGs via the PodioIcon component — never colorful emoji; the typeface is
+   Source Sans (Podio's own), already wired as font-sans
+10. Category chips (pastel background + dark saturated text; solid orange/red
+    reserved for priority-like options)
+11. App Market (grey category sidebar with search + Functional/Industry
+    lists; PACK-ribbon cards with capability-icon strips, teal star ratings,
+    touching Get Pack/More info buttons; "Included in <Pack>" links;
+    square-button pagination)
+12. Chat panel (💬 in the global bar opens a right slide-over that pushes
+    page content: avatar strip + connections list with presence dots,
+    timestamped 1:1 conversations with 📎/🔗 composer)
 
 ## Applying it to the podio-clone codebase
 

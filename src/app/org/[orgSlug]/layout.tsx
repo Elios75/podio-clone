@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { CreateWorkspaceForm } from "./create-workspace-form";
 
 export default async function OrgLayout({
   children,
@@ -101,12 +102,9 @@ export default async function OrgLayout({
             )}
           </nav>
 
-          <Link
-            href={`/org/${org.slug}`}
-            className="mt-6 block rounded px-2 py-1.5 text-sm text-podio-teal hover:bg-podio-row-hover"
-          >
-            + New workspace
-          </Link>
+          <div className="mt-6">
+            <CreateWorkspaceForm orgId={org.id} orgSlug={org.slug} trigger="sidebar" />
+          </div>
         </aside>
         <div className="flex-1">{children}</div>
       </div>
