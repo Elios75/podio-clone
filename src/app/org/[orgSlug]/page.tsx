@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { CreateWorkspaceForm } from "./create-workspace-form";
 import { ApiKeysSection } from "./api-keys-section";
+import { WebhooksSection } from "./webhooks-section";
 
 export default async function OrgPage({
   params,
@@ -37,6 +38,21 @@ export default async function OrgPage({
     .select("id, name, prefix, scopes, last_used_at, revoked_at, created_at")
     .eq("organization_id", org.id)
     .order("created_at", { ascending: false });
+
+  const { data: hooks } = await supabase
+    .from("webhooks")
+    .select("id, url, events, is_verified, is_active, created_at")
+    .eq("organization_id", org.id)
+    .order("created_at", { ascending: false });
+  const hookIds = (hooks ?? []).map((h) => h.id);
+  const { data: hookDeliveries } = hookIds.length
+    ? await supabase
+        .from("webhook_deliveries")
+        .select("id, webhook_id, event_type, status, response_status, created_at")
+        .in("webhook_id", hookIds)
+        .order("created_at", { ascending: false })
+        .limit(50)
+    : { data: [] as any[] };
 
   return (
     <main className="mx-auto max-w-3xl p-8">
@@ -91,6 +107,11 @@ export default async function OrgPage({
       </ul>
 
       <ApiKeysSection orgId={org.id} keys={(apiKeys ?? []) as any} />
+      <WebhooksSection
+        orgId={org.id}
+        hooks={(hooks ?? []) as any}
+        deliveries={(hookDeliveries ?? []) as any}
+      />
     </main>
   );
 }
