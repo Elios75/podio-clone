@@ -82,6 +82,7 @@ export function ViewToolbar({
   const [saveOpen, setSaveOpen] = useState(false);
   const [viewName, setViewName] = useState("");
   const [visibility, setVisibility] = useState<"team" | "private">("team");
+  const [makeDefault, setMakeDefault] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   function buildQuery(extra?: Record<string, string>) {
@@ -118,6 +119,12 @@ export function ViewToolbar({
       .select()
       .single();
     if (insError) return setError(insError.message);
+    if (makeDefault) {
+      await supabase.from("app_views").update({ is_default: false })
+        .eq("app_id", appId).neq("id", view.id);
+      await supabase.from("app_views").update({ is_default: true })
+        .eq("id", view.id);
+    }
     setSaveOpen(false);
     setViewName("");
     router.push(`${baseHref}?viewId=${view.id}`);
@@ -298,6 +305,11 @@ export function ViewToolbar({
               <option value="team">Team view</option>
               <option value="private">Private view</option>
             </select>
+            <label className="flex items-center gap-1 text-xs text-slate-600">
+              <input type="checkbox" checked={makeDefault}
+                onChange={(e) => setMakeDefault(e.target.checked)} />
+              default view
+            </label>
             <button onClick={saveView}
               className="rounded bg-blue-600 px-3 py-1 text-xs font-medium text-white hover:bg-blue-700">
               Save

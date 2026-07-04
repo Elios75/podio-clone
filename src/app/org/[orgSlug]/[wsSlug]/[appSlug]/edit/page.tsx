@@ -35,6 +35,30 @@ export default async function EditAppPage({
   const countByField: Record<string, number> = {};
   for (const c of counts ?? []) countByField[c.field_id] = Number(c.cnt);
 
+  // Rollup sources: relationship fields elsewhere in this workspace that point at this app
+  const { data: relFields } = await supabase
+    .from("app_fields")
+    .select("id, label, app_id, apps:app_id(name, workspace_id)")
+    .eq("type", "relationship")
+    .eq("status", "active")
+    .eq("config->>related_app_id", app.id);
+  const rollupSources = (relFields ?? [])
+    .filter((f: any) => f.apps?.workspace_id === ws.id)
+    .map((f: any) => ({
+      id: f.id,
+      label: `${f.apps?.name} → ${f.label}`,
+      app_id: f.app_id,
+    }));
+  const srcAppIds = [...new Set(rollupSources.map((r) => r.app_id))];
+  const { data: srcNumFields } = srcAppIds.length
+    ? await supabase
+        .from("app_fields")
+        .select("id, label, app_id")
+        .in("app_id", srcAppIds)
+        .in("type", ["number", "money", "progress", "duration", "calculation"])
+        .eq("status", "active")
+    : { data: [] as any[] };
+
   const { data: revisions } = await supabase
     .from("app_schema_revisions")
     .select("version, created_at, changed_by")
@@ -59,6 +83,8 @@ export default async function EditAppPage({
           backHref={`/org/${orgSlug}/${wsSlug}/${app.slug}`}
           wsHref={`/org/${orgSlug}/${wsSlug}`}
           revisions={(revisions ?? []) as any}
+          rollupSources={rollupSources}
+          srcNumFields={(srcNumFields ?? []) as any}
         />
       </div>
     </main>

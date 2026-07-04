@@ -23,7 +23,11 @@ type EditField = {
   options: CategoryOption[];
   multiple: boolean;      // category
   endDate: boolean;       // date
-  formula: string;        // calculation
+  formula: string;        // calculation (formula mode)
+  calcMode: "formula" | "rollup";
+  rollupSource: string;   // relationship field id in the source app
+  rollupAgg: string;      // sum | count | avg
+  rollupValueField: string;
   defaultValue: string;   // text/number
   origType: FieldType | null;
 };
@@ -37,6 +41,8 @@ export function AppEditor({
   backHref,
   wsHref,
   revisions,
+  rollupSources,
+  srcNumFields,
 }: {
   app: any;
   initialFields: any[];
@@ -44,6 +50,8 @@ export function AppEditor({
   backHref: string;
   wsHref: string;
   revisions: { version: number; created_at: string }[];
+  rollupSources: { id: string; label: string; app_id: string }[];
+  srcNumFields: { id: string; label: string; app_id: string }[];
 }) {
   const router = useRouter();
   const supabase = createClient();
@@ -67,6 +75,10 @@ export function AppEditor({
       multiple: f.config?.multiple ?? false,
       endDate: f.config?.end_date ?? false,
       formula: f.config?.formula ?? "",
+      calcMode: f.config?.rollup ? "rollup" : "formula",
+      rollupSource: f.config?.rollup?.source_field_id ?? "",
+      rollupAgg: f.config?.rollup?.agg ?? "sum",
+      rollupValueField: f.config?.rollup?.value_field_id ?? "",
       defaultValue:
         f.config?.default !== undefined && f.config?.default !== null
           ? String(f.config.default)
@@ -144,7 +156,17 @@ export function AppEditor({
         config.multiple = f.multiple;
       }
       if (f.type === "date") config.end_date = f.endDate;
-      if (f.type === "calculation") config.formula = f.formula;
+      if (f.type === "calculation") {
+        if (f.calcMode === "rollup" && f.rollupSource) {
+          config.rollup = {
+            source_field_id: f.rollupSource,
+            agg: f.rollupAgg,
+            value_field_id: f.rollupAgg === "count" ? null : f.rollupValueField || null,
+          };
+        } else {
+          config.formula = f.formula;
+        }
+      }
       if (["text", "number"].includes(f.type) && f.defaultValue !== "") {
         config.default = f.type === "number" ? Number(f.defaultValue) : f.defaultValue;
       }
@@ -303,12 +325,61 @@ export function AppEditor({
 
               {f.type === "calculation" && (
                 <div className="mt-2 space-y-1 pl-8">
+                  <div className="flex items-center gap-2 text-xs">
+                    <select value={f.calcMode}
+                      onChange={(e) => upd(f.key, { calcMode: e.target.value as any })}
+                      className="rounded border border-slate-300 px-1.5 py-1 text-xs">
+                      <option value="formula">Formula (this item)</option>
+                      <option value="rollup">Rollup (related items)</option>
+                    </select>
+                    {f.calcMode === "rollup" && (
+                      <>
+                        <select value={f.rollupAgg}
+                          onChange={(e) => upd(f.key, { rollupAgg: e.target.value })}
+                          className="rounded border border-slate-300 px-1.5 py-1 text-xs">
+                          <option value="sum">Sum of</option>
+                          <option value="avg">Average of</option>
+                          <option value="count">Count of</option>
+                        </select>
+                        {f.rollupAgg !== "count" && (
+                          <select value={f.rollupValueField}
+                            onChange={(e) => upd(f.key, { rollupValueField: e.target.value })}
+                            className="rounded border border-slate-300 px-1.5 py-1 text-xs">
+                            <option value="">— number field —</option>
+                            {srcNumFields
+                              .filter((nf) =>
+                                nf.app_id ===
+                                rollupSources.find((s) => s.id === f.rollupSource)?.app_id)
+                              .map((nf) => (
+                                <option key={nf.id} value={nf.id}>{nf.label}</option>
+                              ))}
+                          </select>
+                        )}
+                        <span className="text-slate-400">from</span>
+                        <select value={f.rollupSource}
+                          onChange={(e) => upd(f.key, { rollupSource: e.target.value, rollupValueField: "" })}
+                          className="rounded border border-slate-300 px-1.5 py-1 text-xs">
+                          <option value="">— relationship —</option>
+                          {rollupSources.map((s) => (
+                            <option key={s.id} value={s.id}>{s.label}</option>
+                          ))}
+                        </select>
+                      </>
+                    )}
+                  </div>
+                  {f.calcMode === "rollup" && rollupSources.length === 0 && (
+                    <p className="text-[11px] text-amber-600">
+                      No other app in this workspace has a relationship field pointing here yet.
+                    </p>
+                  )}
+                  {f.calcMode === "formula" && (
                   <input
                     placeholder="Formula, e.g. {deal-value-1} * 0.2"
                     value={f.formula}
                     onChange={(e) => upd(f.key, { formula: e.target.value })}
                     className="w-full rounded border border-slate-300 px-2 py-1 font-mono text-xs"
                   />
+                  )}
                   <p className="text-[11px] text-slate-400">
                     Tokens:{" "}
                     {numberTokens.length > 0

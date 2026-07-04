@@ -154,6 +154,21 @@ export default async function ItemDetailPage({
     }));
   }
 
+  // Related items: outgoing (this item references) + incoming (items referencing this)
+  const relSelect =
+    "id, title, item_number, apps:app_id(name, icon, slug, workspaces:workspace_id(slug, organizations:organization_id(slug)))";
+  const { data: outgoingRels } = await supabase
+    .from("item_relationships")
+    .select(`id, fields:field_id(label), target:to_item_id(${relSelect})`)
+    .eq("from_item_id", item.id);
+  const { data: incomingRels } = await supabase
+    .from("item_relationships")
+    .select(`id, fields:field_id(label), source:from_item_id(${relSelect})`)
+    .eq("to_item_id", item.id);
+
+  const relHref = (it: any) =>
+    `/org/${it.apps?.workspaces?.organizations?.slug}/${it.apps?.workspaces?.slug}/${it.apps?.slug}/${it.item_number}`;
+
   // Shares on this item
   const { data: shareRows } = await supabase
     .from("item_shares")
@@ -197,6 +212,38 @@ export default async function ItemDetailPage({
           backHref={backHref}
         />
       </div>
+
+      {((outgoingRels ?? []).length > 0 || (incomingRels ?? []).length > 0) && (
+        <section className="mt-10">
+          <h2 className="text-lg font-medium">Related items</h2>
+          <ul className="mt-3 space-y-2">
+            {(outgoingRels ?? []).map((r: any) =>
+              r.target ? (
+                <li key={r.id}
+                  className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm">
+                  <span className="text-xs text-slate-400">{r.fields?.label} →</span>
+                  <a href={relHref(r.target)} className="font-medium text-blue-600 hover:underline">
+                    {r.target.apps?.icon} {r.target.title ?? `#${r.target.item_number}`}
+                  </a>
+                  <span className="ml-auto text-xs text-slate-400">{r.target.apps?.name}</span>
+                </li>
+              ) : null
+            )}
+            {(incomingRels ?? []).map((r: any) =>
+              r.source ? (
+                <li key={r.id}
+                  className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm">
+                  <span className="text-xs text-slate-400">← via {r.fields?.label}</span>
+                  <a href={relHref(r.source)} className="font-medium text-blue-600 hover:underline">
+                    {r.source.apps?.icon} {r.source.title ?? `#${r.source.item_number}`}
+                  </a>
+                  <span className="ml-auto text-xs text-slate-400">{r.source.apps?.name}</span>
+                </li>
+              ) : null
+            )}
+          </ul>
+        </section>
+      )}
 
       <TasksSection
         itemId={item.id}

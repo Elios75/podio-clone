@@ -178,12 +178,16 @@ export default async function AppPage({
   // ----- Saved views + filters/sort -----
   const { data: savedViews } = await supabase
     .from("app_views")
-    .select("id, name, layout, visibility, filters, sort")
+    .select("id, name, layout, visibility, filters, sort, is_default")
     .eq("app_id", app.id)
     .order("name");
 
+  // Explicit selection wins; otherwise fall back to the app's default view
+  const noExplicitState = !sp.viewId && !sp.f && !sp.s && !sp.view;
   const activeView = sp.viewId
     ? (savedViews ?? []).find((v) => v.id === sp.viewId) ?? null
+    : noExplicitState
+    ? (savedViews ?? []).find((v) => v.is_default) ?? null
     : null;
 
   function parseJson<T>(raw: string | undefined, fallback: T): T {
