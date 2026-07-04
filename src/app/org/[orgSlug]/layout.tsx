@@ -34,6 +34,7 @@ export default async function OrgLayout({
         <span className="truncate font-semibold">{org.name}</span>
         <span className="ml-auto flex gap-3 text-sm">
           <Link href="/search">🔍</Link>
+          <Link href="/messages">💬</Link>
           <Link href="/tasks">✓</Link>
           <Link href="/notifications">🔔</Link>
         </span>
@@ -59,6 +60,7 @@ export default async function OrgLayout({
           </Link>
           <span className="flex gap-2">
             <Link href="/search" className="text-sm" title="Search">🔍</Link>
+            <Link href="/messages" className="text-sm" title="Messages">💬</Link>
             <Link href="/tasks" className="text-sm" title="My tasks">✓</Link>
             <Link href="/notifications" className="text-sm" title="Notifications">🔔</Link>
           </span>
