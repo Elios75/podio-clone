@@ -41,7 +41,7 @@ export function AppTabBar({
               : "text-podio-secondary hover:bg-[#E4E4E4]"
           }`}
         >
-          <PodioIcon icon={a.icon} className="h-6 w-6 text-2xl leading-none" />
+          <PodioIcon icon={a.icon} name={a.name} className="h-6 w-6 text-2xl leading-none" />
           <span className="w-full truncate">{a.name}</span>
         </Link>
       ))}

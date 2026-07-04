@@ -327,7 +327,7 @@ export default async function AppPage({
         {/* Left views pane */}
         <aside className="w-full shrink-0 border-b border-podio-border bg-white p-4 lg:w-72 lg:border-b-0 lg:border-r">
           <h1 className="flex items-center gap-2 text-xl font-semibold text-podio-teal">
-            <PodioIcon icon={app.icon} className="h-6 w-6 shrink-0" />
+            <PodioIcon icon={app.icon} name={app.name} className="h-6 w-6 shrink-0" />
             <span className="min-w-0 truncate">{app.name}</span>
           </h1>
           {app.description && (

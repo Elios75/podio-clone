@@ -320,27 +320,73 @@ function normalizeEmoji(s: string): string {
   return s.replace(/️/g, "").trim();
 }
 
+// Emoji that were historical *defaults* (every app got 📋/✅), so they carry
+// no signal — for these, the app NAME is a better source of an icon.
+const GENERIC_EMOJI = new Set(["📋", "✅", "☑", "✔", "📦", "🧱", "📝"]);
+
+// Infer an icon from what the app is called ("Customers" → contact,
+// "Municipalities" → map). First match wins.
+const NAME_HINTS: [RegExp, string][] = [
+  [/task|todo|to-?do|checklist|action/i, "task"],
+  [/customer|client|compan|account|vendor|supplier|crm/i, "contact"],
+  [/people|member|candidate|employee|staff|contact|student/i, "contact"],
+  [/project|launch|onboard|sprint/i, "rocket"],
+  [/meeting|appointment|agenda/i, "meeting"],
+  [/idea|innovation|brainstorm/i, "idea"],
+  [/link|url|bookmark/i, "link"],
+  [/event|calendar|schedule/i, "event"],
+  [/report|chart|metric|analytic|dashboard|kpi/i, "chart"],
+  [/setting|config/i, "gear"],
+  [/call|phone/i, "phone"],
+  [/mail|email|inbox/i, "mail"],
+  [/municipal|location|city|school|district|site|address|map|region|territor|propert/i, "map"],
+  [/order|cart|deal|sale|purchase|invoice|expense|budget|payment|quote/i, "cart"],
+  [/file|librar|document|doc|proof|import|record|archive|asset/i, "doc"],
+];
+
+// Last resort: a stable hash of the name picks from a varied pool, so two
+// unrelated apps still get different icons instead of twin bricks.
+const HASH_POOL = [
+  "brick", "rocket", "doc", "chart", "tray", "idea", "event",
+  "cart", "map", "phone", "mail", "contact", "meeting", "link",
+];
+function hashPick(name: string): string {
+  let h = 0;
+  for (let i = 0; i < name.length; i++) h = (h * 31 + name.charCodeAt(i)) | 0;
+  return HASH_POOL[Math.abs(h) % HASH_POOL.length];
+}
+
 export function isPodioIconKey(icon: string | null): boolean {
   return icon !== null && icon in PATHS;
 }
 
 export function PodioIcon({
   icon,
+  name,
   className,
 }: {
   icon: string | null;
+  name?: string | null; // the app's name, used to differentiate generic icons
   className?: string;
 }) {
-  // Resolution order: icon key → emoji mapping → default brick.
-  // null = app never chose an icon; Podio shows the default brick.
-  let key = icon ?? "brick";
-  if (!PATHS[key]) {
-    key =
-      EMOJI_TO_KEY[key] ??
-      EMOJI_TO_KEY[normalizeEmoji(key)] ??
-      "brick";
+  // Resolution order: explicit icon key → distinctive emoji mapping →
+  // name inference → generic emoji mapping → name hash → default brick.
+  let key: string | undefined = icon ?? undefined;
+  if (key && !PATHS[key]) {
+    const norm = normalizeEmoji(key);
+    const generic = GENERIC_EMOJI.has(key) || GENERIC_EMOJI.has(norm);
+    key = generic ? undefined : EMOJI_TO_KEY[key] ?? EMOJI_TO_KEY[norm];
   }
-  const paths = PATHS[key];
+  if (!key && name) {
+    key = NAME_HINTS.find(([re]) => re.test(name))?.[1];
+  }
+  if (!key && icon) {
+    const norm = normalizeEmoji(icon);
+    key = EMOJI_TO_KEY[icon] ?? EMOJI_TO_KEY[norm];
+  }
+  if (!key && name) key = hashPick(name);
+  key = key ?? "brick";
+  const paths = PATHS[key] ?? PATHS.brick;
   if (!paths) {
     // Unreachable in practice (brick always exists) — kept as a safety net.
     return <span className={className}>{icon}</span>;

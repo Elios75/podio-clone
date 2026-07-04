@@ -4,4 +4,8 @@
 
 body {
   @apply bg-podio-page text-podio-ink antialiased;
+  /* Variable-free fallback: even if the next/font CSS variable or Tailwind
+     font-sans stack fails to compile, we never fall back to serif. */
+  font-family: "Source Sans 3", "Source Sans Pro", "Segoe UI", system-ui,
+    sans-serif;
 }
