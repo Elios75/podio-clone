@@ -29,6 +29,7 @@ export default async function HomePage() {
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-semibold">Your organizations</h1>
         <div className="flex items-center gap-3">
+          <Link href="/calendar" className="text-sm text-slate-500 hover:underline">📅</Link>
           <Link href="/messages" className="text-sm text-slate-500 hover:underline">💬</Link>
           <Link href="/tasks" className="text-sm text-slate-500 hover:underline">✓ Tasks</Link>
           <Link href="/notifications" className="text-sm text-slate-500 hover:underline">🔔</Link>

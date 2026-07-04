@@ -248,15 +248,15 @@ export default async function AppPage({
     sp.month && /^\d{4}-\d{2}$/.test(sp.month)
       ? sp.month
       : new Date().toISOString().slice(0, 7);
-  const cardsByDay: Record<string, { item_number: number; title: string | null }[]> = {};
+  const cardsByDay: Record<string, { href: string; title: string }[]> = {};
   if (dateField) {
     for (const item of visibleItems) {
       const v = valueMap.get(item.id)?.get(dateField.id);
       if (!v?.value_date) continue;
       const day = new Date(v.value_date).toISOString().slice(0, 10);
       (cardsByDay[day] ??= []).push({
-        item_number: item.item_number,
-        title: item.title,
+        href: `${baseHref}/${item.item_number}`,
+        title: item.title ?? `#${item.item_number}`,
       });
     }
   }

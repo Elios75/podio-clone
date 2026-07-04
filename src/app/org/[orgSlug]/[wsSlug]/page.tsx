@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { DashboardTiles, type TileData } from "./dashboard-tiles";
 import { MemberRoleSelect } from "@/components/member-role-select";
+import { StatusComposer } from "./status-composer";
 
 export default async function WorkspacePage({
   params,
@@ -120,6 +121,13 @@ export default async function WorkspacePage({
       .map((f) => ({ id: f.id, label: f.label })),
   }));
 
+  const { data: statusRows } = await supabase
+    .from("status_posts")
+    .select("id, body, created_by, created_at")
+    .eq("workspace_id", ws.id)
+    .order("created_at", { ascending: false })
+    .limit(5);
+
   const { data: activityRows } = await supabase
     .from("activity_events")
     .select("id, event_type, actor_id, payload, created_at")
@@ -197,6 +205,25 @@ export default async function WorkspacePage({
       )}
 
       <h2 className="mt-10 text-lg font-medium">Activity</h2>
+      <div className="mt-3">
+        <StatusComposer wsId={ws.id} />
+      </div>
+      {(statusRows ?? []).length > 0 && (
+        <ul className="mt-3 space-y-1.5">
+          {(statusRows ?? []).map((s: any) => (
+            <li key={s.id}
+              className="rounded-lg border border-blue-100 bg-blue-50/50 px-3 py-2 text-sm">
+              <span className="font-medium text-slate-700">
+                {actorName.get(s.created_by) ?? "Someone"}:
+              </span>{" "}
+              <span className="text-slate-600">{s.body}</span>
+              <span className="ml-2 text-xs text-slate-400">
+                {new Date(s.created_at).toLocaleString()}
+              </span>
+            </li>
+          ))}
+        </ul>
+      )}
       <ul className="mt-3 space-y-1.5">
         {(activityRows ?? []).map((a: any) => (
           <li key={a.id} className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-500">

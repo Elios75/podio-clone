@@ -31,6 +31,7 @@ export function TasksSection({
   const [title, setTitle] = useState("");
   const [assignee, setAssignee] = useState("");
   const [due, setDue] = useState("");
+  const [repeat, setRepeat] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -38,7 +39,7 @@ export function TasksSection({
     setError(null);
     if (!title.trim()) return;
     setBusy(true);
-    const { error: rpcError } = await supabase.rpc("create_task", {
+    const { data: task, error: rpcError } = await supabase.rpc("create_task", {
       p_org: orgId,
       p_ws: wsId,
       p_title: title,
@@ -47,11 +48,18 @@ export function TasksSection({
       p_target_type: "item",
       p_target_id: itemId,
     });
+    if (!rpcError && repeat && task) {
+      await supabase
+        .from("tasks")
+        .update({ repeat_rule: { every: repeat, interval: 1 } })
+        .eq("id", task.id);
+    }
     setBusy(false);
     if (rpcError) return setError(rpcError.message);
     setTitle("");
     setAssignee("");
     setDue("");
+    setRepeat("");
     router.refresh();
   }
 
@@ -115,6 +123,14 @@ export function TasksSection({
         </select>
         <input type="date" value={due} onChange={(e) => setDue(e.target.value)}
           className="rounded-lg border border-slate-300 px-2 py-1.5 text-sm" />
+        <select value={repeat} onChange={(e) => setRepeat(e.target.value)}
+          className="rounded-lg border border-slate-300 px-2 py-1.5 text-sm"
+          title="Repeats after completion">
+          <option value="">No repeat</option>
+          <option value="day">Daily</option>
+          <option value="week">Weekly</option>
+          <option value="month">Monthly</option>
+        </select>
         <button onClick={createTask} disabled={busy || !title.trim()}
           className="rounded-lg bg-blue-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50">
           Add

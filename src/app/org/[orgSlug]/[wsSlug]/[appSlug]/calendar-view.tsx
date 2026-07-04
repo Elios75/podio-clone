@@ -1,6 +1,6 @@
 import Link from "next/link";
 
-type CalCard = { item_number: number; title: string | null };
+type CalCard = { href: string; title: string };
 
 export function CalendarView({
   monthStr, // "YYYY-MM"
@@ -87,13 +87,13 @@ export function CalendarView({
               {cell.date.getUTCDate()}
             </span>
             <div className="mt-1 space-y-1">
-              {(cardsByDay[cell.iso] ?? []).slice(0, 3).map((c) => (
+              {(cardsByDay[cell.iso] ?? []).slice(0, 3).map((c, ci) => (
                 <Link
-                  key={c.item_number}
-                  href={`${baseHref}/${c.item_number}`}
+                  key={ci}
+                  href={c.href}
                   className="block truncate rounded bg-blue-50 px-1.5 py-0.5 text-[11px] text-blue-700 hover:bg-blue-100"
                 >
-                  {c.title ?? `#${c.item_number}`}
+                  {c.title}
                 </Link>
               ))}
               {(cardsByDay[cell.iso] ?? []).length > 3 && (
