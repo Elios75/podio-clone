@@ -1,0 +1,86 @@
+# Development Phases 2 — Gap Analysis & Roadmap (Phases 8–14)
+
+Written after completing Phases 0–7. Every item below is in `podio-clone.md` (the spec) but not yet built, or built as a v1 slice that lacks spec depth. Ordered so that gaps in *existing* features close before new surface area opens.
+
+---
+
+## Phase 8 — App builder completion (the biggest gap)
+
+The builder is create-only. Podio's core promise is *modify anytime*.
+
+- **Edit app schema after creation**: add/rename/retype/delete fields on a live app; soft-delete keeps existing values (`app_fields.status='deleted'` already supported by every query).
+- Warning flow when changing/removing fields that hold data (count values, confirm).
+- Snapshot each publish to `app_schema_revisions` (table exists, never written) + schema history viewer.
+- Builder inputs that exist in schema but not UI: help text, description, default values, hidden / hidden-if-empty toggles.
+- Drag-and-drop field ordering (dnd-kit; replaces arrows).
+- App settings editing: name, icon, description, usage instructions, item name, archive/delete app with confirmation.
+- Field-type depth: multi-select category; multiple values for phone/email (positions exist); date end + time; money currency list per field; link previews/embeds.
+- **Calculation engine v1**: same-item formulas over number/money/progress fields, evaluated in `save_item`, stored as normal values (spec §2.12). Rollups from related items follow in Phase 9.
+- Enforce spec limits (§20): max fields/app, options/field — cheap trigger checks.
+
+## Phase 9 — Relationships & views depth
+
+- **Related-items section on item detail** (reverse relationships — `item_relationships` has the data; nothing displays it).
+- Multi-value relationship fields; restrict selectable items by saved view; cross-workspace picker.
+- **Rollup/aggregate over related items** (sum of deal values on a company).
+- Relationship map visualization (simple graph of app-to-app links).
+- Table layout: show/hide/reorder/resize columns persisted to `app_views.columns` (column exists, unused); inline cell editing.
+- Badge and stream layouts (last two of the six spec layouts).
+- Group/sub-group in table views; default view per app; view ordering; last-used view memory.
+- **View-filter → SQL translation** — the scale prototype flagged since Phase 3; required before any app holds >500 items.
+
+## Phase 10 — Tasks, calendar & collaboration depth
+
+- Task labels UI (schema since day 1), repeating tasks (materialize from `repeat_rule` via the existing cron), reminders (queue notifications at `reminder_at`), task comments/files (polymorphic tables ready), workspace task lists, task filters.
+- **Personal calendar**: tasks + items across all apps/workspaces; workspace calendar; week/day views; per-app colors; **ICS feed** (signed URL) for Google/Outlook subscription.
+- Status posts UI on workspace streams (schema only today); like/react on activity; feed filters; mute workspace from home stream (`follows.muted` is wired for it).
+- Comment depth: revision history, convert-comment-to-task.
+- Notification preferences UI (`notification_prefs` jsonb exists) + daily digest (cron assembles, outbound queue sends).
+
+## Phase 11 — Email & files, production-grade
+
+- **Wire outbound delivery**: worker (edge function or route + cron) draining `outbound_emails` through Resend; covers automation emails, notification digests, share invites.
+- Inbound live: point provider at `/api/inbound-email`; reply-to-item threading (plus-addressing on item comments → comment instead of new item); attach inbound files.
+- Send email from an item; `email_templates` UI (table exists).
+- **Storage hardening**: private bucket + signed URLs (current bucket is public — flagged since Phase 2), per-plan size limits, storage quota tracking per org.
+- File versioning UI (`previous_version_id` ready), workspace files page, external-link files (Drive/Dropbox URLs as `provider` rows — full pickers in Phase 13).
+
+## Phase 12 — Automation & platform depth
+
+- Triggers: **date-reached** (cron scans date fields), scheduled flows, task-completed (RPC exists, no automation hook), comment-added, manual "run now" button, inbound-webhook trigger.
+- Actions: HTTP request (via `pg_net`, mirroring webhook delivery), **PDF generation** from item + template, approval step (approve/reject task gating the flow), update-related-item, loop over related items.
+- Test mode (`automation_runs.is_test` exists), run log detail viewer, flow versioning UI (`automation_revisions` table waiting).
+- Webform depth: theme/custom CSS, redirect URL, captcha (Turnstile), embed snippet + allowed domains, URL-parameter prefill (spec §8 — `external_id`s were designed for this), file uploads on forms.
+- API v1.1: automatic webhook verification handshake, per-key rate limiting, hosted API docs page, workspace/task endpoints, service-user keys.
+- Marketplace depth: install with sample data, template versioning, ratings UI (`template_reviews` exists), public publishing flow.
+- XLSX import/export (SheetJS) + background jobs for large files; org backup export.
+
+## Phase 13 — Integrations & billing
+
+- File pickers: Google Drive, OneDrive, Dropbox (attach as external files).
+- Calendar sync out (ICS from Phase 10 → push integration), Slack/Teams notification channel (webhook consumer recipes), Zapier/Make templates over the public API, Twilio SMS action.
+- **Billing**: Stripe subscriptions mapped to `organizations.billing_plan`; plan-gated limits (users, items, storage, automations/month) enforced by the existing limit checks; upgrade UI. (Free/Team/Business/Enterprise from spec §19.)
+- Hard SSO enforcement via Supabase Auth Hook; IdP group → role mapping.
+- Retention policies: revision pruning + file cleanup by plan (cron).
+
+## Phase 14 — Differentiators (spec §23)
+
+- **AI app builder**: describe a workflow in chat → generated app + fields + views + automations (Claude API; the `app_templates.definition` format is the generation target — this is why it's JSON).
+- AI formula builder for calculation fields; AI workflow suggestions.
+- White-label client portals (custom domain + logo per org, guest-facing views).
+- Better relationship diagrams, approval-flow templates, industry starter packs seeded into the public marketplace.
+- Mobile: real service worker (offline drafts), push notifications, camera capture into image fields.
+
+---
+
+## Cross-cutting debt to schedule alongside (not a phase)
+
+- **UI/permission polish**: hide controls light/guest members can't use (backend enforces; UI still shows buttons that fail).
+- Generated TypeScript types (`supabase gen types --schema podio`) replacing the `as any` casts accumulated across pages.
+- Error toasts + optimistic updates instead of full `router.refresh()` round-trips.
+- Test suite: pgTAP for RLS policies (highest value per line of test code in this codebase), Playwright happy paths.
+- Tighten `user_profiles` visibility to shared-org members before multi-org production use.
+
+## Suggested order
+
+8 → 9 → 10 → 11 → 12 → 13 → 14. Phases 8–10 make existing surface spec-complete (roughly one session each per phase half, as before). Phase 11 is the production-readiness gate. Phases 12+ are expansion. The AI builder (14) can be pulled forward any time after 8 — it only depends on the template format, which is stable.
