@@ -296,12 +296,22 @@ export default async function AppPage({
         <h1 className="text-2xl font-semibold">
           {app.icon} {app.name}
         </h1>
-        <Link
-          href={`${baseHref}/new`}
-          className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
-        >
-          + New {app.item_name.toLowerCase()}
-        </Link>
+        <div className="flex items-center gap-2">
+          <Link href={`${baseHref}/form`}
+            className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-600 hover:bg-slate-100">
+            Webform
+          </Link>
+          <Link href={`${baseHref}/automations`}
+            className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-600 hover:bg-slate-100">
+            ⚡ Automations
+          </Link>
+          <Link
+            href={`${baseHref}/new`}
+            className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
+          >
+            + New {app.item_name.toLowerCase()}
+          </Link>
+        </div>
       </div>
 
       <div className="mt-4 flex items-center gap-2">

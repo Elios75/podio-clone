@@ -1,0 +1,168 @@
+"use client";
+
+import { useState } from "react";
+import { useRouter } from "next/navigation";
+import { createClient } from "@/lib/supabase/client";
+
+type Field = { id: string; label: string; type: string };
+
+const FORM_EXCLUDED = ["relationship", "contact", "image", "file", "calculation"];
+
+export function FormSettings({
+  appId,
+  appSlug,
+  fields,
+  webform,
+  recentSubmissions,
+}: {
+  appId: string;
+  appSlug: string;
+  fields: Field[];
+  webform: any;
+  recentSubmissions: any[];
+}) {
+  const router = useRouter();
+  const supabase = createClient();
+  const eligible = fields.filter((f) => !FORM_EXCLUDED.includes(f.type));
+
+  const [title, setTitle] = useState(webform?.title ?? "");
+  const [description, setDescription] = useState(webform?.description ?? "");
+  const [successMsg, setSuccessMsg] = useState(
+    webform?.settings?.success_message ?? "Thank you! Your submission was received."
+  );
+  const [fieldIds, setFieldIds] = useState<string[]>(
+    webform?.field_ids ?? eligible.map((f) => f.id)
+  );
+  const [isActive, setIsActive] = useState(webform?.is_active ?? true);
+  const [error, setError] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+
+  const publicUrl =
+    typeof window !== "undefined" && webform
+      ? `${window.location.origin}/f/${webform.slug}`
+      : null;
+
+  function toggleField(id: string) {
+    setFieldIds((prev) =>
+      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
+    );
+  }
+
+  async function save() {
+    setError(null);
+    setSaving(true);
+    const row = {
+      app_id: appId,
+      title: title || "Submit a request",
+      description,
+      field_ids: fieldIds,
+      is_active: isActive,
+      settings: { success_message: successMsg },
+      ...(webform ? {} : { slug: `${appSlug}-${Math.random().toString(36).slice(2, 8)}` }),
+    };
+    const { error: upError } = webform
+      ? await supabase.from("webforms").update(row).eq("id", webform.id)
+      : await supabase.from("webforms").insert(row);
+    setSaving(false);
+    if (upError) return setError(upError.message);
+    router.refresh();
+  }
+
+  return (
+    <div className="space-y-4">
+      {publicUrl && (
+        <div className="flex items-center gap-2 rounded-lg border border-green-200 bg-green-50 p-3">
+          <span className="text-sm text-green-800">Public link:</span>
+          <a href={publicUrl} target="_blank"
+            className="truncate text-sm font-medium text-green-700 underline">
+            {publicUrl}
+          </a>
+          <button
+            onClick={() => navigator.clipboard.writeText(publicUrl)}
+            className="ml-auto rounded border border-green-300 px-2 py-1 text-xs text-green-700 hover:bg-green-100"
+          >
+            Copy
+          </button>
+        </div>
+      )}
+
+      <div className="rounded-lg border border-slate-200 bg-white p-4 space-y-3">
+        <input
+          placeholder="Form title"
+          value={title}
+          onChange={(e) => setTitle(e.target.value)}
+          className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
+        />
+        <textarea
+          placeholder="Description shown above the form (optional)"
+          value={description ?? ""}
+          onChange={(e) => setDescription(e.target.value)}
+          rows={2}
+          className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
+        />
+        <textarea
+          placeholder="Success message"
+          value={successMsg}
+          onChange={(e) => setSuccessMsg(e.target.value)}
+          rows={2}
+          className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
+        />
+
+        <p className="text-sm font-medium">Fields on the form</p>
+        <div className="grid grid-cols-2 gap-1">
+          {eligible.map((f) => (
+            <label key={f.id} className="flex items-center gap-2 text-sm">
+              <input
+                type="checkbox"
+                checked={fieldIds.includes(f.id)}
+                onChange={() => toggleField(f.id)}
+              />
+              {f.label}
+              <span className="text-xs text-slate-400">({f.type})</span>
+            </label>
+          ))}
+        </div>
+        {fields.length > eligible.length && (
+          <p className="text-xs text-slate-400">
+            Relationship, contact, file, and calculation fields can't appear on
+            public forms yet.
+          </p>
+        )}
+
+        <label className="flex items-center gap-2 text-sm">
+          <input
+            type="checkbox"
+            checked={isActive}
+            onChange={(e) => setIsActive(e.target.checked)}
+          />
+          Form is active (accepting submissions)
+        </label>
+
+        <div className="flex items-center gap-2">
+          <button
+            onClick={save}
+            disabled={saving}
+            className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
+          >
+            {saving ? "Saving…" : webform ? "Save changes" : "Create form"}
+          </button>
+          {error && <span className="text-sm text-red-600">{error}</span>}
+        </div>
+      </div>
+
+      {recentSubmissions.length > 0 && (
+        <div className="rounded-lg border border-slate-200 bg-white p-4">
+          <p className="text-sm font-medium">Recent submissions</p>
+          <ul className="mt-2 space-y-1">
+            {recentSubmissions.map((s) => (
+              <li key={s.id} className="flex justify-between text-sm text-slate-500">
+                <span>{s.submitter_email ?? "Anonymous"}</span>
+                <span className="text-xs">{new Date(s.created_at).toLocaleString()}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+    </div>
+  );
+}
