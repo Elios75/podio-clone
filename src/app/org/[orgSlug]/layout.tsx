@@ -34,6 +34,7 @@ export default async function OrgLayout({
             ← All organizations
           </Link>
           <span className="flex gap-2">
+            <Link href="/search" className="text-sm" title="Search">🔍</Link>
             <Link href="/tasks" className="text-sm" title="My tasks">✓</Link>
             <Link href="/notifications" className="text-sm" title="Notifications">🔔</Link>
           </span>

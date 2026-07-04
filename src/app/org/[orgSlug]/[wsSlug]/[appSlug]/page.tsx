@@ -5,6 +5,7 @@ import { formatDuration, publicFileUrl, type CategoryOption } from "@/lib/fields
 import { BoardView } from "./board-view";
 import { CalendarView } from "./calendar-view";
 import { ViewToolbar, type Filter, type Sort } from "./view-toolbar";
+import { ExportButton } from "./export-button";
 
 export default async function AppPage({
   params,
@@ -297,6 +298,11 @@ export default async function AppPage({
           {app.icon} {app.name}
         </h1>
         <div className="flex items-center gap-2">
+          <Link href={`${baseHref}/import`}
+            className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-600 hover:bg-slate-100">
+            Import
+          </Link>
+          <ExportButton appId={app.id} appName={app.name} fields={fields as any} />
           <Link href={`${baseHref}/form`}
             className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-600 hover:bg-slate-100">
             Webform
