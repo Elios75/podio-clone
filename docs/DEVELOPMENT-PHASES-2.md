@@ -4,6 +4,15 @@ Written after completing Phases 0–7. Every item below is in `podio-clone.md` (
 
 ---
 
+## Working notes (read me first, next session)
+
+- **Personal project mode**: billing limits are intentionally disabled — both orgs are set to the `enterprise` plan (unlimited). Ignore plan-limit concerns until commercialization; the Stripe/billing machinery is built but dormant (env-gated).
+- Migrations 0–39 are applied to the linked Supabase project. Repo migration files are kept in sync for fresh installs.
+- Workflow: develop in a sandbox clone, apply migrations via the Supabase connector, copy changed files to `C:\Users\fd\podio-clone`, and the user commits/pushes (the GitHub connector is read-only).
+- `.env.local` exists locally (gitignored) with the Supabase URL + anon key. Optional keys documented in `.env.local.example` (Turnstile, Stripe, Anthropic).
+
+---
+
 ## Phase 8 — App builder completion (the biggest gap)
 
 The builder is create-only. Podio's core promise is *modify anytime*.
