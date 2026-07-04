@@ -57,7 +57,13 @@ export default async function OrgPage({
 
   return (
     <main className="mx-auto max-w-3xl p-8">
-      <h1 className="text-2xl font-semibold">{org.name}</h1>
+      <div className="flex items-center justify-between">
+        <h1 className="text-2xl font-semibold">{org.name}</h1>
+        <Link href={`/org/${org.slug}/audit`}
+          className="text-sm text-slate-500 hover:underline">
+          Audit log
+        </Link>
+      </div>
       <p className="mt-1 text-sm text-slate-500">
         {(members ?? []).length} member{(members ?? []).length === 1 ? "" : "s"}
       </p>
