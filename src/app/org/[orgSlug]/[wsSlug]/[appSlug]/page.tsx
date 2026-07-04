@@ -19,6 +19,7 @@ export default async function AppPage({
     f?: string;
     s?: string;
     viewId?: string;
+    cols?: string;
   }>;
 }) {
   const { orgSlug, wsSlug, appSlug } = await params;
@@ -49,7 +50,7 @@ export default async function AppPage({
 
   const { data: items } = await supabase
     .from("items")
-    .select("id, item_number, title, created_at")
+    .select("id, item_number, title, created_at, updated_at")
     .eq("app_id", app.id).eq("is_deleted", false)
     .order("created_at", { ascending: false })
     .limit(500);
@@ -178,7 +179,7 @@ export default async function AppPage({
   // ----- Saved views + filters/sort -----
   const { data: savedViews } = await supabase
     .from("app_views")
-    .select("id, name, layout, visibility, filters, sort, is_default")
+    .select("id, name, layout, visibility, filters, sort, is_default, columns")
     .eq("app_id", app.id)
     .order("name");
 
@@ -201,21 +202,25 @@ export default async function AppPage({
   const filters = parseJson<Filter[]>(sp.f, (activeView?.filters as Filter[]) ?? []);
   const sort = parseJson<Sort[]>(sp.s, (activeView?.sort as Sort[]) ?? []);
 
+  // Visible table columns (URL > saved view > all)
+  const colsList: string[] | null = sp.cols
+    ? sp.cols.split(",").filter(Boolean)
+    : (activeView?.columns as string[] | null) ?? null;
+  const visibleFields = colsList
+    ? fields.filter((f) => colsList.includes(f.id))
+    : fields;
+
   // ----- View selection -----
-  const savedLayout =
-    activeView?.layout === "card"
+  const LAYOUTS = ["table", "board", "calendar", "badge", "stream"];
+  const savedLayout = activeView
+    ? activeView.layout === "card"
       ? "board"
-      : activeView?.layout === "calendar"
-      ? "calendar"
-      : activeView
-      ? "table"
-      : null;
+      : LAYOUTS.includes(activeView.layout)
+      ? activeView.layout
+      : "table"
+    : null;
   const view =
-    sp.view === "board" || sp.view === "calendar"
-      ? sp.view
-      : sp.view === "table"
-      ? "table"
-      : savedLayout ?? "table";
+    sp.view && LAYOUTS.includes(sp.view) ? sp.view : savedLayout ?? "table";
   const baseHref = `/org/${orgSlug}/${wsSlug}/${app.slug}`;
 
   // ----- Apply filters + sort (in-memory over the EAV values; move to SQL at scale) -----
@@ -360,6 +365,8 @@ export default async function AppPage({
         ) : (
           <span className="rounded-lg border border-slate-200 px-3 py-1.5 text-sm text-slate-300" title="Add a Date field to use the calendar">Calendar</span>
         )}
+        <Link href={`${baseHref}?view=badge`} className={tabCls(view === "badge")}>Badge</Link>
+        <Link href={`${baseHref}?view=stream`} className={tabCls(view === "stream")}>Stream</Link>
       </div>
 
       <ViewToolbar
@@ -367,6 +374,8 @@ export default async function AppPage({
         baseHref={baseHref}
         layout={view}
         fields={fields as any}
+        tableFields={fields.map((f) => ({ id: f.id, label: f.label }))}
+        initialCols={colsList}
         members={members}
         savedViews={(savedViews ?? []).map((v) => ({
           id: v.id,
@@ -400,13 +409,75 @@ export default async function AppPage({
         </div>
       )}
 
+      {view === "badge" && (
+        <div className="mt-6 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          {visibleItems.map((item) => (
+            <Link key={item.id}
+              href={`${baseHref}/${item.item_number}`}
+              className="block rounded-lg border border-slate-200 bg-white p-4 hover:border-blue-400">
+              <div className="flex items-center justify-between">
+                <span className="truncate font-medium">
+                  {item.title ?? `#${item.item_number}`}
+                </span>
+                <span className="text-xs text-slate-300">#{item.item_number}</span>
+              </div>
+              <dl className="mt-2 space-y-1">
+                {visibleFields.slice(0, 5).map((f) => (
+                  <div key={f.id} className="flex items-center gap-2 text-xs">
+                    <dt className="w-20 shrink-0 truncate text-slate-400">{f.label}</dt>
+                    <dd className="min-w-0 truncate">{render(f, item.id)}</dd>
+                  </div>
+                ))}
+              </dl>
+            </Link>
+          ))}
+          {visibleItems.length === 0 && (
+            <p className="col-span-full rounded-lg border border-dashed border-slate-300 p-10 text-center text-sm text-slate-400">
+              No {app.item_name.toLowerCase()}s match.
+            </p>
+          )}
+        </div>
+      )}
+
+      {view === "stream" && (
+        <ul className="mt-6 space-y-2">
+          {[...visibleItems]
+            .sort((a, b) => (a.updated_at < b.updated_at ? 1 : -1))
+            .map((item) => (
+              <li key={item.id}>
+                <Link href={`${baseHref}/${item.item_number}`}
+                  className="flex items-center gap-3 rounded-lg border border-slate-200 bg-white px-4 py-3 hover:border-blue-400">
+                  <span className="min-w-0">
+                    <span className="block truncate text-sm font-medium">
+                      {item.title ?? `#${item.item_number}`}
+                    </span>
+                    <span className="block text-xs text-slate-400">
+                      updated {new Date(item.updated_at).toLocaleString()}
+                    </span>
+                  </span>
+                  <span className="ml-auto flex shrink-0 gap-3 text-xs">
+                    {visibleFields.slice(0, 3).map((f) => (
+                      <span key={f.id}>{render(f, item.id)}</span>
+                    ))}
+                  </span>
+                </Link>
+              </li>
+            ))}
+          {visibleItems.length === 0 && (
+            <li className="rounded-lg border border-dashed border-slate-300 p-10 text-center text-sm text-slate-400">
+              No {app.item_name.toLowerCase()}s match.
+            </li>
+          )}
+        </ul>
+      )}
+
       {view === "table" && (
       <div className="mt-6 overflow-x-auto rounded-lg border border-slate-200 bg-white">
         <table className="w-full text-left text-sm">
           <thead className="border-b border-slate-200 bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
             <tr>
               <th className="px-4 py-3">#</th>
-              {fields.map((f) => (
+              {visibleFields.map((f) => (
                 <th key={f.id} className="px-4 py-3">{f.label}</th>
               ))}
             </tr>
@@ -422,14 +493,14 @@ export default async function AppPage({
                     {item.item_number}
                   </Link>
                 </td>
-                {fields.map((f) => (
+                {visibleFields.map((f) => (
                   <td key={f.id} className="px-4 py-3">{render(f, item.id)}</td>
                 ))}
               </tr>
             ))}
             {visibleItems.length === 0 && (
               <tr>
-                <td colSpan={1 + fields.length}
+                <td colSpan={1 + visibleFields.length}
                   className="px-4 py-10 text-center text-slate-400">
                   No {app.item_name.toLowerCase()}s yet.
                 </td>

@@ -53,13 +53,15 @@ function opGroup(t: FieldType): keyof typeof OPS {
 export function ViewToolbar({
   appId,
   baseHref,
-  layout, // "table" | "board" | "calendar"
+  layout, // "table" | "board" | "calendar" | "badge" | "stream"
   fields,
   members,
   savedViews,
   activeViewId,
   initialFilters,
   initialSort,
+  tableFields,
+  initialCols,
 }: {
   appId: string;
   baseHref: string;
@@ -70,6 +72,8 @@ export function ViewToolbar({
   activeViewId: string | null;
   initialFilters: Filter[];
   initialSort: Sort[];
+  tableFields: { id: string; label: string }[];
+  initialCols: string[] | null;
 }) {
   const router = useRouter();
   const supabase = createClient();
@@ -83,6 +87,16 @@ export function ViewToolbar({
   const [viewName, setViewName] = useState("");
   const [visibility, setVisibility] = useState<"team" | "private">("team");
   const [makeDefault, setMakeDefault] = useState(false);
+  const [colsOpen, setColsOpen] = useState(false);
+  const [cols, setCols] = useState<string[] | null>(initialCols);
+
+  function toggleCol(id: string) {
+    const current = cols ?? tableFields.map((f) => f.id);
+    const next = current.includes(id)
+      ? current.filter((x) => x !== id)
+      : [...current, id];
+    setCols(next.length === tableFields.length ? null : next);
+  }
   const [error, setError] = useState<string | null>(null);
 
   function buildQuery(extra?: Record<string, string>) {
@@ -91,6 +105,7 @@ export function ViewToolbar({
     const clean = filters.filter((f) => f.field_id && f.op);
     if (clean.length) q.set("f", JSON.stringify(clean));
     if (sortField) q.set("s", JSON.stringify([{ field_id: sortField, dir: sortDir }]));
+    if (cols && cols.length > 0) q.set("cols", cols.join(","));
     for (const [k, v] of Object.entries(extra ?? {})) q.set(k, v);
     return q.toString();
   }
@@ -115,6 +130,7 @@ export function ViewToolbar({
         owner_id: user?.id,
         filters: filters.filter((f) => f.field_id && f.op),
         sort: sortField ? [{ field_id: sortField, dir: sortDir }] : [],
+        columns: cols,
       })
       .select()
       .single();
@@ -287,6 +303,26 @@ export function ViewToolbar({
         >
           + Add filter
         </button>
+        <button
+          onClick={() => setColsOpen(!colsOpen)}
+          className="rounded border border-slate-300 px-2 py-1 text-xs hover:bg-slate-100"
+        >
+          Columns {cols ? `(${cols.length}/${tableFields.length})` : "▾"}
+        </button>
+        {colsOpen && (
+          <span className="flex flex-wrap gap-x-3 gap-y-1 rounded border border-slate-200 bg-slate-50 px-2 py-1">
+            {tableFields.map((f) => (
+              <label key={f.id} className="flex items-center gap-1 text-xs text-slate-600">
+                <input
+                  type="checkbox"
+                  checked={(cols ?? tableFields.map((x) => x.id)).includes(f.id)}
+                  onChange={() => toggleCol(f.id)}
+                />
+                {f.label}
+              </label>
+            ))}
+          </span>
+        )}
         <button onClick={apply}
           className="rounded bg-slate-900 px-3 py-1 text-xs font-medium text-white hover:bg-slate-700">
           Apply
