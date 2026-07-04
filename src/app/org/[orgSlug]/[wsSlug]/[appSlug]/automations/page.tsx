@@ -48,10 +48,10 @@ export default async function AutomationsPage({
   const { data: runs } = autoIds.length
     ? await supabase
         .from("automation_runs")
-        .select("id, automation_id, status, error, created_at")
+        .select("id, automation_id, item_id, status, error, logs, is_test, trigger_event, created_at, started_at, finished_at")
         .in("automation_id", autoIds)
         .order("created_at", { ascending: false })
-        .limit(20)
+        .limit(30)
     : { data: [] as any[] };
 
   return (

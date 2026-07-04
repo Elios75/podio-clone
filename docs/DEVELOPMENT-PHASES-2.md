@@ -47,6 +47,8 @@ The builder is create-only. Podio's core promise is *modify anytime*.
 
 ## Phase 12 — Automation & platform depth
 
+> **Status: Phase 12a shipped** (migration 35): date-reached / comment-added / task-completed / manual triggers; http_request + update_related_item actions; dry-run test mode; run-log detail viewer. Remaining: scheduled flows, inbound-webhook trigger, PDF/approval/loop actions, flow versioning UI, webform depth, API v1.1, marketplace depth, XLSX import/export.
+
 - Triggers: **date-reached** (cron scans date fields), scheduled flows, task-completed (RPC exists, no automation hook), comment-added, manual "run now" button, inbound-webhook trigger.
 - Actions: HTTP request (via `pg_net`, mirroring webhook delivery), **PDF generation** from item + template, approval step (approve/reject task gating the flow), update-related-item, loop over related items.
 - Test mode (`automation_runs.is_test` exists), run log detail viewer, flow versioning UI (`automation_revisions` table waiting).
