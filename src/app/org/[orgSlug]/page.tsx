@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { CreateWorkspaceForm } from "./create-workspace-form";
 import { ApiKeysSection } from "./api-keys-section";
 import { WebhooksSection } from "./webhooks-section";
+import { BackupButton } from "./backup-button";
 import { MemberRoleSelect } from "@/components/member-role-select";
 import { SsoSettings } from "./sso-settings";
 import { EmailTemplatesSection } from "./email-templates-section";
@@ -142,6 +143,7 @@ export default async function OrgPage({
       />
       <EmailTemplatesSection orgId={org.id} templates={(emailTemplates ?? []) as any} />
       <SsoSettings orgId={org.id} settings={org.security_settings as any} />
+      <BackupButton orgId={org.id} orgSlug={org.slug} />
 
       <p className="mt-10 text-xs text-slate-400">
         Storage used: {(storageBytes / 1024 / 1024).toFixed(1)} MB of 1024 MB

@@ -11,7 +11,9 @@ type Member = { user_id: string; full_name: string | null };
 type Step =
   | { type: "action"; config: any }
   | { type: "delay"; hours: number }
-  | { type: "branch"; condition: any; then: Step[]; else: Step[] };
+  | { type: "branch"; condition: any; then: Step[]; else: Step[] }
+  | { type: "approval"; title: string; assignee_id: string }
+  | { type: "loop_related"; relationship_field_id: string; action: any };
 
 const TRIGGERS = [
   { value: "item_created", label: "Item is created" },
@@ -35,6 +37,7 @@ export function AdvancedBuilder({
 
   const condFields = fields.filter((f) =>
     ["text", "category", "number", "money", "progress"].includes(f.type));
+  const relFields = fields.filter((f) => f.type === "relationship");
 
   function ActionEditor({ value, onChange }: { value: any; onChange: (v: any) => void }) {
     return (
@@ -170,6 +173,13 @@ export function AdvancedBuilder({
         then: [{ type: "action", config: { type: "create_task" } }],
         else: [],
       }]);
+    if (type === "approval")
+      setSteps([...steps, { type: "approval", title: "", assignee_id: "" }]);
+    if (type === "loop_related")
+      setSteps([...steps, {
+        type: "loop_related", relationship_field_id: "",
+        action: { type: "update_field" },
+      }]);
   }
 
   async function save() {
@@ -233,6 +243,44 @@ export function AdvancedBuilder({
                 <span>hours</span>
               </span>
             )}
+            {s.type === "approval" && (
+              <span className="flex flex-wrap items-center gap-1.5">
+                <span className="font-medium text-amber-600">Wait for approval</span>
+                <input placeholder="Approval task title" value={s.title}
+                  onChange={(e) => setStep(i, { ...s, title: e.target.value })}
+                  className="w-44 rounded border border-slate-300 px-1.5 py-1 text-xs" />
+                <select value={s.assignee_id}
+                  onChange={(e) => setStep(i, { ...s, assignee_id: e.target.value })}
+                  className="rounded border border-slate-300 px-1 py-1 text-xs">
+                  <option value="">approver…</option>
+                  {members.map((m) => (
+                    <option key={m.user_id} value={m.user_id}>{m.full_name ?? "member"}</option>
+                  ))}
+                </select>
+                <span className="text-slate-400">flow pauses until the task is completed</span>
+              </span>
+            )}
+            {s.type === "loop_related" && (
+              <div className="flex-1 space-y-1.5">
+                <span className="flex items-center gap-1.5">
+                  <span className="font-medium text-teal-600">For each related item</span>
+                  <select value={s.relationship_field_id}
+                    onChange={(e) => setStep(i, { ...s, relationship_field_id: e.target.value })}
+                    className="rounded border border-slate-300 px-1 py-1 text-xs">
+                    <option value="">any relationship</option>
+                    {relFields.map((f) => <option key={f.id} value={f.id}>via {f.label}</option>)}
+                  </select>
+                </span>
+                <div className="flex items-center gap-1.5 pl-4">
+                  <span className="text-teal-600">do</span>
+                  <ActionEditor value={s.action}
+                    onChange={(action) => setStep(i, { ...s, action })} />
+                </div>
+                <p className="pl-4 text-[10px] text-slate-400">
+                  Field actions run against the related items — pick fields that exist on the related app.
+                </p>
+              </div>
+            )}
             {s.type === "branch" && (
               <div className="flex-1 space-y-1.5">
                 <span className="flex items-center gap-1.5">
@@ -277,6 +325,10 @@ export function AdvancedBuilder({
           className="rounded border border-purple-300 px-2 py-1 text-xs text-purple-700 hover:bg-purple-50">+ Delay</button>
         <button onClick={() => addStep("branch")}
           className="rounded border border-purple-300 px-2 py-1 text-xs text-purple-700 hover:bg-purple-50">+ Branch</button>
+        <button onClick={() => addStep("approval")}
+          className="rounded border border-amber-300 px-2 py-1 text-xs text-amber-700 hover:bg-amber-50">+ Approval</button>
+        <button onClick={() => addStep("loop_related")}
+          className="rounded border border-teal-300 px-2 py-1 text-xs text-teal-700 hover:bg-teal-50">+ Loop related</button>
         <button onClick={save}
           className="ml-auto rounded-lg bg-purple-600 px-4 py-2 text-sm font-medium text-white hover:bg-purple-700">
           Create flow

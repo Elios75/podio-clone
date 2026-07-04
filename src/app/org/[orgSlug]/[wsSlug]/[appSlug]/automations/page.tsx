@@ -40,7 +40,7 @@ export default async function AutomationsPage({
 
   const { data: automations } = await supabase
     .from("automations")
-    .select("id, name, status, trigger, conditions, actions, created_at")
+    .select("id, name, status, version, trigger, conditions, actions, created_at")
     .eq("app_id", app.id)
     .order("created_at");
 

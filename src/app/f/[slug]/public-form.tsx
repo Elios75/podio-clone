@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { CURRENCIES } from "@/lib/fields";
 
@@ -18,6 +18,29 @@ export function PublicForm({
   const [submitted, setSubmitted] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
+  const captchaToken = useRef<string | null>(null);
+  const captchaRef = useRef<HTMLDivElement>(null);
+  const siteKey = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY;
+  const useCaptcha = Boolean(form.captcha_enabled && siteKey);
+
+  useEffect(() => {
+    if (!useCaptcha || !captchaRef.current) return;
+    const render = () => {
+      const t = (window as any).turnstile;
+      if (t && captchaRef.current && !captchaRef.current.hasChildNodes()) {
+        t.render(captchaRef.current, {
+          sitekey: siteKey,
+          callback: (token: string) => { captchaToken.current = token; },
+        });
+      }
+    };
+    if ((window as any).turnstile) return render();
+    const script = document.createElement("script");
+    script.src = "https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit";
+    script.async = true;
+    script.onload = render;
+    document.head.appendChild(script);
+  }, [useCaptcha, siteKey]);
 
   const set = (id: string, v: any) => setValues((p) => ({ ...p, [id]: v }));
 
@@ -25,13 +48,27 @@ export function PublicForm({
     e.preventDefault();
     setError(null);
     setSending(true);
-    const { error: rpcError } = await supabase.rpc("submit_webform", {
-      p_slug: slug,
-      p_values: values,
-      p_submitter_email: email || null,
-    });
+    let submitError: string | null = null;
+    if (useCaptcha) {
+      const res = await fetch("/api/forms/submit", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          slug, values, email: email || null,
+          captcha_token: captchaToken.current,
+        }),
+      }).then((r) => r.json()).catch((e) => ({ error: String(e) }));
+      submitError = res?.error ?? null;
+    } else {
+      const { error: rpcError } = await supabase.rpc("submit_webform", {
+        p_slug: slug,
+        p_values: values,
+        p_submitter_email: email || null,
+      });
+      submitError = rpcError?.message ?? null;
+    }
     setSending(false);
-    if (rpcError) return setError(rpcError.message);
+    if (submitError) return setError(submitError);
     if (form.redirect_url && /^https?:\/\//i.test(form.redirect_url)) {
       window.location.href = form.redirect_url;
       return;
@@ -160,6 +197,8 @@ export function PublicForm({
         <input type="email" value={email} onChange={(e) => setEmail(e.target.value)}
           className={`mt-1 ${inputCls}`} />
       </div>
+
+      {useCaptcha && <div ref={captchaRef} className="min-h-[65px]" />}
 
       {error && <p className="text-sm text-red-600">{error}</p>}
       <button type="submit" disabled={sending}

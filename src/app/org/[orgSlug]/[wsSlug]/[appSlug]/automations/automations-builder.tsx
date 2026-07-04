@@ -11,9 +11,10 @@ type Field = {
 };
 type Member = { user_id: string; full_name: string | null };
 type Automation = {
-  id: string; name: string; status: string;
+  id: string; name: string; status: string; version: number;
   trigger: any; conditions: any[]; actions: any[];
 };
+type Revision = { id: string; version: number; created_at: string };
 type Run = {
   id: string; automation_id: string; status: string; error: string | null;
   logs: any[]; is_test: boolean; trigger_event: any;
@@ -29,6 +30,8 @@ const TRIGGERS = [
   { value: "comment_added", label: "A comment is added" },
   { value: "task_completed", label: "A task is completed" },
   { value: "date_reached", label: "A date is reached" },
+  { value: "scheduled", label: "On a schedule" },
+  { value: "webhook", label: "Inbound webhook received" },
 ];
 
 const ACTION_TYPES = [
@@ -39,6 +42,7 @@ const ACTION_TYPES = [
   { value: "send_email", label: "Send an email" },
   { value: "http_request", label: "Make an HTTP request" },
   { value: "update_related_item", label: "Update related items" },
+  { value: "generate_pdf", label: "Generate a PDF" },
 ];
 
 function StatusBadge({ status, isTest }: { status: string; isTest?: boolean }) {
@@ -175,6 +179,11 @@ export function AutomationsBuilder({
   const [trigger, setTrigger] = useState("item_created");
   const [dateField, setDateField] = useState("");
   const [dateOffset, setDateOffset] = useState("0");
+  const [schedEvery, setSchedEvery] = useState("day");
+  const [schedHour, setSchedHour] = useState("9");
+  const [schedDow, setSchedDow] = useState("1");
+  const [historyFor, setHistoryFor] = useState<string | null>(null);
+  const [revisions, setRevisions] = useState<Record<string, Revision[]>>({});
   const [condField, setCondField] = useState("");
   const [condOp, setCondOp] = useState("equals");
   const [condValue, setCondValue] = useState("");
@@ -224,6 +233,15 @@ export function AutomationsBuilder({
       trig.field_id = dateField;
       trig.offset_days = Number(dateOffset || 0);
     }
+    if (trigger === "scheduled") {
+      trig.every = schedEvery;
+      trig.hour = Number(schedHour || 9);
+      if (schedEvery === "week") trig.dow = Number(schedDow || 1);
+    }
+    if (trigger === "webhook") {
+      trig.token = Array.from(crypto.getRandomValues(new Uint8Array(16)))
+        .map((b) => b.toString(16).padStart(2, "0")).join("");
+    }
     const cleanActions = actions.map((a) => {
       if (a.type !== "http_request") return a;
       let body: any = undefined;
@@ -266,8 +284,42 @@ export function AutomationsBuilder({
     router.refresh();
   }
 
+  async function loadHistory(autoId: string) {
+    if (historyFor === autoId) return setHistoryFor(null);
+    setHistoryFor(autoId);
+    if (!revisions[autoId]) {
+      const { data } = await supabase
+        .from("automation_revisions")
+        .select("id, version, created_at")
+        .eq("automation_id", autoId)
+        .order("version", { ascending: false })
+        .limit(20);
+      setRevisions((prev) => ({ ...prev, [autoId]: (data ?? []) as Revision[] }));
+    }
+  }
+
+  async function restore(revId: string) {
+    const { error: rpcError } = await supabase.rpc("restore_automation_revision", {
+      p_revision: revId,
+    });
+    if (!rpcError) {
+      setHistoryFor(null);
+      setRevisions({});
+      router.refresh();
+    }
+  }
+
+  const DOW = ["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"];
+
   const triggerLabel = (t: any) => {
     const base = TRIGGERS.find((x) => x.value === t?.type)?.label ?? t?.type;
+    if (t?.type === "scheduled") {
+      const every = t.every ?? "day";
+      const at = `${String(t.hour ?? 9).padStart(2, "0")}:00 UTC`;
+      return every === "hour" ? `${base} (hourly)`
+        : every === "week" ? `${base} (${DOW[t.dow ?? 1]}s at ${at})`
+        : `${base} (daily at ${at})`;
+    }
     if (t?.type === "date_reached") {
       const f = fields.find((x) => x.id === t.field_id);
       const off = Number(t.offset_days ?? 0);
@@ -287,7 +339,16 @@ export function AutomationsBuilder({
             <div className="flex items-center gap-2">
               <span className={`h-2 w-2 rounded-full ${a.status === "active" ? "bg-green-500" : "bg-slate-300"}`} />
               <span className="font-medium">{a.name}</span>
+              {a.version > 1 && (
+                <span className="rounded bg-slate-100 px-1.5 py-0.5 text-[11px] text-slate-500">
+                  v{a.version}
+                </span>
+              )}
               <span className="ml-auto flex gap-3 text-xs">
+                <button onClick={() => loadHistory(a.id)}
+                  className="text-slate-500 hover:text-blue-600">
+                  history
+                </button>
                 <button onClick={() => setRunPanel(runPanel === a.id ? null : a.id)}
                   className="text-slate-500 hover:text-blue-600">
                   {runPanel === a.id ? "close" : "run / test"}
@@ -307,6 +368,37 @@ export function AutomationsBuilder({
                 ACTION_TYPES.find((t) => t.value === x.type)?.label ?? x.type
               ).join(", ")}
             </p>
+            {a.trigger?.type === "webhook" && a.trigger?.token && (
+              <div className="mt-2 flex items-center gap-2 rounded border border-slate-200 bg-slate-50 p-2">
+                <code className="flex-1 truncate text-[11px] text-slate-600">
+                  POST {typeof window !== "undefined" ? window.location.origin : ""}/api/hooks/{a.id}?token={a.trigger.token}
+                </code>
+                <button
+                  onClick={() => navigator.clipboard.writeText(
+                    `${window.location.origin}/api/hooks/${a.id}?token=${a.trigger.token}`)}
+                  className="rounded border border-slate-300 px-2 py-0.5 text-[11px] hover:bg-slate-100">
+                  Copy
+                </button>
+              </div>
+            )}
+            {historyFor === a.id && (
+              <div className="mt-2 rounded border border-slate-200 bg-slate-50 p-2 text-xs">
+                <p className="font-medium text-slate-600">Version history</p>
+                {(revisions[a.id] ?? []).map((r) => (
+                  <div key={r.id} className="mt-1 flex items-center gap-2">
+                    <span className="text-slate-500">v{r.version}</span>
+                    <span className="text-slate-400">{new Date(r.created_at).toLocaleString()}</span>
+                    <button onClick={() => restore(r.id)}
+                      className="ml-auto text-blue-600 hover:underline">restore</button>
+                  </div>
+                ))}
+                {(revisions[a.id] ?? []).length === 0 && (
+                  <p className="mt-1 text-slate-400">
+                    No saved versions yet — snapshots are taken automatically on every edit.
+                  </p>
+                )}
+              </div>
+            )}
             {runPanel === a.id && (
               <RunNowPanel automation={a} appId={appId} onDone={() => router.refresh()} />
             )}
@@ -371,6 +463,40 @@ export function AutomationsBuilder({
                   <span className="text-xs text-amber-600">This app has no date fields yet.</span>
                 )}
               </>
+            )}
+            {trigger === "scheduled" && (
+              <>
+                <select value={schedEvery} onChange={(e) => setSchedEvery(e.target.value)}
+                  className="rounded border border-slate-300 px-2 py-1.5 text-sm">
+                  <option value="hour">every hour</option>
+                  <option value="day">every day</option>
+                  <option value="week">every week</option>
+                </select>
+                {schedEvery !== "hour" && (
+                  <>
+                    {schedEvery === "week" && (
+                      <select value={schedDow} onChange={(e) => setSchedDow(e.target.value)}
+                        className="rounded border border-slate-300 px-2 py-1.5 text-sm">
+                        {["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"]
+                          .map((d, i) => <option key={i} value={i}>{d}</option>)}
+                      </select>
+                    )}
+                    <span className="text-xs text-slate-500">at</span>
+                    <input type="number" min={0} max={23} value={schedHour}
+                      onChange={(e) => setSchedHour(e.target.value)}
+                      className="w-16 rounded border border-slate-300 px-2 py-1.5 text-sm" />
+                    <span className="text-xs text-slate-500">:00 UTC</span>
+                  </>
+                )}
+                <span className="text-xs text-slate-500">
+                  runs on items matching the condition below (50 per run)
+                </span>
+              </>
+            )}
+            {trigger === "webhook" && (
+              <span className="text-xs text-slate-500">
+                a secure URL is generated when you save — shown on the automation card
+              </span>
             )}
           </div>
 
@@ -506,6 +632,11 @@ export function AutomationsBuilder({
                         className="w-full rounded border border-slate-300 px-2 py-1.5 text-sm font-mono" />
                     )}
                   </>
+                )}
+                {a.type === "generate_pdf" && (
+                  <input placeholder="Comment prefix (optional)" value={a.note ?? ""}
+                    onChange={(e) => setAction(i, { note: e.target.value })}
+                    className="flex-1 rounded border border-slate-300 px-2 py-1.5 text-sm" />
                 )}
                 {a.type === "update_related_item" && (() => {
                   const relField = relFields.find((f) => f.id === a.relationship_field_id);

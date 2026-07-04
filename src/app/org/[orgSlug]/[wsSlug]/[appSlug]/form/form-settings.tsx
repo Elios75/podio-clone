@@ -42,6 +42,9 @@ export function FormSettings({
     (webform?.settings?.allowed_domains ?? []).join(", ")
   );
   const [showAdvanced, setShowAdvanced] = useState(false);
+  const [captchaEnabled, setCaptchaEnabled] = useState(
+    Boolean(webform?.settings?.captcha_enabled)
+  );
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
@@ -73,6 +76,7 @@ export function FormSettings({
                        ...(bgColor ? { background_color: bgColor } : {}) } }
           : {}),
         ...(customCss.trim() ? { custom_css: customCss } : {}),
+        ...(captchaEnabled ? { captcha_enabled: true } : {}),
         ...(allowedDomains.trim()
           ? { allowed_domains: allowedDomains.split(",").map((d: string) => d.trim()).filter(Boolean) }
           : {}),
@@ -217,6 +221,12 @@ export function FormSettings({
                 placeholder=".podio-form-card { border-radius: 0; }"
                 className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-xs font-mono" />
             </div>
+            <label className="flex items-center gap-2 text-xs text-slate-600">
+              <input type="checkbox" checked={captchaEnabled}
+                onChange={(e) => setCaptchaEnabled(e.target.checked)} />
+              Require captcha (Cloudflare Turnstile — set NEXT_PUBLIC_TURNSTILE_SITE_KEY and
+              TURNSTILE_SECRET_KEY in the environment)
+            </label>
             <div>
               <label className="block text-xs font-medium text-slate-600">
                 Allowed embed domains (comma-separated, informational for now)
