@@ -5,6 +5,7 @@ import { CreateWorkspaceForm } from "./create-workspace-form";
 import { ApiKeysSection } from "./api-keys-section";
 import { WebhooksSection } from "./webhooks-section";
 import { MemberRoleSelect } from "@/components/member-role-select";
+import { SsoSettings } from "./sso-settings";
 
 export default async function OrgPage({
   params,
@@ -16,7 +17,7 @@ export default async function OrgPage({
 
   const { data: org } = await supabase
     .from("organizations")
-    .select("id, name, slug")
+    .select("id, name, slug, security_settings")
     .eq("slug", orgSlug)
     .single();
   if (!org) notFound();
@@ -122,6 +123,7 @@ export default async function OrgPage({
         hooks={(hooks ?? []) as any}
         deliveries={(hookDeliveries ?? []) as any}
       />
+      <SsoSettings orgId={org.id} settings={org.security_settings as any} />
     </main>
   );
 }

@@ -16,6 +16,9 @@ export default async function HomePage() {
     .from("user_profiles")
     .upsert({ user_id: user.id }, { onConflict: "user_id" });
 
+  // SSO auto-provisioning + pending guest-share claims (idempotent, cheap)
+  await supabase.rpc("claim_sso_membership");
+
   const { data: memberships } = await supabase
     .from("organization_members")
     .select("role, organizations(id, name, slug)")
