@@ -1,0 +1,266 @@
+"use client";
+
+import { useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
+import { createClient } from "@/lib/supabase/client";
+
+type Comment = {
+  id: string;
+  body: string;
+  created_by: string;
+  created_at: string;
+  is_edited: boolean;
+  author_name: string | null;
+};
+type Member = { user_id: string; full_name: string | null };
+type Activity = {
+  id: string;
+  event_type: string;
+  actor_name: string | null;
+  created_at: string;
+  payload: any;
+};
+
+export function CommentsSection({
+  itemId,
+  currentUserId,
+  comments,
+  members,
+  activity,
+  isFollowing,
+}: {
+  itemId: string;
+  currentUserId: string;
+  comments: Comment[];
+  members: Member[];
+  activity: Activity[];
+  isFollowing: boolean;
+}) {
+  const router = useRouter();
+  const supabase = createClient();
+  const [body, setBody] = useState("");
+  const [mentionIds, setMentionIds] = useState<string[]>([]);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editBody, setEditBody] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [posting, setPosting] = useState(false);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  // Live updates: refresh when anyone comments on this item
+  useEffect(() => {
+    const channel = supabase
+      .channel(`item-comments-${itemId}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "INSERT",
+          schema: "podio",
+          table: "comments",
+          filter: `target_id=eq.${itemId}`,
+        },
+        () => router.refresh()
+      )
+      .subscribe();
+    return () => {
+      supabase.removeChannel(channel);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [itemId]);
+
+  function addMention(userId: string) {
+    const member = members.find((m) => m.user_id === userId);
+    if (!member) return;
+    const name = member.full_name ?? "member";
+    setBody((b) => `${b}${b.endsWith(" ") || b === "" ? "" : " "}@${name} `);
+    if (!mentionIds.includes(userId)) setMentionIds([...mentionIds, userId]);
+    textareaRef.current?.focus();
+  }
+
+  async function postComment() {
+    setError(null);
+    if (!body.trim()) return;
+    setPosting(true);
+    const { error: rpcError } = await supabase.rpc("add_comment", {
+      p_item: itemId,
+      p_body: body,
+      p_mentions: mentionIds,
+    });
+    setPosting(false);
+    if (rpcError) return setError(rpcError.message);
+    setBody("");
+    setMentionIds([]);
+    router.refresh();
+  }
+
+  async function saveEdit(id: string) {
+    const { error: upError } = await supabase
+      .from("comments")
+      .update({ body: editBody, is_edited: true })
+      .eq("id", id);
+    if (upError) return setError(upError.message);
+    setEditingId(null);
+    router.refresh();
+  }
+
+  async function deleteComment(id: string) {
+    await supabase.from("comments").delete().eq("id", id);
+    router.refresh();
+  }
+
+  async function toggleFollow() {
+    if (isFollowing) {
+      await supabase
+        .from("item_followers")
+        .delete()
+        .eq("item_id", itemId)
+        .eq("user_id", currentUserId);
+    } else {
+      await supabase
+        .from("item_followers")
+        .upsert(
+          { item_id: itemId, user_id: currentUserId },
+          { onConflict: "item_id,user_id" }
+        );
+    }
+    router.refresh();
+  }
+
+  const timeFmt = (d: string) => new Date(d).toLocaleString();
+
+  return (
+    <div className="mt-10 space-y-8">
+      {/* Comments */}
+      <section>
+        <div className="flex items-center justify-between">
+          <h2 className="text-lg font-medium">Comments ({comments.length})</h2>
+          <button
+            onClick={toggleFollow}
+            className={`rounded-lg px-3 py-1.5 text-xs font-medium ${
+              isFollowing
+                ? "bg-slate-900 text-white hover:bg-slate-700"
+                : "border border-slate-300 text-slate-600 hover:bg-slate-100"
+            }`}
+          >
+            {isFollowing ? "Following ✓" : "Follow"}
+          </button>
+        </div>
+
+        <div className="mt-4 space-y-3">
+          {comments.map((c) => (
+            <div key={c.id} className="rounded-lg border border-slate-200 bg-white p-3">
+              <div className="flex items-center gap-2 text-xs text-slate-400">
+                <span className="font-medium text-slate-600">
+                  {c.author_name ?? "Member"}
+                </span>
+                <span>{timeFmt(c.created_at)}</span>
+                {c.is_edited && <span>(edited)</span>}
+                {c.created_by === currentUserId && editingId !== c.id && (
+                  <span className="ml-auto flex gap-2">
+                    <button
+                      onClick={() => {
+                        setEditingId(c.id);
+                        setEditBody(c.body);
+                      }}
+                      className="hover:text-blue-600"
+                    >
+                      edit
+                    </button>
+                    <button onClick={() => deleteComment(c.id)} className="hover:text-red-600">
+                      delete
+                    </button>
+                  </span>
+                )}
+              </div>
+              {editingId === c.id ? (
+                <div className="mt-2">
+                  <textarea
+                    value={editBody}
+                    onChange={(e) => setEditBody(e.target.value)}
+                    className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
+                    rows={2}
+                  />
+                  <div className="mt-1 flex gap-2">
+                    <button onClick={() => saveEdit(c.id)}
+                      className="rounded bg-blue-600 px-3 py-1 text-xs font-medium text-white">
+                      Save
+                    </button>
+                    <button onClick={() => setEditingId(null)}
+                      className="rounded border border-slate-300 px-3 py-1 text-xs">
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <p className="mt-1 whitespace-pre-wrap text-sm">{c.body}</p>
+              )}
+            </div>
+          ))}
+          {comments.length === 0 && (
+            <p className="text-sm text-slate-400">No comments yet.</p>
+          )}
+        </div>
+
+        <div className="mt-4 rounded-lg border border-slate-200 bg-white p-3">
+          <textarea
+            ref={textareaRef}
+            placeholder="Write a comment…"
+            value={body}
+            onChange={(e) => setBody(e.target.value)}
+            rows={3}
+            className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
+          />
+          <div className="mt-2 flex items-center gap-2">
+            <select
+              value=""
+              onChange={(e) => e.target.value && addMention(e.target.value)}
+              className="rounded border border-slate-300 px-2 py-1 text-xs text-slate-500"
+            >
+              <option value="">@ Mention…</option>
+              {members
+                .filter((m) => m.user_id !== currentUserId)
+                .map((m) => (
+                  <option key={m.user_id} value={m.user_id}>
+                    {m.full_name ?? m.user_id.slice(0, 8)}
+                  </option>
+                ))}
+            </select>
+            <button
+              onClick={postComment}
+              disabled={posting || !body.trim()}
+              className="ml-auto rounded-lg bg-blue-600 px-4 py-1.5 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
+            >
+              {posting ? "Posting…" : "Comment"}
+            </button>
+          </div>
+          {error && <p className="mt-1 text-xs text-red-600">{error}</p>}
+        </div>
+      </section>
+
+      {/* Activity timeline */}
+      <section>
+        <h2 className="text-lg font-medium">Activity</h2>
+        <ul className="mt-3 space-y-1.5">
+          {activity.map((a) => (
+            <li key={a.id} className="flex items-center gap-2 text-sm text-slate-500">
+              <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-slate-300" />
+              <span className="font-medium text-slate-700">
+                {a.actor_name ?? "Someone"}
+              </span>
+              <span>
+                {a.event_type === "item_created" && "created this item"}
+                {a.event_type === "item_updated" && "updated this item"}
+                {a.event_type === "comment_added" && "commented"}
+              </span>
+              <span className="ml-auto shrink-0 text-xs text-slate-400">
+                {timeFmt(a.created_at)}
+              </span>
+            </li>
+          ))}
+          {activity.length === 0 && (
+            <li className="text-sm text-slate-400">No activity yet.</li>
+          )}
+        </ul>
+      </section>
+    </div>
+  );
+}

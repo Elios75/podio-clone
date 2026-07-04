@@ -37,6 +37,25 @@ export default async function WorkspacePage({
     .eq("is_archived", false)
     .order("name");
 
+  const { data: activityRows } = await supabase
+    .from("activity_events")
+    .select("id, event_type, actor_id, payload, created_at")
+    .eq("workspace_id", ws.id)
+    .order("created_at", { ascending: false })
+    .limit(20);
+  const feedActorIds = [
+    ...new Set((activityRows ?? []).map((a) => a.actor_id).filter(Boolean)),
+  ];
+  const { data: feedProfiles } = feedActorIds.length
+    ? await supabase
+        .from("user_profiles")
+        .select("user_id, full_name")
+        .in("user_id", feedActorIds)
+    : { data: [] as any[] };
+  const actorName = new Map(
+    (feedProfiles ?? []).map((p) => [p.user_id, p.full_name])
+  );
+
   return (
     <main className="mx-auto max-w-3xl p-8">
       <div className="flex items-center gap-3">
@@ -80,6 +99,31 @@ export default async function WorkspacePage({
           ))}
         </ul>
       )}
+
+      <h2 className="mt-10 text-lg font-medium">Activity</h2>
+      <ul className="mt-3 space-y-1.5">
+        {(activityRows ?? []).map((a: any) => (
+          <li key={a.id} className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-500">
+            <span className="font-medium text-slate-700">
+              {a.actor_id ? actorName.get(a.actor_id) ?? "Someone" : "Someone"}
+            </span>
+            <span>
+              {a.event_type === "item_created" && "created"}
+              {a.event_type === "item_updated" && "updated"}
+              {a.event_type === "comment_added" && "commented on"}
+            </span>
+            <span className="truncate font-medium text-slate-700">
+              {a.payload?.item_title ?? "an item"}
+            </span>
+            <span className="ml-auto shrink-0 text-xs text-slate-400">
+              {new Date(a.created_at).toLocaleString()}
+            </span>
+          </li>
+        ))}
+        {(activityRows ?? []).length === 0 && (
+          <li className="text-sm text-slate-400">No activity yet.</li>
+        )}
+      </ul>
 
       <h2 className="mt-10 text-lg font-medium">Members</h2>
       <ul className="mt-3 space-y-2">

@@ -29,9 +29,14 @@ export default async function OrgLayout({
   return (
     <div className="flex min-h-screen">
       <aside className="w-64 shrink-0 border-r border-slate-200 bg-white p-4">
-        <Link href="/home" className="text-xs text-slate-400 hover:text-slate-600">
-          ← All organizations
-        </Link>
+        <div className="flex items-center justify-between">
+          <Link href="/home" className="text-xs text-slate-400 hover:text-slate-600">
+            ← All organizations
+          </Link>
+          <Link href="/notifications" className="text-sm" title="Notifications">
+            🔔
+          </Link>
+        </div>
         <h2 className="mt-2 truncate text-lg font-semibold">{org.name}</h2>
 
         <p className="mt-6 text-xs font-medium uppercase tracking-wide text-slate-400">
