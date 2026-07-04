@@ -70,10 +70,10 @@ export default function LoginPage() {
   }
 
   return (
-    <main className="flex min-h-screen items-center justify-center p-4">
-      <div className="w-full max-w-sm rounded-xl border border-slate-200 bg-white p-8 shadow-sm">
-        <h1 className="text-xl font-semibold">Podio Clone</h1>
-        <p className="mt-1 text-sm text-slate-500">
+    <main className="flex min-h-screen items-center justify-center bg-podio-page p-4">
+      <div className="w-full max-w-sm rounded-lg border border-podio-border bg-white p-8 shadow-sm">
+        <h1 className="text-xl font-semibold text-podio-ink">Podio Clone</h1>
+        <p className="mt-1 text-sm text-podio-secondary">
           {mode === "signin" ? "Sign in to your account" : "Create an account"}
         </p>
 
@@ -84,7 +84,7 @@ export default function LoginPage() {
             placeholder="Email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
+            className="w-full rounded border border-podio-border px-3 py-2 text-sm focus:border-podio-teal focus:outline-none"
           />
           <input
             type="password"
@@ -93,13 +93,13 @@ export default function LoginPage() {
             placeholder="Password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
-            className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
+            className="w-full rounded border border-podio-border px-3 py-2 text-sm focus:border-podio-teal focus:outline-none"
           />
           {error && <p className="text-sm text-red-600">{error}</p>}
           <button
             type="submit"
             disabled={loading}
-            className="w-full rounded-lg bg-blue-600 px-3 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
+            className="w-full rounded bg-podio-teal px-3 py-2 text-sm font-semibold text-white hover:bg-podio-teal-dark disabled:opacity-50"
           >
             {loading ? "Working…" : mode === "signin" ? "Sign in" : "Sign up"}
           </button>
@@ -107,14 +107,14 @@ export default function LoginPage() {
 
         <button
           onClick={handleSso}
-          className="mt-3 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+          className="mt-3 w-full rounded border border-podio-border px-3 py-2 text-sm font-semibold text-podio-ink hover:bg-podio-row-alt"
         >
           Continue with SSO
         </button>
 
         <button
           onClick={() => setMode(mode === "signin" ? "signup" : "signin")}
-          className="mt-4 text-sm text-blue-600 hover:underline"
+          className="mt-4 text-sm text-podio-teal hover:underline"
         >
           {mode === "signin"
             ? "New here? Create an account"

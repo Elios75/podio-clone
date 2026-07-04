@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import type { CategoryOption, FieldType } from "@/lib/fields";
@@ -12,9 +13,14 @@ type Field = {
   config: { options?: CategoryOption[] };
 };
 type Member = { user_id: string; full_name: string | null };
-type SavedView = { id: string; name: string; visibility: string };
 export type Filter = { field_id: string; op: string; value?: any };
 export type Sort = { field_id: string; dir: "asc" | "desc" };
+export type LayoutToggle = {
+  key: string;
+  label: string;
+  href?: string;
+  disabledTitle?: string;
+};
 
 const OPS: Record<string, { value: string; label: string; needsValue: boolean }[]> = {
   textish: [
@@ -50,13 +56,21 @@ function opGroup(t: FieldType): keyof typeof OPS {
   return "textish";
 }
 
+// Podio view toolbar: filter cluster + item count on the left; layout toggles
+// (active = orange pill, inactive = plain teal) and the single solid-teal
+// "Add <item>" action on the right. Filter/sort/column editing lives in a
+// collapsible white panel underneath.
+// See docs/design/podio-design-skill/references/layouts.md §4.
 export function ViewToolbar({
   appId,
   baseHref,
   layout, // "table" | "board" | "calendar" | "badge" | "stream"
+  layouts,
+  newHref,
+  itemName,
+  countLabel,
   fields,
   members,
-  savedViews,
   activeViewId,
   initialFilters,
   initialSort,
@@ -66,9 +80,12 @@ export function ViewToolbar({
   appId: string;
   baseHref: string;
   layout: string;
+  layouts: LayoutToggle[];
+  newHref: string;
+  itemName: string;
+  countLabel: string;
   fields: Field[];
   members: Member[];
-  savedViews: SavedView[];
   activeViewId: string | null;
   initialFilters: Filter[];
   initialSort: Sort[];
@@ -83,6 +100,9 @@ export function ViewToolbar({
   const [filters, setFilters] = useState<Filter[]>(initialFilters);
   const [sortField, setSortField] = useState(initialSort[0]?.field_id ?? "");
   const [sortDir, setSortDir] = useState<"asc" | "desc">(initialSort[0]?.dir ?? "asc");
+  const [panelOpen, setPanelOpen] = useState(
+    initialFilters.length > 0 || initialSort.length > 0
+  );
   const [saveOpen, setSaveOpen] = useState(false);
   const [viewName, setViewName] = useState("");
   const [visibility, setVisibility] = useState<"team" | "private">("team");
@@ -99,6 +119,8 @@ export function ViewToolbar({
   }
   const [error, setError] = useState<string | null>(null);
 
+  const activeFilterCount = filters.filter((f) => f.field_id && f.op).length;
+
   function buildQuery(extra?: Record<string, string>) {
     const q = new URLSearchParams();
     if (layout !== "table") q.set("view", layout);
@@ -112,6 +134,11 @@ export function ViewToolbar({
 
   function apply() {
     router.push(`${baseHref}?${buildQuery()}`);
+  }
+
+  function showAll() {
+    setFilters([]);
+    router.push(layout !== "table" ? `${baseHref}?view=${layout}` : baseHref);
   }
 
   async function saveView() {
@@ -166,7 +193,7 @@ export function ViewToolbar({
     if (field.type === "category")
       return (
         <select value={flt.value ?? ""} onChange={(e) => setVal(e.target.value)}
-          className="rounded border border-slate-300 px-2 py-1 text-sm">
+          className="rounded border border-podio-border px-2 py-1 text-sm">
           <option value="">— option —</option>
           {(field.config.options ?? []).map((o) => (
             <option key={o.id} value={o.id}>{o.label}</option>
@@ -176,7 +203,7 @@ export function ViewToolbar({
     if (field.type === "contact")
       return (
         <select value={flt.value ?? ""} onChange={(e) => setVal(e.target.value)}
-          className="rounded border border-slate-300 px-2 py-1 text-sm">
+          className="rounded border border-podio-border px-2 py-1 text-sm">
           <option value="">— member —</option>
           {members.map((m) => (
             <option key={m.user_id} value={m.user_id}>
@@ -188,172 +215,213 @@ export function ViewToolbar({
     if (field.type === "date")
       return (
         <input type="date" value={flt.value ?? ""} onChange={(e) => setVal(e.target.value)}
-          className="rounded border border-slate-300 px-2 py-1 text-sm" />
+          className="rounded border border-podio-border px-2 py-1 text-sm" />
       );
     if (opGroup(field.type) === "numberish")
       return (
         <input type="number" step="any" value={flt.value ?? ""}
           onChange={(e) => setVal(e.target.value === "" ? "" : Number(e.target.value))}
-          className="w-28 rounded border border-slate-300 px-2 py-1 text-sm" />
+          className="w-28 rounded border border-podio-border px-2 py-1 text-sm" />
       );
     return (
       <input value={flt.value ?? ""} onChange={(e) => setVal(e.target.value)}
         placeholder="value"
-        className="w-36 rounded border border-slate-300 px-2 py-1 text-sm" />
+        className="w-36 rounded border border-podio-border px-2 py-1 text-sm" />
     );
   }
 
   return (
-    <div className="mt-4 rounded-lg border border-slate-200 bg-white p-3">
-      {/* Saved views row */}
-      <div className="flex flex-wrap items-center gap-2">
-        <select
-          value={activeViewId ?? ""}
-          onChange={(e) => {
-            const id = e.target.value;
-            router.push(id ? `${baseHref}?viewId=${id}` : baseHref);
-          }}
-          className="rounded-lg border border-slate-300 px-2 py-1.5 text-sm"
+    <div className="mt-1">
+      {/* Main toolbar row */}
+      <div className="flex flex-wrap items-center gap-3 py-2 text-[15px]">
+        <button
+          onClick={() => setPanelOpen(!panelOpen)}
+          className="flex items-center gap-1.5 text-podio-secondary hover:text-podio-ink"
+          title="Filter & sort"
         >
-          <option value="">All items</option>
-          {savedViews.map((v) => (
-            <option key={v.id} value={v.id}>
-              {v.name} {v.visibility === "private" ? "🔒" : ""}
-            </option>
-          ))}
-        </select>
-        {activeViewId && (
-          <button onClick={() => deleteView(activeViewId)}
-            className="text-xs text-slate-400 hover:text-red-600">
-            delete view
+          <span aria-hidden>⏳</span>
+          Filters
+          {activeFilterCount > 0 && (
+            <span className="rounded-full bg-[#4E5E5E] px-1.5 text-xs font-semibold text-white">
+              {activeFilterCount}
+            </span>
+          )}
+        </button>
+        <span className="text-podio-secondary">{countLabel}</span>
+        {activeFilterCount > 0 && (
+          <button onClick={showAll} className="text-podio-teal hover:underline">
+            Show all
           </button>
         )}
-        <div className="ml-auto flex items-center gap-2">
-          <span className="text-xs text-slate-400">Sort:</span>
-          <select value={sortField} onChange={(e) => setSortField(e.target.value)}
-            className="rounded border border-slate-300 px-2 py-1 text-sm">
-            <option value="">Created (newest)</option>
-            {filterable.map((f) => (
-              <option key={f.id} value={f.id}>{f.label}</option>
-            ))}
-          </select>
-          {sortField && (
-            <select value={sortDir} onChange={(e) => setSortDir(e.target.value as any)}
-              className="rounded border border-slate-300 px-2 py-1 text-sm">
-              <option value="asc">↑ asc</option>
-              <option value="desc">↓ desc</option>
-            </select>
+
+        <div className="ml-auto flex flex-wrap items-center gap-4">
+          {layouts.map((l) =>
+            l.key === layout ? (
+              <span
+                key={l.key}
+                className="rounded bg-podio-orange px-3 py-1.5 font-semibold text-white"
+              >
+                {l.label}
+              </span>
+            ) : l.href ? (
+              <Link key={l.key} href={l.href} className="text-podio-teal hover:underline">
+                {l.label}
+              </Link>
+            ) : (
+              <span
+                key={l.key}
+                title={l.disabledTitle}
+                className="cursor-not-allowed text-podio-disabled"
+              >
+                {l.label}
+              </span>
+            )
           )}
+          <Link
+            href={newHref}
+            className="rounded bg-podio-teal px-4 py-2 text-sm font-semibold text-white hover:bg-podio-teal-dark"
+          >
+            Add {itemName}
+          </Link>
         </div>
       </div>
 
-      {/* Filter rows */}
-      <div className="mt-2 space-y-2">
-        {filters.map((flt, i) => {
-          const field = filterable.find((f) => f.id === flt.field_id);
-          const ops = field ? OPS[opGroup(field.type)] : [];
-          return (
-            <div key={i} className="flex flex-wrap items-center gap-2">
-              <select
-                value={flt.field_id}
-                onChange={(e) => {
-                  const fid = e.target.value;
-                  const nf = filterable.find((f) => f.id === fid);
-                  setFilters(filters.map((x, xi) =>
-                    xi === i
-                      ? { field_id: fid, op: nf ? OPS[opGroup(nf.type)][0].value : "", value: "" }
-                      : x
-                  ));
-                }}
-                className="rounded border border-slate-300 px-2 py-1 text-sm"
-              >
-                <option value="">— field —</option>
-                {filterable.map((f) => (
-                  <option key={f.id} value={f.id}>{f.label}</option>
-                ))}
-              </select>
-              {field && (
-                <select value={flt.op}
-                  onChange={(e) =>
-                    setFilters(filters.map((x, xi) => (xi === i ? { ...x, op: e.target.value } : x)))
-                  }
-                  className="rounded border border-slate-300 px-2 py-1 text-sm">
-                  {ops.map((o) => (
-                    <option key={o.value} value={o.value}>{o.label}</option>
-                  ))}
-                </select>
-              )}
-              {valueInput(flt, i)}
-              <button
-                onClick={() => setFilters(filters.filter((_, xi) => xi !== i))}
-                className="text-xs text-slate-400 hover:text-red-600"
-              >
-                ✕
-              </button>
-            </div>
-          );
-        })}
-      </div>
-
-      {/* Actions */}
-      <div className="mt-3 flex flex-wrap items-center gap-2">
-        <button
-          onClick={() => setFilters([...filters, { field_id: "", op: "", value: "" }])}
-          className="rounded border border-slate-300 px-2 py-1 text-xs hover:bg-slate-100"
-        >
-          + Add filter
-        </button>
-        <button
-          onClick={() => setColsOpen(!colsOpen)}
-          className="rounded border border-slate-300 px-2 py-1 text-xs hover:bg-slate-100"
-        >
-          Columns {cols ? `(${cols.length}/${tableFields.length})` : "▾"}
-        </button>
-        {colsOpen && (
-          <span className="flex flex-wrap gap-x-3 gap-y-1 rounded border border-slate-200 bg-slate-50 px-2 py-1">
-            {tableFields.map((f) => (
-              <label key={f.id} className="flex items-center gap-1 text-xs text-slate-600">
-                <input
-                  type="checkbox"
-                  checked={(cols ?? tableFields.map((x) => x.id)).includes(f.id)}
-                  onChange={() => toggleCol(f.id)}
-                />
-                {f.label}
-              </label>
-            ))}
-          </span>
-        )}
-        <button onClick={apply}
-          className="rounded bg-slate-900 px-3 py-1 text-xs font-medium text-white hover:bg-slate-700">
-          Apply
-        </button>
-        <button onClick={() => setSaveOpen(!saveOpen)}
-          className="rounded border border-slate-300 px-2 py-1 text-xs hover:bg-slate-100">
-          Save as view…
-        </button>
-        {saveOpen && (
-          <span className="flex items-center gap-2">
-            <input placeholder="View name" value={viewName}
-              onChange={(e) => setViewName(e.target.value)}
-              className="rounded border border-slate-300 px-2 py-1 text-sm" />
-            <select value={visibility} onChange={(e) => setVisibility(e.target.value as any)}
-              className="rounded border border-slate-300 px-2 py-1 text-sm">
-              <option value="team">Team view</option>
-              <option value="private">Private view</option>
+      {panelOpen && (
+        <div className="rounded border border-podio-border bg-white p-3 shadow-sm">
+          {/* Sort row */}
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-xs text-podio-meta">Sort:</span>
+            <select value={sortField} onChange={(e) => setSortField(e.target.value)}
+              className="rounded border border-podio-border px-2 py-1 text-sm">
+              <option value="">Created (newest)</option>
+              {filterable.map((f) => (
+                <option key={f.id} value={f.id}>{f.label}</option>
+              ))}
             </select>
-            <label className="flex items-center gap-1 text-xs text-slate-600">
-              <input type="checkbox" checked={makeDefault}
-                onChange={(e) => setMakeDefault(e.target.checked)} />
-              default view
-            </label>
-            <button onClick={saveView}
-              className="rounded bg-blue-600 px-3 py-1 text-xs font-medium text-white hover:bg-blue-700">
-              Save
+            {sortField && (
+              <select value={sortDir} onChange={(e) => setSortDir(e.target.value as any)}
+                className="rounded border border-podio-border px-2 py-1 text-sm">
+                <option value="asc">↑ asc</option>
+                <option value="desc">↓ desc</option>
+              </select>
+            )}
+            {activeViewId && (
+              <button onClick={() => deleteView(activeViewId)}
+                className="ml-auto text-xs text-podio-meta hover:text-red-600">
+                delete view
+              </button>
+            )}
+          </div>
+
+          {/* Filter rows */}
+          <div className="mt-2 space-y-2">
+            {filters.map((flt, i) => {
+              const field = filterable.find((f) => f.id === flt.field_id);
+              const ops = field ? OPS[opGroup(field.type)] : [];
+              return (
+                <div key={i} className="flex flex-wrap items-center gap-2">
+                  <select
+                    value={flt.field_id}
+                    onChange={(e) => {
+                      const fid = e.target.value;
+                      const nf = filterable.find((f) => f.id === fid);
+                      setFilters(filters.map((x, xi) =>
+                        xi === i
+                          ? { field_id: fid, op: nf ? OPS[opGroup(nf.type)][0].value : "", value: "" }
+                          : x
+                      ));
+                    }}
+                    className="rounded border border-podio-border px-2 py-1 text-sm"
+                  >
+                    <option value="">— field —</option>
+                    {filterable.map((f) => (
+                      <option key={f.id} value={f.id}>{f.label}</option>
+                    ))}
+                  </select>
+                  {field && (
+                    <select value={flt.op}
+                      onChange={(e) =>
+                        setFilters(filters.map((x, xi) => (xi === i ? { ...x, op: e.target.value } : x)))
+                      }
+                      className="rounded border border-podio-border px-2 py-1 text-sm">
+                      {ops.map((o) => (
+                        <option key={o.value} value={o.value}>{o.label}</option>
+                      ))}
+                    </select>
+                  )}
+                  {valueInput(flt, i)}
+                  <button
+                    onClick={() => setFilters(filters.filter((_, xi) => xi !== i))}
+                    className="text-xs text-podio-meta hover:text-red-600"
+                  >
+                    ✕
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Actions */}
+          <div className="mt-3 flex flex-wrap items-center gap-2">
+            <button
+              onClick={() => setFilters([...filters, { field_id: "", op: "", value: "" }])}
+              className="rounded border border-podio-border px-2 py-1 text-xs text-podio-ink hover:bg-podio-row-alt"
+            >
+              + Add filter
             </button>
-          </span>
-        )}
-        {error && <span className="text-xs text-red-600">{error}</span>}
-      </div>
+            <button
+              onClick={() => setColsOpen(!colsOpen)}
+              className="rounded border border-podio-border px-2 py-1 text-xs text-podio-ink hover:bg-podio-row-alt"
+            >
+              Columns {cols ? `(${cols.length}/${tableFields.length})` : "▾"}
+            </button>
+            {colsOpen && (
+              <span className="flex flex-wrap gap-x-3 gap-y-1 rounded border border-podio-border bg-podio-row-alt px-2 py-1">
+                {tableFields.map((f) => (
+                  <label key={f.id} className="flex items-center gap-1 text-xs text-podio-secondary">
+                    <input
+                      type="checkbox"
+                      checked={(cols ?? tableFields.map((x) => x.id)).includes(f.id)}
+                      onChange={() => toggleCol(f.id)}
+                    />
+                    {f.label}
+                  </label>
+                ))}
+              </span>
+            )}
+            <button onClick={apply}
+              className="rounded bg-podio-teal px-3 py-1 text-xs font-semibold text-white hover:bg-podio-teal-dark">
+              Apply
+            </button>
+            <button onClick={() => setSaveOpen(!saveOpen)}
+              className="rounded border border-podio-border px-2 py-1 text-xs text-podio-ink hover:bg-podio-row-alt">
+              Save as view…
+            </button>
+            {saveOpen && (
+              <span className="flex items-center gap-2">
+                <input placeholder="View name" value={viewName}
+                  onChange={(e) => setViewName(e.target.value)}
+                  className="rounded border border-podio-border px-2 py-1 text-sm" />
+                <select value={visibility} onChange={(e) => setVisibility(e.target.value as any)}
+                  className="rounded border border-podio-border px-2 py-1 text-sm">
+                  <option value="team">Team view</option>
+                  <option value="private">Private view</option>
+                </select>
+                <label className="flex items-center gap-1 text-xs text-podio-secondary">
+                  <input type="checkbox" checked={makeDefault}
+                    onChange={(e) => setMakeDefault(e.target.checked)} />
+                  default view
+                </label>
+                <button onClick={saveView}
+                  className="rounded bg-podio-teal px-3 py-1 text-xs font-semibold text-white hover:bg-podio-teal-dark">
+                  Save
+                </button>
+              </span>
+            )}
+            {error && <span className="text-xs text-red-600">{error}</span>}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

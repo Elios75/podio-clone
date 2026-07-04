@@ -51,6 +51,7 @@ export function AdvancedBuilder({
           <option value="add_comment">Comment</option>
           <option value="send_email">Send email</option>
           <option value="chat_message">Slack/Teams</option>
+          <option value="send_sms">Send SMS</option>
           <option value="generate_pdf">Generate PDF</option>
         </select>
         {value.type === "create_task" && (
@@ -120,6 +121,16 @@ export function AdvancedBuilder({
             <input placeholder="message" value={value.text ?? ""}
               onChange={(e) => onChange({ ...value, text: e.target.value })}
               className="w-36 rounded border border-slate-300 px-1.5 py-1 text-xs" />
+          </>
+        )}
+        {value.type === "send_sms" && (
+          <>
+            <input placeholder="+15551234567" value={value.to ?? ""}
+              onChange={(e) => onChange({ ...value, to: e.target.value })}
+              className="w-32 rounded border border-slate-300 px-1.5 py-1 text-xs font-mono" />
+            <input placeholder="message" value={value.body ?? ""}
+              onChange={(e) => onChange({ ...value, body: e.target.value })}
+              className="w-40 rounded border border-slate-300 px-1.5 py-1 text-xs" />
           </>
         )}
         {value.type === "send_email" && (

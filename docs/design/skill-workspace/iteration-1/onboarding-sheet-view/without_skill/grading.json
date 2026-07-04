@@ -1,0 +1,29 @@
+{
+ "expectations": [
+  {
+   "text": "Primary action button uses Podio teal #15808D",
+   "passed": false,
+   "evidence": "teal token not found"
+  },
+  {
+   "text": "Active view toggle is the Podio orange pill #F7A11C",
+   "passed": false,
+   "evidence": "orange token not found"
+  },
+  {
+   "text": "Global bar uses grey-teal chrome #CBDBDB",
+   "passed": false,
+   "evidence": "chrome token not found"
+  },
+  {
+   "text": "Uses the Podio pastel chip palette (3+ token pairs from tokens.md)",
+   "passed": false,
+   "evidence": "0 chip-palette hexes found"
+  },
+  {
+   "text": "No blue primary color (blue-600 / #2563EB family absent)",
+   "passed": false,
+   "evidence": "found: #4A90D9"
+  }
+ ]
+}

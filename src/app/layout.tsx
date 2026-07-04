@@ -1,5 +1,12 @@
 import type { Metadata, Viewport } from "next";
+import { Source_Sans_3 } from "next/font/google";
 import "./globals.css";
+import { SwRegister } from "./sw-register";
+
+const sourceSans = Source_Sans_3({
+  subsets: ["latin"],
+  variable: "--font-source-sans",
+});
 
 export const metadata: Metadata = {
   title: "Podio Clone",
@@ -10,7 +17,7 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: "#2563eb",
+  themeColor: "#15808D",
   width: "device-width",
   initialScale: 1,
 };
@@ -19,8 +26,11 @@ export default function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html lang="en">
-      <body>{children}</body>
+    <html lang="en" className={sourceSans.variable}>
+      <body className="font-sans">
+        <SwRegister />
+        {children}
+      </body>
     </html>
   );
 }

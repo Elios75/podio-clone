@@ -30,18 +30,18 @@ export function NotificationPrefs({
   }
 
   return (
-    <div className="mt-6 rounded-lg border border-slate-200 bg-white p-4">
-      <p className="text-sm font-medium">Preferences</p>
-      <label className="mt-2 flex items-center gap-2 text-sm text-slate-600">
+    <div className="mt-6 rounded border border-podio-border bg-white p-4 shadow-sm">
+      <p className="text-sm font-semibold text-podio-ink">Preferences</p>
+      <label className="mt-2 flex items-center gap-2 text-sm text-podio-secondary">
         <input
           type="checkbox"
           checked={digest}
           onChange={(e) => save(e.target.checked)}
         />
         Email me a daily digest of unread notifications
-        {saved && <span className="text-xs text-green-600">saved ✓</span>}
+        {saved && <span className="text-xs text-podio-teal">saved ✓</span>}
       </label>
-      <p className="mt-1 text-xs text-slate-400">
+      <p className="mt-1 text-xs text-podio-meta">
         Sent each morning when there's something new. (Queued now; delivery goes
         live with the email provider hookup in Phase 11.)
       </p>

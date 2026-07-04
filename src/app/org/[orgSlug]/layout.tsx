@@ -27,10 +27,34 @@ export default async function OrgLayout({
     .order("name");
 
   return (
-    <div className="flex min-h-screen flex-col md:flex-row">
+    <div className="flex min-h-screen flex-col">
+      {/* Global top bar (desktop) */}
+      <header className="hidden h-14 items-center gap-4 bg-podio-chrome px-4 text-podio-ink md:flex">
+        <Link
+          href="/home"
+          title="All organizations"
+          className="flex items-center gap-3 hover:opacity-80"
+        >
+          <span aria-hidden>☰</span>
+          <span className="truncate text-lg font-semibold text-podio-ink">
+            {org.name}
+          </span>
+        </Link>
+        <nav className="ml-6 flex items-center gap-5 text-[#4E5E5E]">
+          <Link href="/search" title="Search" className="hover:opacity-80">🔍</Link>
+          <Link href="/calendar" title="My calendar" className="hover:opacity-80">📅</Link>
+          <Link href="/messages" title="Messages" className="hover:opacity-80">💬</Link>
+          <Link href="/tasks" title="My tasks" className="hover:opacity-80">✓</Link>
+        </nav>
+        <div className="mx-auto font-semibold tracking-wide">Podio Clone</div>
+        <div className="flex items-center gap-4">
+          <Link href="/notifications" title="Notifications" className="hover:opacity-80">🔔</Link>
+        </div>
+      </header>
+
       {/* Mobile top bar */}
-      <div className="flex items-center gap-3 border-b border-slate-200 bg-white px-4 py-3 md:hidden">
-        <Link href="/home" className="text-xs text-slate-400">←</Link>
+      <div className="flex items-center gap-3 bg-podio-chrome px-4 py-3 text-podio-ink md:hidden">
+        <Link href="/home" className="text-xs text-podio-secondary">←</Link>
         <span className="truncate font-semibold">{org.name}</span>
         <span className="ml-auto flex gap-3 text-sm">
           <Link href="/search">🔍</Link>
@@ -40,64 +64,52 @@ export default async function OrgLayout({
         </span>
       </div>
       {/* Mobile workspace strip */}
-      <div className="flex gap-2 overflow-x-auto border-b border-slate-200 bg-white px-4 py-2 md:hidden">
+      <div className="flex gap-2 overflow-x-auto border-b border-podio-border bg-white px-4 py-2 md:hidden">
         {(workspaces ?? []).map((ws) => (
           <Link key={ws.id} href={`/org/${org.slug}/${ws.slug}`}
-            className="shrink-0 rounded-full border border-slate-200 px-3 py-1 text-xs text-slate-600">
+            className="shrink-0 rounded-full border border-podio-border px-3 py-1 text-xs text-podio-teal">
             {ws.name}
           </Link>
         ))}
         <Link href={`/org/${org.slug}`}
-          className="shrink-0 rounded-full border border-blue-200 px-3 py-1 text-xs text-blue-600">
+          className="shrink-0 rounded-full border border-podio-border px-3 py-1 text-xs font-medium text-podio-teal">
           + New
         </Link>
       </div>
 
-      <aside className="hidden w-64 shrink-0 border-r border-slate-200 bg-white p-4 md:block">
-        <div className="flex items-center justify-between">
-          <Link href="/home" className="text-xs text-slate-400 hover:text-slate-600">
-            ← All organizations
+      <div className="flex flex-1 flex-col md:flex-row">
+        <aside className="hidden w-64 shrink-0 border-r border-podio-border bg-white p-4 md:block">
+          <p className="text-xs font-medium uppercase tracking-wide text-podio-meta">
+            Workspaces
+          </p>
+          <nav className="mt-2 space-y-0.5">
+            {(workspaces ?? []).map((ws) => (
+              <Link
+                key={ws.id}
+                href={`/org/${org.slug}/${ws.slug}`}
+                className="block truncate rounded px-2 py-1.5 text-sm text-podio-teal hover:bg-podio-row-hover"
+              >
+                <span
+                  className="mr-2 inline-block h-2 w-2 rounded-full"
+                  style={{ backgroundColor: ws.color ?? "#8A9494" }}
+                />
+                {ws.name}
+              </Link>
+            ))}
+            {(workspaces ?? []).length === 0 && (
+              <p className="px-2 text-sm text-podio-meta">None yet</p>
+            )}
+          </nav>
+
+          <Link
+            href={`/org/${org.slug}`}
+            className="mt-6 block rounded px-2 py-1.5 text-sm text-podio-teal hover:bg-podio-row-hover"
+          >
+            + New workspace
           </Link>
-          <span className="flex gap-2">
-            <Link href="/search" className="text-sm" title="Search">🔍</Link>
-            <Link href="/calendar" className="text-sm" title="My calendar">📅</Link>
-            <Link href="/messages" className="text-sm" title="Messages">💬</Link>
-            <Link href="/tasks" className="text-sm" title="My tasks">✓</Link>
-            <Link href="/notifications" className="text-sm" title="Notifications">🔔</Link>
-          </span>
-        </div>
-        <h2 className="mt-2 truncate text-lg font-semibold">{org.name}</h2>
-
-        <p className="mt-6 text-xs font-medium uppercase tracking-wide text-slate-400">
-          Workspaces
-        </p>
-        <nav className="mt-2 space-y-1">
-          {(workspaces ?? []).map((ws) => (
-            <Link
-              key={ws.id}
-              href={`/org/${org.slug}/${ws.slug}`}
-              className="block truncate rounded-md px-2 py-1.5 text-sm text-slate-700 hover:bg-slate-100"
-            >
-              <span
-                className="mr-2 inline-block h-2 w-2 rounded-full"
-                style={{ backgroundColor: ws.color ?? "#94a3b8" }}
-              />
-              {ws.name}
-            </Link>
-          ))}
-          {(workspaces ?? []).length === 0 && (
-            <p className="px-2 text-sm text-slate-400">None yet</p>
-          )}
-        </nav>
-
-        <Link
-          href={`/org/${org.slug}`}
-          className="mt-6 block rounded-md px-2 py-1.5 text-sm text-blue-600 hover:bg-blue-50"
-        >
-          + New workspace
-        </Link>
-      </aside>
-      <div className="flex-1">{children}</div>
+        </aside>
+        <div className="flex-1">{children}</div>
+      </div>
     </div>
   );
 }

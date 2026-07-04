@@ -17,10 +17,17 @@ supabase sso add --project-ref <ref> \
   --attribute-mapping-file mapping.json
 ```
 
-`mapping.json` (adjust attribute names to your IdP):
+`mapping.json` (adjust attribute names to your IdP). Include a `groups` key if
+you want IdP group → role mapping (Phase 13b):
 
 ```json
-{ "keys": { "email": { "name": "email" }, "name": { "name": "displayName" } } }
+{
+  "keys": {
+    "email": { "name": "email" },
+    "name": { "name": "displayName" },
+    "groups": { "name": "groups" }
+  }
+}
 ```
 
 `supabase sso list` shows registered providers; `supabase sso info` gives the
@@ -50,13 +57,39 @@ and optionally check **Require SSO**. This drives:
 3. Supabase redirects to the IdP; SAML assertion comes back; session issued.
 4. First `/home` load runs `claim_sso_membership()` → org membership appears.
 
+## 4. Hard enforcement (Phase 13b — Auth Hooks)
+
+Migration 40 ships two hook functions that reject password auth at the API
+level (not just in the login UI) for domains with **Require SSO** checked:
+
+- `podio.hook_password_verification` — rejects password sign-in.
+- `podio.hook_before_user_created` — rejects password sign-up.
+
+They exist in the database but are inert until **enabled** in
+Dashboard → Authentication → Hooks (Postgres function type):
+
+- *Password verification attempt* → `podio.hook_password_verification`
+- *Before user created* → `podio.hook_before_user_created`
+
+Non-SSO domains are unaffected (`decision: continue`).
+
+## 5. IdP group → role mapping (Phase 13b)
+
+Org page → **Single sign-on (SAML)** → *IdP group → role mapping*. Stored as
+`security_settings.sso_group_roles`, e.g.
+`{ "Engineering Admins": "admin", "Contractors": "light" }`.
+
+On every SSO login, `claim_sso_membership()` reads groups from
+`raw_user_meta_data.groups` (or `.custom_claims.groups` — see the attribute
+mapping above), resolves the highest-ranked matching role
+(`admin > employee > light > guest`), and applies it:
+
+- New users join with the mapped role (or `employee` if no group matches).
+- Existing members are re-synced — the IdP is authoritative, except `owner`,
+  which is never changed.
+
 ## Known limitations (by design, for now)
 
-- **"Require SSO" is app-level enforcement.** The login UI blocks password
-  auth for enforced domains, but a determined user could hit the Supabase Auth
-  API directly. Hard enforcement requires a Supabase Auth Hook
-  (before-sign-in) rejecting password grants for enforced domains — add when
-  moving to production SSO.
-- Auto-provisioned users get org role `employee`; group/role mapping from IdP
-  attributes is a future enhancement.
 - One SSO domain per organization.
+- Hooks must be enabled by hand in the dashboard (Supabase has no SQL/CLI
+  surface for it on this plan).

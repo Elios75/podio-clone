@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import {
@@ -57,6 +57,53 @@ export function ItemForm({
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState<string | null>(null);
   const [localPreviews, setLocalPreviews] = useState<Record<string, string>>({});
+  const [draftRestored, setDraftRestored] = useState(false);
+  const cameraInputs = useRef<Record<string, HTMLInputElement | null>>({});
+
+  // Offline drafts (create mode only): persist typed values on this device so
+  // a dropped connection or closed tab doesn't lose the entry.
+  const draftKey = `podio-draft-${appId}`;
+  const isCreate = !itemId;
+
+  useEffect(() => {
+    if (!isCreate) return;
+    try {
+      const raw = localStorage.getItem(draftKey);
+      if (!raw) return;
+      const draft = JSON.parse(raw) as { values?: Record<string, any> };
+      if (draft?.values && Object.keys(draft.values).length > 0) {
+        setValues(draft.values);
+        setDraftRestored(true);
+      }
+    } catch {
+      // Corrupt draft — ignore it.
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    if (!isCreate) return;
+    const t = setTimeout(() => {
+      if (Object.keys(values).length === 0) return;
+      try {
+        localStorage.setItem(
+          draftKey,
+          JSON.stringify({ values, savedAt: new Date().toISOString() })
+        );
+      } catch {
+        // Storage full/unavailable — drafts are best-effort.
+      }
+    }, 500);
+    return () => clearTimeout(t);
+  }, [values, isCreate, draftKey]);
+
+  function clearDraft() {
+    try {
+      localStorage.removeItem(draftKey);
+    } catch {}
+    setValues(initialValues ?? {});
+    setDraftRestored(false);
+  }
 
   function set(fieldId: string, v: any) {
     setValues((prev) => ({ ...prev, [fieldId]: v }));
@@ -96,6 +143,11 @@ export function ItemForm({
     if (rpcError) {
       setError(rpcError.message);
       return;
+    }
+    if (isCreate) {
+      try {
+        localStorage.removeItem(draftKey);
+      } catch {}
     }
     router.push(backHref);
     router.refresh();
@@ -288,13 +340,32 @@ export function ItemForm({
                 <span className="text-sm text-slate-500">{v.name}</span>
               )
             )}
-            <input type="file"
-              accept={f.type === "image" ? "image/*" : undefined}
-              onChange={(e) => {
-                const file = e.target.files?.[0];
-                if (file) uploadFile(f.id, file);
-              }}
-              className="block text-sm" />
+            <div className="flex items-center gap-2">
+              <input type="file"
+                accept={f.type === "image" ? "image/*" : undefined}
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (file) uploadFile(f.id, file);
+                }}
+                className="block text-sm" />
+              {f.type === "image" && (
+                <>
+                  <button type="button"
+                    onClick={() => cameraInputs.current[f.id]?.click()}
+                    className="shrink-0 rounded border border-slate-300 px-2 py-1 text-xs text-slate-600 hover:bg-slate-100">
+                    📷 Camera
+                  </button>
+                  <input
+                    ref={(el) => { cameraInputs.current[f.id] = el; }}
+                    type="file" accept="image/*" capture="environment"
+                    className="hidden"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) uploadFile(f.id, file);
+                    }} />
+                </>
+              )}
+            </div>
             {uploading === f.id && (
               <p className="text-xs text-slate-400">Uploading…</p>
             )}
@@ -325,6 +396,21 @@ export function ItemForm({
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
+      {draftRestored && (
+        <div className="flex items-center justify-between gap-3 rounded border border-[#E3E3E3] bg-[#CDEDED] px-3 py-2 text-sm text-[#136570]">
+          <span>Draft restored from this device.</span>
+          <span className="flex shrink-0 items-center gap-3">
+            <button type="button" onClick={clearDraft}
+              className="font-medium underline hover:no-underline">
+              clear draft
+            </button>
+            <button type="button" onClick={() => setDraftRestored(false)}
+              aria-label="Dismiss" className="font-medium hover:opacity-70">
+              ✕
+            </button>
+          </span>
+        </div>
+      )}
       {fields.map((f) =>
         f.type === "separator" ? (
           <div key={f.id} className="border-t border-slate-200 pt-3">

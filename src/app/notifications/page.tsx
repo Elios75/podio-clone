@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { MarkAllRead } from "./mark-all-read";
 import { NotificationPrefs } from "./notification-prefs";
+import { PushToggle } from "./push-toggle";
 
 export default async function NotificationsPage() {
   const supabase = await createClient();
@@ -38,16 +39,17 @@ export default async function NotificationsPage() {
   return (
     <main className="mx-auto max-w-2xl p-8">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold">
+        <h1 className="text-2xl font-semibold text-podio-ink">
           Notifications{unread > 0 && (
-            <span className="ml-2 rounded-full bg-blue-600 px-2 py-0.5 text-sm font-medium text-white">
+            <span className="ml-2 rounded bg-podio-teal px-2 py-0.5 text-sm font-medium text-white">
               {unread}
             </span>
           )}
         </h1>
-        <div className="flex gap-3">
+        <div className="flex items-center gap-3">
+          <PushToggle />
           {unread > 0 && <MarkAllRead />}
-          <Link href="/home" className="text-sm text-slate-500 hover:underline">
+          <Link href="/home" className="text-sm text-podio-teal hover:underline">
             ← Home
           </Link>
         </div>
@@ -57,29 +59,32 @@ export default async function NotificationsPage() {
         {(notifications ?? []).map((n) => (
           <li
             key={n.id}
-            className={`rounded-lg border p-3 text-sm ${
-              n.read_at ? "border-slate-200 bg-white" : "border-blue-200 bg-blue-50"
-            }`}
+            className="flex items-start gap-3 rounded border border-podio-border bg-white p-3 text-sm hover:bg-podio-row-hover"
           >
-            <p>
-              <span className="font-medium">
-                {n.actor_id ? nameByUser.get(n.actor_id) ?? "Someone" : "Someone"}
-              </span>{" "}
-              {label(n.event_type)}{" "}
-              <span className="font-medium">
-                {n.payload?.item_title ?? "an item"}
-              </span>
-            </p>
-            {n.payload?.preview && (
-              <p className="mt-1 text-slate-500">“{n.payload.preview}”</p>
+            {!n.read_at && (
+              <span className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-podio-teal" />
             )}
-            <p className="mt-1 text-xs text-slate-400">
-              {new Date(n.created_at).toLocaleString()}
-            </p>
+            <div className="min-w-0">
+              <p className="text-podio-ink">
+                <span className="font-medium">
+                  {n.actor_id ? nameByUser.get(n.actor_id) ?? "Someone" : "Someone"}
+                </span>{" "}
+                {label(n.event_type)}{" "}
+                <span className="font-medium">
+                  {n.payload?.item_title ?? "an item"}
+                </span>
+              </p>
+              {n.payload?.preview && (
+                <p className="mt-1 text-podio-secondary">“{n.payload.preview}”</p>
+              )}
+              <p className="mt-1 text-xs text-podio-meta">
+                {new Date(n.created_at).toLocaleString()}
+              </p>
+            </div>
           </li>
         ))}
         {(notifications ?? []).length === 0 && (
-          <li className="rounded-lg border border-dashed border-slate-300 p-8 text-center text-sm text-slate-400">
+          <li className="rounded border border-dashed border-podio-border bg-white p-8 text-center text-sm text-podio-meta">
             Nothing yet — you'll see mentions and comments on items you follow here.
           </li>
         )}

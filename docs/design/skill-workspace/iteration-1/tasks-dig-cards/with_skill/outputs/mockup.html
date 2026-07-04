@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>360iSuite — Tasks</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+  body {
+    font-family: "Source Sans 3", "Source Sans Pro", "Segoe UI", system-ui, sans-serif;
+    color: #333333;
+  }
+</style>
+</head>
+<body class="bg-[#EDEDED] text-[15px]">
+
+  <!-- ============ Global top bar ============ -->
+  <header class="flex h-14 items-center gap-4 bg-[#CBDBDB] px-4 text-[#333333]">
+    <button aria-label="Menu" class="text-xl leading-none">&#9776;</button>
+    <span class="text-lg font-semibold">360iSuite</span>
+    <nav class="ml-6 flex items-center gap-5 text-[#4E5E5E]">
+      <span title="Contacts">&#128101;</span>
+      <span title="Calendar">&#128197;</span>
+      <span title="Tasks">&#10003;</span>
+    </nav>
+    <div class="mx-auto font-semibold tracking-wide">Podio Clone</div>
+    <div class="flex items-center gap-4 text-[#4E5E5E]">
+      <span title="Help">&#10067;</span>
+      <span title="Search">&#128269;</span>
+      <span class="flex h-7 w-7 items-center justify-center rounded-full bg-[#15808D] text-xs font-semibold text-white" title="Fernan Delgado">FD</span>
+      <span class="relative" title="Notifications">&#128276;
+        <span class="absolute -right-3 -top-1 rounded bg-[#F5D327] px-1 text-xs font-semibold text-[#333333]">5</span>
+      </span>
+      <span title="Chat">&#128172;</span>
+    </div>
+  </header>
+
+  <!-- ============ App tab bar ============ -->
+  <nav class="flex items-end gap-1 bg-[#EDEDED] px-4 pt-2">
+    <a href="#" class="flex w-24 flex-col items-center gap-1 rounded-lg px-3 py-3 text-[13px] text-[#6E7A7A] hover:bg-[#E4E4E4]">
+      <span class="text-2xl leading-none">&#128200;</span>Activity
+    </a>
+    <a href="#" class="flex w-24 flex-col items-center gap-1 rounded-lg bg-white px-3 py-3 text-[13px] text-[#333333] shadow-sm" aria-current="page">
+      <span class="text-2xl leading-none">&#9989;</span>Tasks
+    </a>
+    <a href="#" class="flex w-24 flex-col items-center gap-1 rounded-lg px-3 py-3 text-[13px] text-[#6E7A7A] hover:bg-[#E4E4E4]">
+      <span class="text-2xl leading-none">&#128193;</span>Files
+    </a>
+    <a href="#" class="flex w-24 flex-col items-center gap-1 rounded-lg px-3 py-3 text-[13px] text-[#6E7A7A] hover:bg-[#E4E4E4]">
+      <span class="text-2xl leading-none">&#127891;</span>Onboarding
+    </a>
+    <a href="#" class="flex w-24 flex-col items-center gap-1 rounded-lg px-3 py-3 text-[13px] text-[#6E7A7A] hover:bg-[#E4E4E4]">
+      <span class="text-2xl leading-none">&#128188;</span>Projects
+    </a>
+    <span class="mx-2 h-10 w-px self-center bg-[#DADADA]"></span>
+    <button class="flex w-24 flex-col items-center gap-1 px-3 py-3 text-[13px] uppercase text-[#B8C2C2]">
+      <span class="text-2xl leading-none">&#8853;</span>Add app
+    </button>
+  </nav>
+
+  <!-- ============ Body: left views pane + main view ============ -->
+  <div class="flex items-stretch">
+
+    <!-- Left views pane -->
+    <aside class="w-72 shrink-0 border-r border-t border-[#E3E3E3] bg-white p-4">
+      <div class="flex items-center gap-2">
+        <h1 class="text-xl font-semibold text-[#15808D]">Tasks</h1>
+        <span class="ml-auto flex gap-2 text-[#8A9494]">
+          <span title="Share">&#8599;</span>
+          <span title="Notifications">&#128276;</span>
+          <span title="Settings">&#128295;</span>
+          <span title="Expand">&#10530;</span>
+        </span>
+      </div>
+      <p class="mt-2 text-sm text-[#6E7A7A]">Track and assign work across the 360iSuite team.</p>
+
+      <div class="mt-5 flex items-center">
+        <h2 class="text-lg font-semibold text-[#333333]">Views</h2>
+        <button class="ml-auto rounded border border-[#E3E3E3] bg-[#F7F7F7] px-2 py-0.5 text-sm">+ Add</button>
+      </div>
+
+      <!-- Team / Private underline tabs -->
+      <div class="mt-2 flex gap-6 border-b border-[#E3E3E3] text-[15px]">
+        <button class="border-b-2 border-[#333333] pb-1 font-semibold">Team</button>
+        <button class="pb-1 text-[#6E7A7A]">Private</button>
+      </div>
+
+      <ul class="mt-3 space-y-0.5">
+        <li>
+          <a href="#" class="flex items-center rounded px-2 py-1.5 text-[15px] text-[#15808D] hover:bg-[#F3F3F3]">
+            All Tasks
+            <span class="ml-auto text-[#333333]">745</span>
+          </a>
+        </li>
+        <li>
+          <a href="#" class="flex items-center rounded bg-[#ECECEC] px-2 py-1.5 text-[15px] font-semibold text-[#15808D]">
+            Open Tasks
+            <span class="ml-auto font-normal text-[#333333]">134</span>
+          </a>
+        </li>
+        <li>
+          <a href="#" class="flex items-center rounded px-2 py-1.5 text-[15px] text-[#15808D] hover:bg-[#F3F3F3]">
+            Responsible
+            <span class="ml-auto text-[#333333]">134</span>
+          </a>
+          <a href="#" class="flex items-center gap-2 rounded px-2 py-1 pl-4 text-sm text-[#6E7A7A] hover:bg-[#F3F3F3]">
+            <span class="h-2.5 w-2.5 rounded-full" style="background:#15808D"></span>
+            Fernan Delgado
+            <span class="ml-auto">52</span>
+          </a>
+          <a href="#" class="flex items-center gap-2 rounded px-2 py-1 pl-4 text-sm text-[#6E7A7A] hover:bg-[#F3F3F3]">
+            <span class="h-2.5 w-2.5 rounded-full" style="background:#F7941D"></span>
+            Marisol Vega
+            <span class="ml-auto">38</span>
+          </a>
+          <a href="#" class="flex items-center gap-2 rounded px-2 py-1 pl-4 text-sm text-[#6E7A7A] hover:bg-[#F3F3F3]">
+            <span class="h-2.5 w-2.5 rounded-full" style="background:#5B3A8E"></span>
+            Devon Whitfield
+            <span class="ml-auto">27</span>
+          </a>
+          <a href="#" class="flex items-center gap-2 rounded px-2 py-1 pl-4 text-sm text-[#6E7A7A] hover:bg-[#F3F3F3]">
+            <span class="h-2.5 w-2.5 rounded-full" style="background:#1C7A4D"></span>
+            Priya Ramachandran
+            <span class="ml-auto">17</span>
+          </a>
+        </li>
+      </ul>
+    </aside>
+
+    <!-- Main view area -->
+    <main class="min-w-0 flex-1 border-t border-[#E3E3E3]">
+
+      <!-- View toolbar -->
+      <div class="flex flex-wrap items-center gap-3 px-4 py-3 text-[15px]">
+        <span class="flex gap-3 text-[#6E7A7A]">
+          <span title="Layout">&#9638;</span>
+          <span title="Sort">&#8595;A</span>
+          <span title="More">&#8230;</span>
+        </span>
+        <span class="flex items-center gap-1.5 text-[#6E7A7A]">
+          <span class="rounded-full bg-[#4E5E5E] px-1.5 text-xs font-semibold leading-5 text-white">3</span>
+          <span title="Filters">&#9207;</span>
+          134 of 745
+        </span>
+        <a href="#" class="text-[#15808D] hover:underline">Show all</a>
+
+        <div class="ml-auto flex items-center gap-4">
+          <button class="text-[#15808D]">Dig</button>
+          <button class="rounded bg-[#F7A11C] px-3 py-1.5 font-semibold text-white">Sheet</button>
+          <button class="text-[#15808D]">Reports</button>
+          <button class="text-[#333333]">Create report &#9662;</button>
+          <button class="rounded bg-[#15808D] px-4 py-2 font-semibold text-white hover:bg-[#0F6D79]">Add Task</button>
+        </div>
+      </div>
+
+      <!-- Card grid (3-up) -->
+      <div class="grid grid-cols-3 gap-4 px-4 pb-6">
+
+        <!-- Card 1 -->
+        <article class="flex flex-col rounded border border-[#E3E3E3] bg-white shadow-sm">
+          <h3 class="px-4 pt-4 text-[17px] font-semibold text-[#333333]">Migrate client billing records to new ledger</h3>
+          <div class="mx-4 mt-3 max-h-40 overflow-hidden bg-[#F7F7F7] p-3 text-[15px] text-[#4E5E5E]">
+            Export the full billing history for the Hendricks and Alvarado accounts from the legacy ledger, normalize the invoice numbering, and re-import into the new chart of accounts. Flag any records with unmatched payment references so finance can reconcile them before month-end close.
+          </div>
+          <div class="flex flex-col items-start gap-1.5 px-4 py-3">
+            <span class="rounded px-2 py-0.5 text-sm font-medium" style="background:#F7941D;color:#3A2A00">High</span>
+            <span class="rounded px-2 py-0.5 text-sm font-medium" style="background:#F5EFC8;color:#7A6A1C">In-Process</span>
+          </div>
+          <footer class="mt-auto flex items-center px-4 pb-3 text-sm text-[#B8C2C2]">
+            05/18/2026 by Fernan Delgado
+            <span class="ml-auto flex items-center gap-1">&#128172; 4</span>
+          </footer>
+        </article>
+
+        <!-- Card 2 -->
+        <article class="flex flex-col rounded border border-[#E3E3E3] bg-white shadow-sm">
+          <h3 class="px-4 pt-4 text-[17px] font-semibold text-[#333333]">Draft Q3 onboarding checklist for new hires</h3>
+          <div class="mx-4 mt-3 max-h-40 overflow-hidden bg-[#F7F7F7] p-3 text-[15px] text-[#4E5E5E]">
+            Compile the equipment, accounts, and training items every new team member needs in their first two weeks. Include the IT provisioning steps, the compliance modules, and the intro sessions with each department lead. Circulate a draft to HR for review before the July intake.
+          </div>
+          <div class="flex flex-col items-start gap-1.5 px-4 py-3">
+            <span class="rounded px-2 py-0.5 text-sm font-medium" style="background:#CDEDED;color:#136570">Submitted for Review</span>
+            <span class="rounded px-2 py-0.5 text-sm font-medium" style="background:#DCC8F5;color:#5B3A8E">Admin Related</span>
+          </div>
+          <footer class="mt-auto flex items-center px-4 pb-3 text-sm text-[#B8C2C2]">
+            05/21/2026 by Marisol Vega
+            <span class="ml-auto flex items-center gap-1">&#128172; 2</span>
+          </footer>
+        </article>
+
+        <!-- Card 3 -->
+        <article class="flex flex-col rounded border border-[#E3E3E3] bg-white shadow-sm">
+          <h3 class="px-4 pt-4 text-[17px] font-semibold text-[#333333]">Fix broken webhook on invoice sync</h3>
+          <div class="mx-4 mt-3 max-h-40 overflow-hidden bg-[#F7F7F7] p-3 text-[15px] text-[#4E5E5E]">
+            The invoice sync webhook has been returning 500s since the vendor API update on Tuesday. Trace the failing payloads in the integration logs, patch the field mapping for the new tax schema, and replay the queued events. Confirm with accounting that no invoices were dropped.
+          </div>
+          <div class="flex flex-col items-start gap-1.5 px-4 py-3">
+            <span class="rounded px-2 py-0.5 text-sm font-medium" style="background:#F97F70;color:#4A1410">Urgent</span>
+            <span class="rounded px-2 py-0.5 text-sm font-medium" style="background:#F5EFC8;color:#7A6A1C">In-Process</span>
+          </div>
+          <footer class="mt-auto flex items-center px-4 pb-3 text-sm text-[#B8C2C2]">
+            05/25/2026 by Devon Whitfield
+            <span class="ml-auto flex items-center gap-1">&#128172; 9</span>
+          </footer>
+        </article>
+
+        <!-- Card 4 -->
+        <article class="flex flex-col rounded border border-[#E3E3E3] bg-white shadow-sm">
+          <h3 class="px-4 pt-4 text-[17px] font-semibold text-[#333333]">Renew office lease paperwork</h3>
+          <div class="mx-4 mt-3 max-h-40 overflow-hidden bg-[#F7F7F7] p-3 text-[15px] text-[#4E5E5E]">
+            Review the renewal terms sent by the property manager, compare against last year's rate schedule, and prepare the countersigned documents for the landlord. Scan and file the executed copies in the legal folder and update the facilities calendar with the new lease dates.
+          </div>
+          <div class="flex flex-col items-start gap-1.5 px-4 py-3">
+            <span class="rounded px-2 py-0.5 text-sm font-medium" style="background:#DCC8F5;color:#5B3A8E">Admin Related</span>
+            <span class="text-[15px] italic text-[#B8C2C2]">Priority not set</span>
+          </div>
+          <footer class="mt-auto flex items-center px-4 pb-3 text-sm text-[#B8C2C2]">
+            05/28/2026 by Fernan Delgado
+            <span class="ml-auto flex items-center gap-1">&#128172; 1</span>
+          </footer>
+        </article>
+
+        <!-- Card 5 -->
+        <article class="flex flex-col rounded border border-[#E3E3E3] bg-white shadow-sm">
+          <h3 class="px-4 pt-4 text-[17px] font-semibold text-[#333333]">Prepare demo environment for Westbrook pitch</h3>
+          <div class="mx-4 mt-3 max-h-40 overflow-hidden bg-[#F7F7F7] p-3 text-[15px] text-[#4E5E5E]">
+            Seed the sandbox workspace with realistic sample data for the Westbrook Academy walkthrough: three student cohorts, an enrollment pipeline, and a term calendar. Double-check that the reporting dashboards render correctly and remove any leftover data from the previous demo.
+          </div>
+          <div class="flex flex-col items-start gap-1.5 px-4 py-3">
+            <span class="rounded px-2 py-0.5 text-sm font-medium" style="background:#F7941D;color:#3A2A00">High</span>
+            <span class="rounded px-2 py-0.5 text-sm font-medium" style="background:#CDEDED;color:#136570">Submitted for Review</span>
+          </div>
+          <footer class="mt-auto flex items-center px-4 pb-3 text-sm text-[#B8C2C2]">
+            06/02/2026 by Priya Ramachandran
+            <span class="ml-auto flex items-center gap-1">&#128172; 6</span>
+          </footer>
+        </article>
+
+        <!-- Card 6 -->
+        <article class="flex flex-col rounded border border-[#E3E3E3] bg-white shadow-sm">
+          <h3 class="px-4 pt-4 text-[17px] font-semibold text-[#333333]">Audit user permissions across workspaces</h3>
+          <div class="mx-4 mt-3 max-h-40 overflow-hidden bg-[#F7F7F7] p-3 text-[15px] text-[#4E5E5E]">
+            Go through every workspace and confirm that member roles still match current responsibilities. Remove access for the two contractors who rolled off in April, downgrade stale admin grants, and document any exceptions. Deliver a summary of changes to the security review meeting.
+          </div>
+          <div class="flex flex-col items-start gap-1.5 px-4 py-3">
+            <span class="rounded px-2 py-0.5 text-sm font-medium" style="background:#F97F70;color:#4A1410">Urgent</span>
+            <span class="rounded px-2 py-0.5 text-sm font-medium" style="background:#F5EFC8;color:#7A6A1C">In-Process</span>
+            <span class="rounded px-2 py-0.5 text-sm font-medium" style="background:#DCC8F5;color:#5B3A8E">Admin Related</span>
+          </div>
+          <footer class="mt-auto flex items-center px-4 pb-3 text-sm text-[#B8C2C2]">
+            06/05/2026 by Marisol Vega
+            <span class="ml-auto flex items-center gap-1">&#128172; 3</span>
+          </footer>
+        </article>
+
+      </div>
+    </main>
+  </div>
+
+</body>
+</html>

@@ -8,6 +8,7 @@ import { BackupButton } from "./backup-button";
 import { BillingSection } from "./billing-section";
 import { MemberRoleSelect } from "@/components/member-role-select";
 import { SsoSettings } from "./sso-settings";
+import { BrandingSection } from "./branding-section";
 import { EmailTemplatesSection } from "./email-templates-section";
 
 export default async function OrgPage({
@@ -20,7 +21,7 @@ export default async function OrgPage({
 
   const { data: org } = await supabase
     .from("organizations")
-    .select("id, name, slug, security_settings")
+    .select("id, name, slug, security_settings, logo_url, branding")
     .eq("slug", orgSlug)
     .single();
   if (!org) notFound();
@@ -149,6 +150,12 @@ export default async function OrgPage({
       />
       <EmailTemplatesSection orgId={org.id} templates={(emailTemplates ?? []) as any} />
       <SsoSettings orgId={org.id} settings={org.security_settings as any} />
+      <BrandingSection
+        orgId={org.id}
+        orgSlug={org.slug}
+        logoUrl={(org as any).logo_url ?? null}
+        branding={(org as any).branding ?? null}
+      />
       <BillingSection orgId={org.id} isOwner={isOwner} />
       <BackupButton orgId={org.id} orgSlug={org.slug} />
 

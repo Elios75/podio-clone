@@ -27,33 +27,33 @@ export default async function HomePage() {
   return (
     <main className="mx-auto max-w-2xl p-8">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold">Your organizations</h1>
+        <h1 className="text-2xl font-semibold text-podio-ink">Your organizations</h1>
         <div className="flex items-center gap-3">
-          <Link href="/calendar" className="text-sm text-slate-500 hover:underline">📅</Link>
-          <Link href="/messages" className="text-sm text-slate-500 hover:underline">💬</Link>
-          <Link href="/tasks" className="text-sm text-slate-500 hover:underline">✓ Tasks</Link>
-          <Link href="/notifications" className="text-sm text-slate-500 hover:underline">🔔</Link>
+          <Link href="/calendar" className="text-sm text-podio-teal hover:underline">📅</Link>
+          <Link href="/messages" className="text-sm text-podio-teal hover:underline">💬</Link>
+          <Link href="/tasks" className="text-sm text-podio-teal hover:underline">✓ Tasks</Link>
+          <Link href="/notifications" className="text-sm text-podio-teal hover:underline">🔔</Link>
           <SignOutButton />
         </div>
       </div>
-      <p className="mt-1 text-sm text-slate-500">{user.email}</p>
+      <p className="mt-1 text-sm text-podio-secondary">{user.email}</p>
 
       <ul className="mt-6 space-y-2">
         {(memberships ?? []).map((m: any) => (
           <li key={m.organizations.id}>
             <Link
               href={`/org/${m.organizations.slug}`}
-              className="block rounded-lg border border-slate-200 bg-white p-4 hover:border-blue-400"
+              className="block rounded border border-podio-border bg-white p-4 hover:border-podio-teal"
             >
-              <span className="font-medium">{m.organizations.name}</span>
-              <span className="ml-2 rounded bg-slate-100 px-2 py-0.5 text-xs text-slate-600">
+              <span className="font-semibold text-podio-ink">{m.organizations.name}</span>
+              <span className="ml-2 rounded bg-podio-row-alt px-2 py-0.5 text-xs text-podio-secondary">
                 {m.role}
               </span>
             </Link>
           </li>
         ))}
         {(memberships ?? []).length === 0 && (
-          <li className="rounded-lg border border-dashed border-slate-300 p-6 text-center text-sm text-slate-500">
+          <li className="rounded border border-dashed border-podio-border bg-white p-6 text-center text-sm text-podio-secondary">
             No organizations yet — create your first one below.
           </li>
         )}
@@ -93,19 +93,19 @@ async function HomeFeed() {
 
   return (
     <section className="mt-10">
-      <h2 className="text-lg font-medium">Recent activity</h2>
+      <h2 className="text-lg font-semibold text-podio-ink">Recent activity</h2>
       <ul className="mt-3 space-y-1.5">
         {(events ?? []).map((e: any) => (
           <li key={e.id}
-            className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-500">
-            <span className="font-medium text-slate-700">
+            className="flex items-center gap-2 rounded border border-podio-border bg-white px-3 py-2 text-sm text-podio-secondary">
+            <span className="font-semibold text-podio-ink">
               {e.actor_id ? nameByUser.get(e.actor_id) ?? "Someone" : "Someone"}
             </span>
             <span>{verb(e.event_type)}</span>
-            <span className="truncate font-medium text-slate-700">
+            <span className="truncate font-semibold text-podio-ink">
               {e.payload?.item_title ?? e.payload?.task_title ?? "an item"}
             </span>
-            <span className="ml-auto shrink-0 text-xs text-slate-400">
+            <span className="ml-auto shrink-0 text-xs text-podio-meta">
               {new Date(e.created_at).toLocaleString()}
             </span>
           </li>

@@ -2,9 +2,10 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { formatDuration, type CategoryOption } from "@/lib/fields";
+import { AppTabBar } from "../app-tab-bar";
 import { BoardView } from "./board-view";
 import { CalendarView } from "./calendar-view";
-import { ViewToolbar, type Filter, type Sort } from "./view-toolbar";
+import { ViewToolbar, type Filter, type Sort, type LayoutToggle } from "./view-toolbar";
 import { ExportButton } from "./export-button";
 import { SaveTemplateButton } from "./save-template-button";
 
@@ -34,9 +35,17 @@ export default async function AppPage({
     .eq("organization_id", org.id).eq("slug", wsSlug).single();
   if (!ws) notFound();
   const { data: app } = await supabase
-    .from("apps").select("id, name, slug, icon, item_name")
+    .from("apps").select("id, name, slug, icon, item_name, description")
     .eq("workspace_id", ws.id).eq("slug", appSlug).single();
   if (!app) notFound();
+
+  // Sibling apps of the workspace for the shared app tab bar
+  const { data: siblingApps } = await supabase
+    .from("apps")
+    .select("id, name, slug, icon")
+    .eq("workspace_id", ws.id)
+    .eq("is_archived", false)
+    .order("name");
 
   const { data: allFields } = await supabase
     .from("app_fields")
@@ -128,7 +137,7 @@ export default async function AppPage({
 
   function render(field: any, itemId: string) {
     const v = valueMap.get(itemId)?.get(field.id);
-    if (!v) return <span className="text-slate-300">—</span>;
+    if (!v) return <span className="text-podio-disabled">—</span>;
 
     switch (field.type) {
       case "category": {
@@ -145,23 +154,25 @@ export default async function AppPage({
           <span className="flex flex-wrap gap-1">
             {opts.map((opt) => (
               <span key={opt.id}
-                className="rounded px-2 py-0.5 text-xs font-medium text-white"
-                style={{ backgroundColor: opt.color }}>
+                className={`rounded px-2 py-0.5 text-sm font-medium text-podio-ink ${
+                  opt.color ? "" : "bg-podio-row-alt"
+                }`}
+                style={opt.color ? { backgroundColor: opt.color } : undefined}>
                 {opt.label}
               </span>
             ))}
           </span>
-        ) : <span className="text-slate-300">—</span>;
+        ) : <span className="text-podio-disabled">—</span>;
       }
       case "contact":
         return <span>{nameByUser.get(v.ref_user_id) ?? "Member"}</span>;
       case "relationship": {
         const ref = refById.get(v.ref_item_id);
         return ref ? (
-          <span className="rounded bg-slate-100 px-2 py-0.5 text-xs">
+          <span className="rounded bg-podio-row-alt px-2 py-0.5 text-xs text-podio-ink">
             #{ref.item_number} {ref.title ?? ""}
           </span>
-        ) : <span className="text-slate-300">—</span>;
+        ) : <span className="text-podio-disabled">—</span>;
       }
       case "date":
         return <span>{v.value_date ? new Date(v.value_date).toLocaleDateString() : "—"}</span>;
@@ -176,22 +187,22 @@ export default async function AppPage({
       case "progress":
         return (
           <div className="flex items-center gap-2">
-            <div className="h-2 w-16 rounded bg-slate-200">
-              <div className="h-2 rounded bg-blue-500"
+            <div className="h-2 w-16 rounded bg-podio-row-hover">
+              <div className="h-2 rounded bg-podio-teal"
                 style={{ width: `${Math.min(100, Number(v.value_number ?? 0))}%` }} />
             </div>
-            <span className="text-xs text-slate-500">{v.value_number}%</span>
+            <span className="text-xs text-podio-meta">{v.value_number}%</span>
           </div>
         );
       case "duration":
         return <span>{formatDuration(Number(v.value_number ?? 0))}</span>;
       case "phone":
-        return <a href={`tel:${v.value_text}`} className="text-blue-600 hover:underline">{v.value_text}</a>;
+        return <a href={`tel:${v.value_text}`} className="text-podio-teal hover:underline">{v.value_text}</a>;
       case "email":
-        return <a href={`mailto:${v.value_text}`} className="text-blue-600 hover:underline">{v.value_text}</a>;
+        return <a href={`mailto:${v.value_text}`} className="text-podio-teal hover:underline">{v.value_text}</a>;
       case "link":
         return (
-          <a href={v.value_text} target="_blank" className="text-blue-600 hover:underline">
+          <a href={v.value_text} target="_blank" className="text-podio-teal hover:underline">
             {v.value_text?.replace(/^https?:\/\//, "").slice(0, 30)}
           </a>
         );
@@ -200,19 +211,19 @@ export default async function AppPage({
           // eslint-disable-next-line @next/next/no-img-element
           <img src={signedByPath.get(v.value.path)} alt={v.value_text ?? ""}
             className="h-8 w-8 rounded object-cover" />
-        ) : <span className="text-slate-300">—</span>;
+        ) : <span className="text-podio-disabled">—</span>;
       case "file":
         return v.value?.path && signedByPath.get(v.value.path) ? (
           <a href={signedByPath.get(v.value.path)} target="_blank"
-            className="text-blue-600 hover:underline">
+            className="text-podio-teal hover:underline">
             {v.value_text}
           </a>
-        ) : <span className="text-slate-300">—</span>;
+        ) : <span className="text-podio-disabled">—</span>;
       case "calculation":
         return v.value_number != null ? (
           <span className="font-medium">{Number(v.value_number).toLocaleString()}</span>
         ) : (
-          <span className="text-slate-300">ƒ</span>
+          <span className="text-podio-disabled">ƒ</span>
         );
       default:
         return <span className="line-clamp-1">{v.value_text}</span>;
@@ -284,88 +295,116 @@ export default async function AppPage({
     full_name: m.user_profiles?.full_name ?? null,
   }));
 
-  const tabCls = (active: boolean) =>
-    `rounded-lg px-3 py-1.5 text-sm ${
-      active
-        ? "bg-slate-900 font-medium text-white"
-        : "border border-slate-300 text-slate-600 hover:bg-slate-100"
-    }`;
+  // Layout toggles for the view toolbar (active one renders as the orange pill)
+  const layoutToggles: LayoutToggle[] = [
+    { key: "table", label: "Sheet", href: baseHref },
+    categoryField
+      ? { key: "board", label: "Board", href: `${baseHref}?view=board` }
+      : { key: "board", label: "Board", disabledTitle: "Add a Category field to use the board" },
+    dateField
+      ? { key: "calendar", label: "Calendar", href: `${baseHref}?view=calendar` }
+      : { key: "calendar", label: "Calendar", disabledTitle: "Add a Date field to use the calendar" },
+    { key: "badge", label: "Badge", href: `${baseHref}?view=badge` },
+    { key: "stream", label: "Stream", href: `${baseHref}?view=stream` },
+  ];
+
+  const countLabel =
+    visibleItems.length === totalItems
+      ? `${totalItems.toLocaleString()} ${app.item_name.toLowerCase()}${totalItems === 1 ? "" : "s"}`
+      : `${visibleItems.length.toLocaleString()} of ${totalItems.toLocaleString()}`;
 
   return (
-    <main className="p-8">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold">
-          {app.icon} {app.name}
-        </h1>
-        <div className="flex items-center gap-2">
-          <Link href={`${baseHref}/edit`}
-            className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-600 hover:bg-slate-100">
-            ✏️ Edit app
-          </Link>
-          <Link href={`${baseHref}/import`}
-            className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-600 hover:bg-slate-100">
-            Import
-          </Link>
-          <ExportButton appId={app.id} appName={app.name} fields={fields as any} />
-          <SaveTemplateButton appId={app.id} appName={app.name} />
-          <Link href={`${baseHref}/form`}
-            className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-600 hover:bg-slate-100">
-            Webform
-          </Link>
-          <Link href={`${baseHref}/automations`}
-            className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-600 hover:bg-slate-100">
-            ⚡ Automations
-          </Link>
-          <Link
-            href={`${baseHref}/new`}
-            className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
-          >
-            + New {app.item_name.toLowerCase()}
-          </Link>
-        </div>
-      </div>
+    <main>
+      <AppTabBar
+        orgSlug={orgSlug}
+        wsSlug={wsSlug}
+        apps={siblingApps ?? []}
+        activeAppSlug={app.slug}
+      />
 
-      <div className="mt-4 flex items-center gap-2">
-        <Link href={baseHref} className={tabCls(view === "table")}>Table</Link>
-        {categoryField ? (
-          <Link href={`${baseHref}?view=board`} className={tabCls(view === "board")}>Board</Link>
-        ) : (
-          <span className="rounded-lg border border-slate-200 px-3 py-1.5 text-sm text-slate-300" title="Add a Category field to use the board">Board</span>
-        )}
-        {dateField ? (
-          <Link href={`${baseHref}?view=calendar`} className={tabCls(view === "calendar")}>Calendar</Link>
-        ) : (
-          <span className="rounded-lg border border-slate-200 px-3 py-1.5 text-sm text-slate-300" title="Add a Date field to use the calendar">Calendar</span>
-        )}
-        <Link href={`${baseHref}?view=badge`} className={tabCls(view === "badge")}>Badge</Link>
-        <Link href={`${baseHref}?view=stream`} className={tabCls(view === "stream")}>Stream</Link>
-        <span className="ml-auto text-xs text-slate-400">
-          {visibleItems.length === totalItems
-            ? `${totalItems.toLocaleString()} ${app.item_name.toLowerCase()}${totalItems === 1 ? "" : "s"}`
-            : `${visibleItems.length.toLocaleString()} of ${totalItems.toLocaleString()}`}
-        </span>
-      </div>
+      <div className="flex flex-col lg:flex-row lg:items-stretch">
+        {/* Left views pane */}
+        <aside className="w-full shrink-0 border-b border-podio-border bg-white p-4 lg:w-72 lg:border-b-0 lg:border-r">
+          <h1 className="text-xl font-semibold text-podio-teal">
+            {app.icon} {app.name}
+          </h1>
+          {app.description && (
+            <p className="mt-2 text-sm text-podio-secondary">{app.description}</p>
+          )}
 
+          <div className="mt-4 flex flex-wrap gap-x-4 gap-y-1 text-sm">
+            <Link href={`${baseHref}/edit`} className="text-podio-teal hover:underline">
+              Edit app
+            </Link>
+            <Link href={`${baseHref}/import`} className="text-podio-teal hover:underline">
+              Import
+            </Link>
+            <Link href={`${baseHref}/form`} className="text-podio-teal hover:underline">
+              Webform
+            </Link>
+            <Link href={`${baseHref}/automations`} className="text-podio-teal hover:underline">
+              Automations
+            </Link>
+          </div>
+          <div className="mt-3 flex flex-wrap items-center gap-2">
+            <ExportButton appId={app.id} appName={app.name} fields={fields as any} />
+            <SaveTemplateButton appId={app.id} appName={app.name} />
+          </div>
+
+          <h2 className="mt-5 text-lg font-semibold text-podio-ink">Views</h2>
+          <ul className="mt-2 space-y-0.5 text-[15px]">
+            <li>
+              <Link
+                href={baseHref}
+                className={`flex items-center rounded px-2 py-1.5 text-podio-teal ${
+                  !activeView ? "bg-podio-row-hover font-semibold" : "hover:bg-[#F3F3F3]"
+                }`}
+              >
+                All {app.item_name.toLowerCase()}s
+                <span className="ml-auto text-podio-ink">{totalItems.toLocaleString()}</span>
+              </Link>
+            </li>
+            {(savedViews ?? []).map((v) => (
+              <li key={v.id}>
+                <Link
+                  href={`${baseHref}?viewId=${v.id}`}
+                  className={`flex items-center rounded px-2 py-1.5 text-podio-teal ${
+                    activeView?.id === v.id
+                      ? "bg-podio-row-hover font-semibold"
+                      : "hover:bg-[#F3F3F3]"
+                  }`}
+                >
+                  <span className="truncate">{v.name}</span>
+                  {v.visibility === "private" && (
+                    <span className="ml-auto text-xs text-podio-meta">🔒</span>
+                  )}
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </aside>
+
+        {/* Main view area */}
+        <section className="min-w-0 flex-1 px-4 pb-8 pt-2 lg:px-6">
       <ViewToolbar
         appId={app.id}
         baseHref={baseHref}
         layout={view}
+        layouts={layoutToggles}
+        newHref={`${baseHref}/new`}
+        itemName={app.item_name.toLowerCase()}
+        countLabel={countLabel}
         fields={fields as any}
         tableFields={fields.map((f) => ({ id: f.id, label: f.label }))}
         initialCols={colsList}
         members={members}
-        savedViews={(savedViews ?? []).map((v) => ({
-          id: v.id,
-          name: v.name,
-          visibility: v.visibility,
-        }))}
         activeViewId={activeView?.id ?? null}
         initialFilters={filters}
         initialSort={sort}
       />
 
       {view === "board" && categoryField && (
-        <div className="mt-6">
+        <div className="mt-4">
           <BoardView
             fieldId={categoryField.id}
             options={(categoryField.config?.options ?? []) as CategoryOption[]}
@@ -376,7 +415,7 @@ export default async function AppPage({
       )}
 
       {view === "calendar" && dateField && (
-        <div className="mt-6">
+        <div className="mt-4">
           <CalendarView
             monthStr={monthStr}
             cardsByDay={cardsByDay}
@@ -387,29 +426,34 @@ export default async function AppPage({
       )}
 
       {view === "badge" && (
-        <div className="mt-6 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {visibleItems.map((item) => (
             <Link key={item.id}
               href={`${baseHref}/${item.item_number}`}
-              className="block rounded-lg border border-slate-200 bg-white p-4 hover:border-blue-400">
-              <div className="flex items-center justify-between">
-                <span className="truncate font-medium">
-                  {item.title ?? `#${item.item_number}`}
-                </span>
-                <span className="text-xs text-slate-300">#{item.item_number}</span>
-              </div>
-              <dl className="mt-2 space-y-1">
+              className="flex flex-col rounded border border-podio-border bg-white shadow-sm hover:border-podio-teal">
+              <h3 className="truncate px-4 pt-4 text-[17px] font-semibold text-podio-ink">
+                {item.title ?? `#${item.item_number}`}
+              </h3>
+              <dl className="mx-4 mt-3 space-y-1.5 rounded bg-podio-row-alt p-3">
                 {visibleFields.slice(0, 5).map((f) => (
-                  <div key={f.id} className="flex items-center gap-2 text-xs">
-                    <dt className="w-20 shrink-0 truncate text-slate-400">{f.label}</dt>
-                    <dd className="min-w-0 truncate">{render(f, item.id)}</dd>
+                  <div key={f.id} className="flex items-center gap-2 text-sm">
+                    <dt className="w-20 shrink-0 truncate text-podio-meta">{f.label}</dt>
+                    <dd className="min-w-0 truncate text-podio-ink">{render(f, item.id)}</dd>
                   </div>
                 ))}
               </dl>
+              <footer className="mt-auto flex items-center px-4 py-3 text-sm text-podio-meta">
+                #{item.item_number}
+                {item.updated_at && (
+                  <span className="ml-auto">
+                    {new Date(item.updated_at).toLocaleDateString()}
+                  </span>
+                )}
+              </footer>
             </Link>
           ))}
           {visibleItems.length === 0 && (
-            <p className="col-span-full rounded-lg border border-dashed border-slate-300 p-10 text-center text-sm text-slate-400">
+            <p className="col-span-full rounded border border-dashed border-podio-border bg-white p-10 text-sm text-podio-meta">
               No {app.item_name.toLowerCase()}s match.
             </p>
           )}
@@ -417,18 +461,18 @@ export default async function AppPage({
       )}
 
       {view === "stream" && (
-        <ul className="mt-6 space-y-2">
+        <ul className="mt-4 space-y-2">
           {[...visibleItems]
             .sort((a, b) => (a.updated_at < b.updated_at ? 1 : -1))
             .map((item) => (
               <li key={item.id}>
                 <Link href={`${baseHref}/${item.item_number}`}
-                  className="flex items-center gap-3 rounded-lg border border-slate-200 bg-white px-4 py-3 hover:border-blue-400">
+                  className="flex items-center gap-3 rounded border border-podio-border bg-white px-4 py-3 hover:bg-podio-row-hover">
                   <span className="min-w-0">
-                    <span className="block truncate text-sm font-medium">
+                    <span className="block truncate text-sm font-semibold text-podio-ink">
                       {item.title ?? `#${item.item_number}`}
                     </span>
-                    <span className="block text-xs text-slate-400">
+                    <span className="block text-xs text-podio-meta">
                       updated {new Date(item.updated_at).toLocaleString()}
                     </span>
                   </span>
@@ -441,7 +485,7 @@ export default async function AppPage({
               </li>
             ))}
           {visibleItems.length === 0 && (
-            <li className="rounded-lg border border-dashed border-slate-300 p-10 text-center text-sm text-slate-400">
+            <li className="rounded border border-dashed border-podio-border bg-white p-10 text-sm text-podio-meta">
               No {app.item_name.toLowerCase()}s match.
             </li>
           )}
@@ -449,36 +493,44 @@ export default async function AppPage({
       )}
 
       {view === "table" && (
-      <div className="mt-6 overflow-x-auto rounded-lg border border-slate-200 bg-white">
-        <table className="w-full text-left text-sm">
-          <thead className="border-b border-slate-200 bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
+      <div className="mt-4 overflow-x-auto rounded border border-podio-border bg-white shadow-sm">
+        <table className="w-full text-left text-[15px]">
+          <thead className="bg-podio-row-alt font-semibold text-podio-ink">
             <tr>
-              <th className="px-4 py-3">#</th>
+              <th className="w-10 border-b border-podio-border px-2 py-2" />
+              <th className="border-b border-podio-border px-3 py-2 font-semibold">#</th>
               {visibleFields.map((f) => (
-                <th key={f.id} className="px-4 py-3">{f.label}</th>
+                <th key={f.id} className="border-b border-podio-border px-3 py-2 font-semibold">
+                  {f.label}
+                </th>
               ))}
             </tr>
           </thead>
           <tbody>
-            {visibleItems.map((item) => (
-              <tr key={item.id} className="border-b border-slate-100 hover:bg-slate-50">
-                <td className="px-4 py-3 text-slate-400">
+            {visibleItems.map((item, i) => (
+              <tr key={item.id} className="hover:bg-podio-row-hover">
+                <td className="border-b border-[#EFEFEF] px-2 py-2.5 text-right text-podio-disabled">
+                  {i + 1}
+                </td>
+                <td className="border-b border-[#EFEFEF] px-3 py-2.5">
                   <Link
                     href={`/org/${orgSlug}/${wsSlug}/${app.slug}/${item.item_number}`}
-                    className="text-blue-600 hover:underline"
+                    className="text-podio-teal hover:underline"
                   >
                     {item.item_number}
                   </Link>
                 </td>
                 {visibleFields.map((f) => (
-                  <td key={f.id} className="px-4 py-3">{render(f, item.id)}</td>
+                  <td key={f.id} className="border-b border-[#EFEFEF] px-3 py-2.5 text-podio-ink">
+                    {render(f, item.id)}
+                  </td>
                 ))}
               </tr>
             ))}
             {visibleItems.length === 0 && (
               <tr>
-                <td colSpan={1 + visibleFields.length}
-                  className="px-4 py-10 text-center text-slate-400">
+                <td colSpan={2 + visibleFields.length}
+                  className="px-4 py-10 text-podio-meta">
                   No {app.item_name.toLowerCase()}s yet.
                 </td>
               </tr>
@@ -487,6 +539,8 @@ export default async function AppPage({
         </table>
       </div>
       )}
+        </section>
+      </div>
     </main>
   );
 }

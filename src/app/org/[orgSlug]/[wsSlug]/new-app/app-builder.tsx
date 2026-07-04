@@ -21,6 +21,72 @@ type DraftField = {
   formula: string;           // calculation
 };
 
+function AiFormulaAssist({
+  aiFields,
+  onFormula,
+}: {
+  aiFields: { external_id: string; label: string; type: string }[];
+  onFormula: (formula: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [prompt, setPrompt] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [explanation, setExplanation] = useState<string | null>(null);
+  const [aiError, setAiError] = useState<string | null>(null);
+
+  async function generate() {
+    if (!prompt.trim() || busy) return;
+    setBusy(true);
+    setAiError(null);
+    setExplanation(null);
+    try {
+      const res = await fetch("/api/ai/formula", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ prompt, fields: aiFields }),
+      });
+      const data = await res.json();
+      if (!res.ok || data.error) {
+        setAiError(data.error ?? "AI request failed");
+      } else {
+        onFormula(data.formula);
+        setExplanation(data.explanation || null);
+      }
+    } catch (e: any) {
+      setAiError(e.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <>
+      <button type="button"
+        onClick={() => { setOpen(!open); setAiError(null); }}
+        title="Write the formula with AI"
+        className="rounded border border-slate-300 px-2 py-1 text-xs text-slate-500 hover:bg-slate-100">
+        ✨ AI
+      </button>
+      {open && (
+        <div className="flex w-full items-center gap-1.5">
+          <input
+            value={prompt}
+            onChange={(e) => setPrompt(e.target.value)}
+            onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); void generate(); } }}
+            placeholder="e.g. 20% commission on deal value"
+            className="min-w-0 flex-1 rounded border border-slate-300 px-2 py-1 text-xs" />
+          <button type="button" onClick={generate} disabled={busy || !prompt.trim()}
+            className="rounded bg-blue-600 px-2 py-1 text-xs font-medium text-white hover:bg-blue-700 disabled:opacity-50">
+            {busy ? "…" : "Generate"}
+          </button>
+        </div>
+      )}
+      {explanation && <p className="w-full text-xs text-slate-400">{explanation}</p>}
+      {aiError && <p className="w-full text-xs text-red-600">{aiError}</p>}
+    </>
+  );
+}
+
 export function AppBuilder({
   wsId,
   orgSlug,
@@ -277,12 +343,24 @@ export function AppBuilder({
             )}
 
             {f.type === "calculation" && (
-              <div className="mt-2 pl-8">
+              <div className="mt-2 flex flex-wrap items-center gap-1.5 pl-8">
                 <input
                   placeholder="Formula (stored now, evaluated when the calc engine ships)"
                   value={f.formula}
                   onChange={(e) => updateField(f.key, { formula: e.target.value })}
-                  className="w-full rounded-lg border border-slate-300 px-2 py-1.5 text-sm"
+                  className="min-w-0 flex-1 rounded-lg border border-slate-300 px-2 py-1.5 text-sm"
+                />
+                <AiFormulaAssist
+                  aiFields={fields
+                    .map((x, xi) => ({
+                      external_id: `${slugify(x.label)}-${xi}`,
+                      label: x.label,
+                      type: x.type as string,
+                    }))
+                    .filter((x) =>
+                      ["number", "money", "progress"].includes(x.type) &&
+                      x.label.trim() !== "")}
+                  onFormula={(v) => updateField(f.key, { formula: v })}
                 />
               </div>
             )}

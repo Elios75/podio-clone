@@ -1,0 +1,591 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>School Onboarding – 360iSuite</title>
+<style>
+  :root {
+    --topbar-bg: #2f3437;
+    --topbar-text: #d7dbde;
+    --brand-blue: #2b6cb0;
+    --accent: #0d7bbf;
+    --tab-active: #ffffff;
+    --page-bg: #eef1f3;
+    --border: #d9dee2;
+    --border-soft: #e6eaed;
+    --text: #33383c;
+    --text-soft: #6b7379;
+    --selected-row: #e7f2fa;
+    --chip-green-bg: #d9efd9; --chip-green-tx: #2e7d32;
+    --chip-yellow-bg: #fdf1cf; --chip-yellow-tx: #9a7413;
+    --chip-blue-bg: #dcecf9;  --chip-blue-tx: #1b6ca8;
+    --chip-red-bg: #fbe0dd;   --chip-red-tx: #c0392b;
+    --chip-gray-bg: #e7eaec;  --chip-gray-tx: #5d6569;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    background: var(--page-bg);
+    color: var(--text);
+    font-size: 13px;
+  }
+  a { text-decoration: none; color: inherit; }
+
+  /* ---------- Global top bar ---------- */
+  .topbar {
+    background: var(--topbar-bg);
+    color: var(--topbar-text);
+    height: 46px;
+    display: flex;
+    align-items: center;
+    padding: 0 16px;
+    gap: 18px;
+  }
+  .topbar .logo {
+    font-weight: 700;
+    font-size: 17px;
+    color: #fff;
+    letter-spacing: -0.3px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .topbar .logo .mark {
+    background: var(--accent);
+    color: #fff;
+    width: 26px; height: 26px;
+    border-radius: 6px;
+    display: inline-flex; align-items: center; justify-content: center;
+    font-size: 14px;
+  }
+  .topbar .org {
+    display: flex; align-items: center; gap: 6px;
+    background: rgba(255,255,255,0.08);
+    padding: 5px 12px;
+    border-radius: 5px;
+    font-weight: 600;
+    color: #fff;
+    cursor: pointer;
+  }
+  .topbar .org .caret { font-size: 9px; opacity: 0.7; }
+  .topbar .search {
+    flex: 1;
+    max-width: 420px;
+    display: flex; align-items: center; gap: 8px;
+    background: rgba(255,255,255,0.10);
+    border-radius: 5px;
+    padding: 6px 12px;
+    color: #aab1b6;
+  }
+  .topbar .spacer { flex: 1; }
+  .topbar .icon-btn {
+    width: 32px; height: 32px;
+    display: inline-flex; align-items: center; justify-content: center;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 15px;
+    position: relative;
+  }
+  .topbar .icon-btn:hover { background: rgba(255,255,255,0.1); }
+  .topbar .icon-btn .dot {
+    position: absolute; top: 4px; right: 5px;
+    width: 8px; height: 8px; border-radius: 50%;
+    background: #e74c3c;
+    border: 2px solid var(--topbar-bg);
+  }
+  .topbar .avatar {
+    width: 28px; height: 28px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #7b5cd6, #4a90d9);
+    color: #fff;
+    display: inline-flex; align-items: center; justify-content: center;
+    font-size: 11px; font-weight: 700;
+    cursor: pointer;
+  }
+
+  /* ---------- Workspace header + app tabs ---------- */
+  .workspace-bar {
+    background: #3d566e;
+    color: #fff;
+    padding: 10px 20px 0;
+  }
+  .workspace-bar .ws-title {
+    display: flex; align-items: baseline; gap: 10px;
+    padding-bottom: 8px;
+  }
+  .workspace-bar .ws-title h1 { font-size: 16px; font-weight: 600; }
+  .workspace-bar .ws-title .ws-sub { font-size: 11px; color: #b9c5d0; }
+  .app-tabs {
+    display: flex;
+    gap: 2px;
+    align-items: flex-end;
+    overflow-x: auto;
+  }
+  .app-tab {
+    padding: 8px 14px;
+    border-radius: 6px 6px 0 0;
+    color: #c8d2db;
+    font-weight: 500;
+    white-space: nowrap;
+    cursor: pointer;
+    display: flex; align-items: center; gap: 7px;
+    font-size: 13px;
+  }
+  .app-tab:hover { background: rgba(255,255,255,0.08); color: #fff; }
+  .app-tab.active {
+    background: var(--tab-active);
+    color: var(--text);
+    font-weight: 600;
+  }
+  .app-tab.add { color: #9fb0be; font-size: 12px; }
+  .app-tab .emoji { font-size: 13px; }
+
+  /* ---------- Main layout ---------- */
+  .main {
+    display: flex;
+    min-height: calc(100vh - 46px - 78px);
+    background: #fff;
+  }
+
+  /* ---------- Views pane ---------- */
+  .views-pane {
+    width: 232px;
+    min-width: 232px;
+    background: #f7f8f9;
+    border-right: 1px solid var(--border);
+    padding: 14px 0 20px;
+  }
+  .views-pane .pane-header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 0 16px 10px;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.6px;
+    color: var(--text-soft);
+    text-transform: uppercase;
+  }
+  .views-pane .pane-header .gear { cursor: pointer; font-size: 12px; }
+  .view-group { margin-bottom: 16px; }
+  .view-group .group-label {
+    padding: 6px 16px 4px;
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--text-soft);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    display: flex; align-items: center; gap: 6px;
+  }
+  .view-group .group-label .tri { font-size: 8px; }
+  .view-row {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 6px 16px;
+    cursor: pointer;
+    color: var(--text);
+    border-left: 3px solid transparent;
+  }
+  .view-row:hover { background: #eef1f3; }
+  .view-row.selected {
+    background: var(--selected-row);
+    border-left-color: var(--accent);
+    font-weight: 600;
+    color: #14567f;
+  }
+  .view-row .count {
+    font-size: 11px;
+    color: var(--text-soft);
+    background: #e6eaed;
+    border-radius: 10px;
+    padding: 1px 8px;
+    min-width: 26px;
+    text-align: center;
+  }
+  .view-row.selected .count { background: #cfe4f4; color: #14567f; }
+  .view-row.sub { padding-left: 34px; font-size: 12.5px; color: var(--text-soft); }
+  .view-row.sub .swatch {
+    display: inline-block;
+    width: 8px; height: 8px;
+    border-radius: 2px;
+    margin-right: 7px;
+  }
+  .view-row.sub .lbl { display: flex; align-items: center; }
+  .views-pane .save-view {
+    margin: 4px 16px 0;
+    display: block;
+    font-size: 12px;
+    color: var(--accent);
+    cursor: pointer;
+  }
+
+  /* ---------- Content area ---------- */
+  .content {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+  }
+
+  /* ---------- View toolbar ---------- */
+  .view-toolbar {
+    display: flex; align-items: center;
+    gap: 14px;
+    padding: 12px 20px;
+    border-bottom: 1px solid var(--border);
+    background: #fff;
+    flex-wrap: wrap;
+  }
+  .view-toolbar .view-name {
+    font-size: 16px; font-weight: 600;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .view-toolbar .view-name .caret { font-size: 9px; color: var(--text-soft); }
+  .filter-pill {
+    display: flex; align-items: center; gap: 7px;
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 5px 13px;
+    color: var(--text-soft);
+    cursor: pointer;
+    font-size: 12.5px;
+    background: #fff;
+  }
+  .filter-pill:hover { border-color: #b9c2c8; color: var(--text); }
+  .filter-pill strong { color: var(--text); font-weight: 600; }
+  .toolbar-spacer { flex: 1; }
+  .segmented {
+    display: flex;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    overflow: hidden;
+  }
+  .segmented .seg {
+    padding: 6px 14px;
+    font-size: 12.5px;
+    color: var(--text-soft);
+    background: #fff;
+    cursor: pointer;
+    display: flex; align-items: center; gap: 6px;
+    border-right: 1px solid var(--border);
+  }
+  .segmented .seg:last-child { border-right: none; }
+  .segmented .seg:hover { background: #f2f4f6; }
+  .segmented .seg.active {
+    background: var(--accent);
+    color: #fff;
+    font-weight: 600;
+  }
+  .btn-add {
+    background: #4f9e37;
+    color: #fff;
+    border: none;
+    border-radius: 6px;
+    padding: 8px 16px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    display: flex; align-items: center; gap: 7px;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.12);
+  }
+  .btn-add:hover { background: #458c30; }
+  .toolbar-icon {
+    width: 30px; height: 30px;
+    display: inline-flex; align-items: center; justify-content: center;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    color: var(--text-soft);
+    cursor: pointer;
+    background: #fff;
+    font-size: 13px;
+  }
+  .toolbar-icon:hover { background: #f2f4f6; }
+
+  /* ---------- Sheet / table ---------- */
+  .sheet-wrap {
+    flex: 1;
+    overflow: auto;
+    background: #fff;
+  }
+  table.sheet {
+    width: 100%;
+    border-collapse: collapse;
+    min-width: 900px;
+  }
+  table.sheet thead th {
+    position: sticky; top: 0;
+    background: #f4f6f7;
+    border-bottom: 1px solid var(--border);
+    border-right: 1px solid var(--border-soft);
+    text-align: left;
+    padding: 9px 14px;
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--text-soft);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    white-space: nowrap;
+    z-index: 1;
+  }
+  table.sheet thead th .sort { font-size: 9px; margin-left: 4px; color: #9aa3a9; }
+  table.sheet thead th.checkbox-col,
+  table.sheet td.checkbox-col {
+    width: 38px;
+    text-align: center;
+    border-right: 1px solid var(--border-soft);
+  }
+  table.sheet tbody td {
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--border-soft);
+    border-right: 1px solid var(--border-soft);
+    white-space: nowrap;
+    vertical-align: middle;
+  }
+  table.sheet tbody tr:hover { background: #f6fafd; }
+  table.sheet tbody tr:nth-child(even) { background: #fbfcfd; }
+  table.sheet tbody tr:nth-child(even):hover { background: #f6fafd; }
+  .school-cell {
+    display: flex; align-items: center; gap: 10px;
+    font-weight: 600;
+    color: #14567f;
+    cursor: pointer;
+  }
+  .school-cell .school-ic {
+    width: 26px; height: 26px;
+    border-radius: 6px;
+    background: #eaf1f6;
+    display: inline-flex; align-items: center; justify-content: center;
+    font-size: 14px;
+  }
+  .school-cell:hover { text-decoration: underline; }
+  .chip {
+    display: inline-flex; align-items: center;
+    padding: 3px 11px;
+    border-radius: 12px;
+    font-size: 11.5px;
+    font-weight: 600;
+    letter-spacing: 0.2px;
+  }
+  .chip.green  { background: var(--chip-green-bg);  color: var(--chip-green-tx); }
+  .chip.yellow { background: var(--chip-yellow-bg); color: var(--chip-yellow-tx); }
+  .chip.blue   { background: var(--chip-blue-bg);   color: var(--chip-blue-tx); }
+  .chip.red    { background: var(--chip-red-bg);    color: var(--chip-red-tx); }
+  .chip.gray   { background: var(--chip-gray-bg);   color: var(--chip-gray-tx); }
+  .contact-cell { display: flex; align-items: center; gap: 8px; }
+  .contact-cell .c-avatar {
+    width: 24px; height: 24px;
+    border-radius: 50%;
+    color: #fff;
+    display: inline-flex; align-items: center; justify-content: center;
+    font-size: 10px; font-weight: 700;
+    flex: none;
+  }
+  .yn { display: inline-flex; align-items: center; gap: 6px; font-weight: 600; }
+  .yn.yes { color: #2e7d32; }
+  .yn.no  { color: #c0392b; }
+  .date-cell { color: var(--text-soft); }
+  input[type="checkbox"] { accent-color: var(--accent); cursor: pointer; }
+
+  /* ---------- Footer bar ---------- */
+  .sheet-footer {
+    border-top: 1px solid var(--border);
+    background: #f7f8f9;
+    padding: 8px 20px;
+    font-size: 12px;
+    color: var(--text-soft);
+    display: flex; align-items: center; gap: 16px;
+  }
+</style>
+</head>
+<body>
+
+  <!-- ===== Global top bar ===== -->
+  <header class="topbar">
+    <div class="logo"><span class="mark">◎</span></div>
+    <div class="org">🏢 360iSuite <span class="caret">▼</span></div>
+    <div class="search">🔍 <span>Search 360iSuite…</span></div>
+    <div class="spacer"></div>
+    <div class="icon-btn" title="Add">＋</div>
+    <div class="icon-btn" title="Tasks">✓</div>
+    <div class="icon-btn" title="Calendar">📅</div>
+    <div class="icon-btn" title="Notifications">🔔<span class="dot"></span></div>
+    <div class="avatar" title="Fernan D.">FD</div>
+  </header>
+
+  <!-- ===== Workspace header & app tab bar ===== -->
+  <div class="workspace-bar">
+    <div class="ws-title">
+      <h1>School Onboarding Workspace</h1>
+      <span class="ws-sub">Employee network · 12 members</span>
+    </div>
+    <nav class="app-tabs">
+      <div class="app-tab"><span class="emoji">⚡</span> Activity</div>
+      <div class="app-tab"><span class="emoji">✅</span> Tasks</div>
+      <div class="app-tab active"><span class="emoji">🏫</span> Onboarding</div>
+      <div class="app-tab"><span class="emoji">📅</span> Meetings</div>
+      <div class="app-tab"><span class="emoji">📁</span> Files Library</div>
+      <div class="app-tab"><span class="emoji">💡</span> Ideas</div>
+      <div class="app-tab"><span class="emoji">🔗</span> Link Library</div>
+      <div class="app-tab add">＋ Add app</div>
+    </nav>
+  </div>
+
+  <div class="main">
+
+    <!-- ===== Left views pane ===== -->
+    <aside class="views-pane">
+      <div class="pane-header">Views <span class="gear" title="Manage views">⚙</span></div>
+
+      <div class="view-group">
+        <div class="view-row">
+          <span class="lbl">📋 All Onboarding</span>
+          <span class="count">17</span>
+        </div>
+        <div class="view-row selected">
+          <span class="lbl">⏳ Pending Onboarding</span>
+          <span class="count">17</span>
+        </div>
+        <div class="view-row sub">
+          <span class="lbl"><span class="swatch" style="background:#4f9e37;"></span>Completed</span>
+          <span class="count">15</span>
+        </div>
+        <div class="view-row sub">
+          <span class="lbl"><span class="swatch" style="background:#e5a834;"></span>In Process</span>
+          <span class="count">2</span>
+        </div>
+      </div>
+
+      <div class="view-group">
+        <div class="group-label"><span class="tri">▼</span> Student Data Uploaded</div>
+        <div class="view-row sub">
+          <span class="lbl"><span class="swatch" style="background:#2e7d32;"></span>Yes</span>
+          <span class="count">16</span>
+        </div>
+        <div class="view-row sub">
+          <span class="lbl"><span class="swatch" style="background:#c0392b;"></span>No</span>
+          <span class="count">1</span>
+        </div>
+      </div>
+
+      <span class="save-view">＋ Save new view</span>
+    </aside>
+
+    <!-- ===== Content ===== -->
+    <section class="content">
+
+      <!-- View toolbar -->
+      <div class="view-toolbar">
+        <div class="view-name">Pending Onboarding <span class="caret">▼</span></div>
+        <div class="filter-pill" title="Filters">⚲ Filters · <strong>17 of 17</strong></div>
+        <div class="filter-pill" title="Sort">⇅ Sort: School A–Z</div>
+        <div class="toolbar-spacer"></div>
+        <div class="segmented">
+          <div class="seg" title="Dig view">🔎 Dig</div>
+          <div class="seg active" title="Sheet view">▦ Sheet</div>
+          <div class="seg" title="Reports view">📊 Reports</div>
+        </div>
+        <div class="toolbar-icon" title="Export">⇩</div>
+        <div class="toolbar-icon" title="More">⋯</div>
+        <button class="btn-add">＋ Add School</button>
+      </div>
+
+      <!-- Sheet view -->
+      <div class="sheet-wrap">
+        <table class="sheet">
+          <thead>
+            <tr>
+              <th class="checkbox-col"><input type="checkbox"></th>
+              <th>School <span class="sort">▲</span></th>
+              <th>Status</th>
+              <th>PO Date <span class="sort">▼</span></th>
+              <th>Contact</th>
+              <th>Data Extracted</th>
+              <th>Data Uploaded</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td class="checkbox-col"><input type="checkbox"></td>
+              <td><span class="school-cell"><span class="school-ic">🏫</span>Brookfield Elementary</span></td>
+              <td><span class="chip green">Completed</span></td>
+              <td class="date-cell">Mar 12, 2026</td>
+              <td><span class="contact-cell"><span class="c-avatar" style="background:#7b5cd6;">MP</span>Maria Perez</span></td>
+              <td><span class="yn yes">✔ Yes</span></td>
+              <td><span class="yn yes">✔ Yes</span></td>
+            </tr>
+            <tr>
+              <td class="checkbox-col"><input type="checkbox"></td>
+              <td><span class="school-cell"><span class="school-ic">🏫</span>Cedar Grove Middle School</span></td>
+              <td><span class="chip yellow">In Process</span></td>
+              <td class="date-cell">May 04, 2026</td>
+              <td><span class="contact-cell"><span class="c-avatar" style="background:#2f8f83;">JT</span>James Turner</span></td>
+              <td><span class="yn yes">✔ Yes</span></td>
+              <td><span class="yn no">✖ No</span></td>
+            </tr>
+            <tr>
+              <td class="checkbox-col"><input type="checkbox"></td>
+              <td><span class="school-cell"><span class="school-ic">🏫</span>Eastwood High School</span></td>
+              <td><span class="chip green">Completed</span></td>
+              <td class="date-cell">Feb 27, 2026</td>
+              <td><span class="contact-cell"><span class="c-avatar" style="background:#c0662b;">AL</span>Angela Lee</span></td>
+              <td><span class="yn yes">✔ Yes</span></td>
+              <td><span class="yn yes">✔ Yes</span></td>
+            </tr>
+            <tr>
+              <td class="checkbox-col"><input type="checkbox"></td>
+              <td><span class="school-cell"><span class="school-ic">🏫</span>Hillcrest Academy</span></td>
+              <td><span class="chip green">Completed</span></td>
+              <td class="date-cell">Apr 18, 2026</td>
+              <td><span class="contact-cell"><span class="c-avatar" style="background:#4a90d9;">RB</span>Robert Boyd</span></td>
+              <td><span class="yn yes">✔ Yes</span></td>
+              <td><span class="yn yes">✔ Yes</span></td>
+            </tr>
+            <tr>
+              <td class="checkbox-col"><input type="checkbox"></td>
+              <td><span class="school-cell"><span class="school-ic">🏫</span>Lakeside Preparatory</span></td>
+              <td><span class="chip yellow">In Process</span></td>
+              <td class="date-cell">Jun 09, 2026</td>
+              <td><span class="contact-cell"><span class="c-avatar" style="background:#a54ac7;">SN</span>Sofia Nguyen</span></td>
+              <td><span class="yn no">✖ No</span></td>
+              <td><span class="yn no">✖ No</span></td>
+            </tr>
+            <tr>
+              <td class="checkbox-col"><input type="checkbox"></td>
+              <td><span class="school-cell"><span class="school-ic">🏫</span>Maple Ridge Elementary</span></td>
+              <td><span class="chip green">Completed</span></td>
+              <td class="date-cell">Jan 30, 2026</td>
+              <td><span class="contact-cell"><span class="c-avatar" style="background:#3d8f4f;">DW</span>Daniel Wright</span></td>
+              <td><span class="yn yes">✔ Yes</span></td>
+              <td><span class="yn yes">✔ Yes</span></td>
+            </tr>
+            <tr>
+              <td class="checkbox-col"><input type="checkbox"></td>
+              <td><span class="school-cell"><span class="school-ic">🏫</span>Riverstone Charter School</span></td>
+              <td><span class="chip green">Completed</span></td>
+              <td class="date-cell">Mar 25, 2026</td>
+              <td><span class="contact-cell"><span class="c-avatar" style="background:#c74a6e;">KH</span>Karen Hall</span></td>
+              <td><span class="yn yes">✔ Yes</span></td>
+              <td><span class="yn yes">✔ Yes</span></td>
+            </tr>
+            <tr>
+              <td class="checkbox-col"><input type="checkbox"></td>
+              <td><span class="school-cell"><span class="school-ic">🏫</span>Westgate STEM Academy</span></td>
+              <td><span class="chip green">Completed</span></td>
+              <td class="date-cell">May 21, 2026</td>
+              <td><span class="contact-cell"><span class="c-avatar" style="background:#5a6b7b;">TC</span>Tom Castillo</span></td>
+              <td><span class="yn yes">✔ Yes</span></td>
+              <td><span class="yn yes">✔ Yes</span></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="sheet-footer">
+        <span>Showing <strong>8</strong> of <strong>17</strong> schools</span>
+        <span>·</span>
+        <span>Last updated 12 minutes ago</span>
+      </div>
+
+    </section>
+  </div>
+
+</body>
+</html>

@@ -31,7 +31,7 @@ export function BoardView({
 
   const columns: { key: string; label: string; color: string; optionId: string | null }[] = [
     ...options.map((o) => ({ key: o.id, label: o.label, color: o.color, optionId: o.id })),
-    { key: "__none__", label: "No value", color: "#cbd5e1", optionId: null },
+    { key: "__none__", label: "No value", color: "#B8C2C2", optionId: null },
   ];
 
   async function moveCard(itemId: string, optionId: string | null) {
@@ -76,10 +76,10 @@ export function BoardView({
               const itemId = e.dataTransfer.getData("text/plain");
               if (itemId) moveCard(itemId, col.optionId);
             }}
-            className={`w-64 shrink-0 rounded-lg border p-3 ${
+            className={`w-64 shrink-0 rounded border p-3 ${
               dragOver === col.key
-                ? "border-blue-400 bg-blue-50"
-                : "border-slate-200 bg-slate-100/60"
+                ? "border-podio-teal bg-podio-row-alt"
+                : "border-podio-border bg-white"
             }`}
           >
             <div className="flex items-center gap-2">
@@ -87,8 +87,8 @@ export function BoardView({
                 className="inline-block h-2.5 w-2.5 rounded-full"
                 style={{ backgroundColor: col.color }}
               />
-              <span className="text-sm font-medium">{col.label}</span>
-              <span className="ml-auto text-xs text-slate-400">{colCards.length}</span>
+              <span className="text-sm font-semibold text-podio-ink">{col.label}</span>
+              <span className="ml-auto text-xs text-podio-meta">{colCards.length}</span>
             </div>
             <div className="mt-3 space-y-2">
               {colCards.map((c) => (
@@ -96,19 +96,19 @@ export function BoardView({
                   key={c.id}
                   draggable
                   onDragStart={(e) => e.dataTransfer.setData("text/plain", c.id)}
-                  className="cursor-grab rounded-lg border border-slate-200 bg-white p-3 shadow-sm active:cursor-grabbing"
+                  className="cursor-grab rounded border border-podio-border bg-white p-3 shadow-sm active:cursor-grabbing"
                 >
                   <Link
                     href={`${baseHref}/${c.item_number}`}
-                    className="text-sm font-medium hover:text-blue-600"
+                    className="text-sm font-semibold text-podio-ink hover:text-podio-teal"
                   >
                     {c.title ?? `#${c.item_number}`}
                   </Link>
-                  <p className="mt-1 text-xs text-slate-400">#{c.item_number}</p>
+                  <p className="mt-1 text-xs text-podio-meta">#{c.item_number}</p>
                 </div>
               ))}
               {colCards.length === 0 && (
-                <p className="rounded border border-dashed border-slate-300 p-3 text-center text-xs text-slate-400">
+                <p className="rounded border border-dashed border-podio-border p-3 text-xs text-podio-meta">
                   Drop here
                 </p>
               )}

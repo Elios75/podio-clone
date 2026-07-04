@@ -77,21 +77,21 @@ export default async function MyTasksPage({
     const link = t.target_type === "item" ? hrefByItem.get(t.target_id) : null;
     const overdue = t.due_at && new Date(t.due_at) < new Date() && t.status === "open";
     return (
-      <li className="flex items-center gap-3 rounded-lg border border-slate-200 bg-white px-3 py-2">
+      <li className="flex items-center gap-3 rounded border border-podio-border bg-white px-3 py-2 hover:bg-podio-row-hover">
         <TaskToggle taskId={t.id} status={t.status} />
         <div className="min-w-0">
-          <p className={`truncate text-sm ${t.status === "completed" ? "text-slate-400 line-through" : ""}`}>
+          <p className={`truncate text-sm ${t.status === "completed" ? "text-podio-disabled line-through" : "text-podio-ink"}`}>
             {t.title}
           </p>
           {link && (
-            <Link href={link.href} className="text-xs text-blue-600 hover:underline">
+            <Link href={link.href} className="text-xs text-podio-teal hover:underline">
               {link.title}
             </Link>
           )}
         </div>
         <span className="ml-auto flex shrink-0 items-center gap-2">
           {t.due_at && (
-            <span className={`text-xs ${overdue ? "font-medium text-red-500" : "text-slate-400"}`}>
+            <span className={`text-xs ${overdue ? "font-medium text-red-500" : "text-podio-meta"}`}>
               {new Date(t.due_at).toLocaleDateString()}
             </span>
           )}
@@ -108,19 +108,19 @@ export default async function MyTasksPage({
   return (
     <main className="mx-auto max-w-2xl p-8">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold">My tasks</h1>
-        <Link href="/home" className="text-sm text-slate-500 hover:underline">← Home</Link>
+        <h1 className="text-2xl font-semibold text-podio-ink">My tasks</h1>
+        <Link href="/home" className="text-sm text-podio-teal hover:underline">← Home</Link>
       </div>
 
       <LabelManager labels={labels ?? []} activeLabel={activeLabel ?? null} />
 
-      <h2 className="mt-6 text-sm font-medium uppercase tracking-wide text-slate-400">
+      <h2 className="mt-6 text-sm font-semibold uppercase tracking-wide text-podio-meta">
         Open ({open.length})
       </h2>
       <ul className="mt-2 space-y-2">
         {open.map((t) => <TaskRow key={t.id} t={t} />)}
         {open.length === 0 && (
-          <li className="rounded-lg border border-dashed border-slate-300 p-6 text-center text-sm text-slate-400">
+          <li className="rounded border border-dashed border-podio-border bg-white p-6 text-center text-sm text-podio-meta">
             All clear 🎉
           </li>
         )}
@@ -128,7 +128,7 @@ export default async function MyTasksPage({
 
       {done.length > 0 && (
         <>
-          <h2 className="mt-8 text-sm font-medium uppercase tracking-wide text-slate-400">
+          <h2 className="mt-8 text-sm font-semibold uppercase tracking-wide text-podio-meta">
             Recently completed
           </h2>
           <ul className="mt-2 space-y-2">

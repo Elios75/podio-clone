@@ -6,8 +6,16 @@ import { createClient } from "@/lib/supabase/client";
 import type { CategoryOption } from "@/lib/fields";
 
 type Field = {
-  id: string; label: string; type: string;
+  id: string; external_id?: string | null; label: string; type: string;
   config: { options?: CategoryOption[]; related_app_id?: string };
+};
+
+type Suggestion = {
+  name: string;
+  trigger: { type: string };
+  conditions?: { field_external_id: string; op: string; value: string }[];
+  actions: any[];
+  rationale: string;
 };
 type Member = { user_id: string; full_name: string | null };
 type Automation = {
@@ -44,6 +52,7 @@ const ACTION_TYPES = [
   { value: "update_related_item", label: "Update related items" },
   { value: "generate_pdf", label: "Generate a PDF" },
   { value: "chat_message", label: "Post to Slack / Teams" },
+  { value: "send_sms", label: "Send an SMS (Twilio)" },
 ];
 
 function StatusBadge({ status, isTest }: { status: string; isTest?: boolean }) {
@@ -168,9 +177,10 @@ function RunNowPanel({
 }
 
 export function AutomationsBuilder({
-  appId, wsId, fields, members, automations, runs,
+  appId, wsId, appName, itemName, fields, members, automations, runs,
 }: {
-  appId: string; wsId: string; fields: Field[]; members: Member[];
+  appId: string; wsId: string; appName: string; itemName: string;
+  fields: Field[]; members: Member[];
   automations: Automation[]; runs: Run[];
 }) {
   const router = useRouter();
@@ -194,6 +204,9 @@ export function AutomationsBuilder({
   const [expandedRun, setExpandedRun] = useState<string | null>(null);
   const [runPanel, setRunPanel] = useState<string | null>(null);
   const [relAppFields, setRelAppFields] = useState<Record<string, Field[]>>({});
+  const [suggestions, setSuggestions] = useState<Suggestion[] | null>(null);
+  const [sugBusy, setSugBusy] = useState(false);
+  const [sugError, setSugError] = useState<string | null>(null);
 
   async function loadRelAppFields(appIdToLoad: string) {
     if (relAppFields[appIdToLoad]) return;
@@ -269,6 +282,79 @@ export function AutomationsBuilder({
     setActions([{ type: "create_task", title: "" }]);
     setCondField(""); setCondValue("");
     setDateField(""); setDateOffset("0");
+    router.refresh();
+  }
+
+  async function fetchSuggestions() {
+    setSugBusy(true);
+    setSugError(null);
+    try {
+      const res = await fetch("/api/ai/suggest-automations", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          appName,
+          itemName,
+          fields: fields
+            .filter((f) => f.external_id)
+            .map((f) => ({
+              external_id: f.external_id,
+              label: f.label,
+              type: f.type,
+              options: f.config.options?.map((o) => ({ id: o.id, label: o.label })),
+            })),
+          existing: automations.map((a) => a.name),
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok || data.error) {
+        setSugError(data.error ?? "AI request failed");
+      } else {
+        setSuggestions(data.suggestions ?? []);
+      }
+    } catch (e: any) {
+      setSugError(e.message);
+    } finally {
+      setSugBusy(false);
+    }
+  }
+
+  async function addSuggestion(s: Suggestion, idx: number) {
+    setSugError(null);
+    const byExt = new Map<string, Field>(
+      fields.filter((f) => f.external_id).map((f) => [f.external_id as string, f] as [string, Field]));
+    const conditions = (s.conditions ?? [])
+      .filter((c) => byExt.has(c.field_external_id))
+      .map((c) => ({ field_id: byExt.get(c.field_external_id)!.id, op: c.op, value: c.value }));
+    const cleanActions = (s.actions ?? [])
+      .map((a: any) => {
+        if (a?.type === "create_task" && a.title) {
+          const act: any = { type: "create_task", title: a.title };
+          if (a.due_days != null && a.due_days !== "") act.due_days = Number(a.due_days);
+          return act;
+        }
+        if (a?.type === "update_field") {
+          const f = byExt.get(a.field_external_id);
+          if (!f) return null; // skip unresolvable field
+          return { type: "update_field", field_id: f.id, value: a.value };
+        }
+        if (a?.type === "add_comment" && a.body) return { type: "add_comment", body: a.body };
+        return null;
+      })
+      .filter(Boolean);
+    if (cleanActions.length === 0) return setSugError("That suggestion has no usable actions for this app.");
+    const { error: insError } = await supabase.from("automations").insert({
+      workspace_id: wsId,
+      app_id: appId,
+      name: s.name,
+      kind: "simple",
+      status: "active",
+      trigger: { type: s.trigger?.type ?? "item_created" },
+      conditions,
+      actions: cleanActions,
+    });
+    if (insError) return setSugError(insError.message);
+    setSuggestions((prev) => (prev ?? []).filter((_, i) => i !== idx));
     router.refresh();
   }
 
@@ -644,6 +730,16 @@ export function AutomationsBuilder({
                       className="w-full rounded border border-slate-300 px-2 py-1.5 text-sm" />
                   </>
                 )}
+                {a.type === "send_sms" && (
+                  <>
+                    <input placeholder="+15551234567" value={a.to ?? ""}
+                      onChange={(e) => setAction(i, { to: e.target.value })}
+                      className="w-44 rounded border border-slate-300 px-2 py-1.5 text-sm font-mono" />
+                    <input placeholder="Message (max 1600 chars)" value={a.body ?? ""}
+                      onChange={(e) => setAction(i, { body: e.target.value })}
+                      className="flex-1 rounded border border-slate-300 px-2 py-1.5 text-sm" />
+                  </>
+                )}
                 {a.type === "generate_pdf" && (
                   <input placeholder="Comment prefix (optional)" value={a.note ?? ""}
                     onChange={(e) => setAction(i, { note: e.target.value })}
@@ -722,11 +818,60 @@ export function AutomationsBuilder({
           </div>
         </div>
       ) : (
-        <button onClick={() => setOpen(true)}
-          className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700">
-          + New automation
-        </button>
+        <div className="flex flex-wrap items-center gap-2">
+          <button onClick={() => setOpen(true)}
+            className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700">
+            + New automation
+          </button>
+          <button onClick={fetchSuggestions} disabled={sugBusy}
+            className="rounded-lg border border-slate-300 px-4 py-2 text-sm text-slate-600 hover:bg-slate-100 disabled:opacity-50">
+            {sugBusy ? "Thinking…" : "✨ Suggest automations"}
+          </button>
+        </div>
       )}
+
+      {/* AI suggestions */}
+      {sugError && <p className="text-sm text-red-600">{sugError}</p>}
+      {suggestions && suggestions.length === 0 && !sugBusy && (
+        <p className="text-xs text-slate-400">No suggestions right now.</p>
+      )}
+      {(suggestions ?? []).map((s, i) => (
+        <div key={`${s.name}-${i}`} className="rounded-lg border border-slate-200 bg-white p-3">
+          <div className="flex items-start gap-3">
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-medium">✨ {s.name}</p>
+              <p className="mt-0.5 text-xs text-slate-500">
+                When{" "}
+                <span className="font-medium">
+                  {TRIGGERS.find((t) => t.value === s.trigger?.type)?.label ?? s.trigger?.type}
+                </span>
+                {(s.conditions ?? []).length > 0 &&
+                  ` (if ${(s.conditions ?? [])
+                    .map((c) => {
+                      const f = fields.find((x) => x.external_id === c.field_external_id);
+                      const opTxt = c.op === "equals" ? "=" : c.op === "not_equals" ? "≠" : c.op === "gt" ? ">" : "<";
+                      const optLabel = f?.config.options?.find((o) => o.id === c.value)?.label;
+                      return `${f?.label ?? c.field_external_id} ${opTxt} ${optLabel ?? c.value}`;
+                    })
+                    .join(", ")})`}{" "}
+                →{" "}
+                {(s.actions ?? [])
+                  .map((x: any) => ACTION_TYPES.find((t) => t.value === x.type)?.label ?? x.type)
+                  .join(", ")}
+              </p>
+              <p className="mt-0.5 text-xs text-slate-400">{s.rationale}</p>
+            </div>
+            <button onClick={() => addSuggestion(s, i)}
+              className="rounded bg-blue-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-blue-700">
+              Add
+            </button>
+            <button onClick={() => setSuggestions((prev) => (prev ?? []).filter((_, x) => x !== i))}
+              className="text-sm text-slate-400 hover:text-red-600" title="Dismiss">
+              ✕
+            </button>
+          </div>
+        </div>
+      ))}
     </div>
   );
 }

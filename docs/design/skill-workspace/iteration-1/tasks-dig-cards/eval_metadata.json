@@ -1,0 +1,12 @@
+{
+  "eval_id": 1,
+  "eval_name": "tasks-dig-cards",
+  "prompt": "Mock up the Tasks app in card (Dig) view as a single self-contained HTML file: org 360iSuite, Tasks tab active, left views pane with Responsible member counts, toolbar with 3 filters / 134 of 745 / Show all / Sheet active / Add Task, and a 3-across grid of 6 task cards with grey excerpt blocks, category chips, and date+comments footers.",
+  "assertions": [
+    "Primary action button uses Podio teal #15808D",
+    "Active view toggle is the Podio orange pill #F7A11C",
+    "Global bar uses grey-teal chrome #CBDBDB",
+    "Uses the Podio pastel chip palette (3+ token pairs from tokens.md)",
+    "No blue primary color (blue-600 / #2563EB family absent)"
+  ]
+}

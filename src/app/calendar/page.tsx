@@ -66,16 +66,16 @@ export default async function PersonalCalendarPage({
   return (
     <main className="mx-auto max-w-4xl p-8">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold">My calendar</h1>
+        <h1 className="text-2xl font-semibold text-podio-ink">My calendar</h1>
         <div className="flex items-center gap-3">
           <IcsLink />
-          <Link href="/home" className="text-sm text-slate-500 hover:underline">← Home</Link>
+          <Link href="/home" className="text-sm text-podio-teal hover:underline">← Home</Link>
         </div>
       </div>
-      <p className="mt-1 text-sm text-slate-500">
+      <p className="mt-1 text-sm text-podio-secondary">
         Your tasks plus every dated item across your workspaces.
       </p>
-      <div className="mt-6">
+      <div className="mt-6 rounded border border-podio-border bg-white p-4 shadow-sm">
         <CalendarView
           monthStr={monthStr}
           cardsByDay={cardsByDay}

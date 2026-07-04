@@ -19,13 +19,13 @@ export default async function AutomationsPage({
     .eq("organization_id", org.id).eq("slug", wsSlug).single();
   if (!ws) notFound();
   const { data: app } = await supabase
-    .from("apps").select("id, name, slug, icon")
+    .from("apps").select("id, name, slug, icon, item_name")
     .eq("workspace_id", ws.id).eq("slug", appSlug).single();
   if (!app) notFound();
 
   const { data: fields } = await supabase
     .from("app_fields")
-    .select("id, label, type, config")
+    .select("id, external_id, label, type, config")
     .eq("app_id", app.id).eq("status", "active")
     .order("position");
 
@@ -66,6 +66,8 @@ export default async function AutomationsPage({
         <AutomationsBuilder
           appId={app.id}
           wsId={ws.id}
+          appName={app.name}
+          itemName={app.item_name ?? "Item"}
           fields={(fields ?? []) as any}
           members={members}
           automations={(automations ?? []) as any}

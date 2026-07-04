@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { DashboardTiles, type TileData } from "./dashboard-tiles";
 import { MemberRoleSelect } from "@/components/member-role-select";
 import { StatusComposer } from "./status-composer";
+import { AppTabBar } from "./app-tab-bar";
 
 export default async function WorkspacePage({
   params,
@@ -148,137 +149,157 @@ export default async function WorkspacePage({
   );
 
   return (
-    <main className="mx-auto max-w-3xl p-8">
-      <div className="flex items-center gap-3">
-        <h1 className="text-2xl font-semibold">{ws.name}</h1>
-        <span className="rounded bg-slate-100 px-2 py-0.5 text-xs text-slate-600">
-          {ws.privacy}
-        </span>
-      </div>
-      {ws.description && (
-        <p className="mt-1 text-sm text-slate-500">{ws.description}</p>
-      )}
+    <main className="min-h-screen bg-podio-page pb-10">
+      <AppTabBar
+        orgSlug={orgSlug}
+        wsSlug={ws.slug}
+        apps={(apps ?? []).map((a) => ({
+          id: a.id,
+          name: a.name,
+          slug: a.slug,
+          icon: a.icon,
+        }))}
+        activityActive
+      />
 
-      <h2 className="mt-8 text-lg font-medium">Dashboard</h2>
-      <div className="mt-3">
-        <DashboardTiles wsId={ws.id} apps={appInfos} tiles={tiles} />
-      </div>
+      <div className="px-4 pt-5 md:px-6">
+        <div className="flex items-center gap-3">
+          <h1 className="text-2xl font-semibold text-podio-ink">{ws.name}</h1>
+          <span className="rounded bg-podio-row-alt px-2 py-0.5 text-xs text-podio-secondary">
+            {ws.privacy}
+          </span>
+        </div>
+        {ws.description && (
+          <p className="mt-1 text-sm text-podio-secondary">{ws.description}</p>
+        )}
 
-      <div className="mt-8 flex items-center justify-between">
-        <h2 className="text-lg font-medium">Apps</h2>
-        <div className="flex gap-2">
-          <Link
-            href={`/org/${orgSlug}/${ws.slug}/files`}
-            className="rounded-lg border border-slate-300 px-3 py-1.5 text-sm text-slate-600 hover:bg-slate-100"
-          >
-            Files
-          </Link>
-          <Link
-            href={`/org/${orgSlug}/${ws.slug}/market`}
-            className="rounded-lg border border-slate-300 px-3 py-1.5 text-sm text-slate-600 hover:bg-slate-100"
-          >
-            App market
-          </Link>
-          <Link
-            href={`/org/${orgSlug}/${ws.slug}/new-app-from-csv`}
-            className="rounded-lg border border-slate-300 px-3 py-1.5 text-sm text-slate-600 hover:bg-slate-100"
-          >
-            From CSV
-          </Link>
-          <Link
-            href={`/org/${orgSlug}/${ws.slug}/new-app`}
-            className="rounded-lg bg-blue-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-700"
-          >
-            + New app
-          </Link>
+        <h2 className="mt-8 text-lg font-semibold text-podio-ink">Dashboard</h2>
+        <div className="mt-3">
+          <DashboardTiles wsId={ws.id} apps={appInfos} tiles={tiles} />
         </div>
-      </div>
-      {(apps ?? []).length === 0 ? (
-        <div className="mt-3 rounded-lg border border-dashed border-slate-300 p-8 text-center text-sm text-slate-500">
-          No apps yet — build your first one. This is where your CRM, project
-          tracker, or help desk will live.
+
+        <div className="mt-8 flex flex-wrap items-center justify-between gap-2">
+          <h2 className="text-lg font-semibold text-podio-ink">Apps</h2>
+          <div className="flex flex-wrap items-center gap-1">
+            <Link
+              href={`/org/${orgSlug}/${ws.slug}/map`}
+              className="rounded px-2 py-1.5 text-sm text-podio-teal hover:bg-podio-row-hover"
+            >
+              🗺️ Relationship map
+            </Link>
+            <Link
+              href={`/org/${orgSlug}/${ws.slug}/files`}
+              className="rounded px-2 py-1.5 text-sm text-podio-teal hover:bg-podio-row-hover"
+            >
+              Files
+            </Link>
+            <Link
+              href={`/org/${orgSlug}/${ws.slug}/market`}
+              className="rounded px-2 py-1.5 text-sm text-podio-teal hover:bg-podio-row-hover"
+            >
+              App market
+            </Link>
+            <Link
+              href={`/org/${orgSlug}/${ws.slug}/new-app-from-csv`}
+              className="rounded px-2 py-1.5 text-sm text-podio-teal hover:bg-podio-row-hover"
+            >
+              From CSV
+            </Link>
+            <Link
+              href={`/org/${orgSlug}/${ws.slug}/new-app`}
+              className="ml-2 rounded bg-podio-teal px-3 py-1.5 text-sm font-semibold text-white hover:bg-podio-teal-dark"
+            >
+              + New app
+            </Link>
+          </div>
         </div>
-      ) : (
-        <ul className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
-          {(apps ?? []).map((app) => (
-            <li key={app.id}>
-              <Link
-                href={`/org/${orgSlug}/${ws.slug}/${app.slug}`}
-                className="block rounded-lg border border-slate-200 bg-white p-4 hover:border-blue-400"
-              >
-                <span className="font-medium">
-                  {app.icon ? `${app.icon} ` : ""}
-                  {app.name}
+        {(apps ?? []).length === 0 ? (
+          <div className="mt-3 rounded border border-dashed border-podio-border bg-white p-8 text-center text-sm text-podio-secondary">
+            No apps yet — build your first one. This is where your CRM, project
+            tracker, or help desk will live.
+          </div>
+        ) : (
+          <ul className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {(apps ?? []).map((app) => (
+              <li key={app.id}>
+                <Link
+                  href={`/org/${orgSlug}/${ws.slug}/${app.slug}`}
+                  className="block rounded border border-podio-border bg-white p-4 hover:border-podio-teal"
+                >
+                  <span className="font-semibold text-podio-ink">
+                    {app.icon ? `${app.icon} ` : ""}
+                    {app.name}
+                  </span>
+                </Link>
+              </li>
+            ))}
+          </ul>
+        )}
+
+        <h2 className="mt-10 text-lg font-semibold text-podio-ink">Activity</h2>
+        <div className="mt-3">
+          <StatusComposer wsId={ws.id} />
+        </div>
+        {(statusRows ?? []).length > 0 && (
+          <ul className="mt-3 space-y-1.5">
+            {(statusRows ?? []).map((s: any) => (
+              <li key={s.id}
+                className="rounded border border-podio-border bg-podio-row-alt px-3 py-2 text-sm">
+                <span className="font-semibold text-podio-ink">
+                  {actorName.get(s.created_by) ?? "Someone"}:
+                </span>{" "}
+                <span className="text-podio-secondary">{s.body}</span>
+                <span className="ml-2 text-xs text-podio-meta">
+                  {new Date(s.created_at).toLocaleString()}
                 </span>
-              </Link>
-            </li>
-          ))}
-        </ul>
-      )}
-
-      <h2 className="mt-10 text-lg font-medium">Activity</h2>
-      <div className="mt-3">
-        <StatusComposer wsId={ws.id} />
-      </div>
-      {(statusRows ?? []).length > 0 && (
+              </li>
+            ))}
+          </ul>
+        )}
         <ul className="mt-3 space-y-1.5">
-          {(statusRows ?? []).map((s: any) => (
-            <li key={s.id}
-              className="rounded-lg border border-blue-100 bg-blue-50/50 px-3 py-2 text-sm">
-              <span className="font-medium text-slate-700">
-                {actorName.get(s.created_by) ?? "Someone"}:
-              </span>{" "}
-              <span className="text-slate-600">{s.body}</span>
-              <span className="ml-2 text-xs text-slate-400">
-                {new Date(s.created_at).toLocaleString()}
+          {(activityRows ?? []).map((a: any) => (
+            <li key={a.id} className="flex items-center gap-2 rounded border border-podio-border bg-white px-3 py-2 text-sm text-podio-secondary">
+              <span className="font-semibold text-podio-ink">
+                {a.actor_id ? actorName.get(a.actor_id) ?? "Someone" : "Someone"}
+              </span>
+              <span>
+                {a.event_type === "item_created" && "created"}
+                {a.event_type === "item_updated" && "updated"}
+                {a.event_type === "comment_added" && "commented on"}
+              </span>
+              <span className="truncate font-semibold text-podio-ink">
+                {a.payload?.item_title ?? "an item"}
+              </span>
+              <span className="ml-auto shrink-0 text-xs text-podio-meta">
+                {new Date(a.created_at).toLocaleString()}
               </span>
             </li>
           ))}
+          {(activityRows ?? []).length === 0 && (
+            <li className="text-sm text-podio-meta">No activity yet.</li>
+          )}
         </ul>
-      )}
-      <ul className="mt-3 space-y-1.5">
-        {(activityRows ?? []).map((a: any) => (
-          <li key={a.id} className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-500">
-            <span className="font-medium text-slate-700">
-              {a.actor_id ? actorName.get(a.actor_id) ?? "Someone" : "Someone"}
-            </span>
-            <span>
-              {a.event_type === "item_created" && "created"}
-              {a.event_type === "item_updated" && "updated"}
-              {a.event_type === "comment_added" && "commented on"}
-            </span>
-            <span className="truncate font-medium text-slate-700">
-              {a.payload?.item_title ?? "an item"}
-            </span>
-            <span className="ml-auto shrink-0 text-xs text-slate-400">
-              {new Date(a.created_at).toLocaleString()}
-            </span>
-          </li>
-        ))}
-        {(activityRows ?? []).length === 0 && (
-          <li className="text-sm text-slate-400">No activity yet.</li>
-        )}
-      </ul>
 
-      <h2 className="mt-10 text-lg font-medium">Members</h2>
-      <ul className="mt-3 space-y-2">
-        {(members ?? []).map((m: any) => (
-          <li
-            key={m.id}
-            className="flex items-center justify-between rounded-lg border border-slate-200 bg-white px-4 py-2"
-          >
-            <span className="text-sm">
-              {m.user_profiles?.full_name ?? m.user_id}
-            </span>
-            <MemberRoleSelect
-              table="workspace_members"
-              memberId={m.id}
-              role={m.role}
-              options={["admin", "member", "light", "guest"]}
-            />
-          </li>
-        ))}
-      </ul>
+        <h2 className="mt-10 text-lg font-semibold text-podio-ink">Members</h2>
+        <ul className="mt-3 space-y-2">
+          {(members ?? []).map((m: any) => (
+            <li
+              key={m.id}
+              className="flex items-center justify-between rounded border border-podio-border bg-white px-4 py-2"
+            >
+              <span className="text-sm text-podio-ink">
+                {m.user_profiles?.full_name ?? m.user_id}
+              </span>
+              <MemberRoleSelect
+                table="workspace_members"
+                memberId={m.id}
+                role={m.role}
+                options={["admin", "member", "light", "guest"]}
+              />
+            </li>
+          ))}
+        </ul>
+      </div>
     </main>
   );
 }

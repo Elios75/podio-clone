@@ -1,0 +1,12 @@
+{
+  "eval_id": 0,
+  "eval_name": "onboarding-sheet-view",
+  "prompt": "Mock up a 'School Onboarding' app page as a single self-contained HTML file: global top bar (org 360iSuite), app tab bar with Onboarding active, left views pane with grouped views and counts, view toolbar (17 of 17, Dig/Sheet/Reports, Add School), sheet view of ~8 schools with status chips.",
+  "assertions": [
+    "Primary action button uses Podio teal #15808D",
+    "Active view toggle is the Podio orange pill #F7A11C",
+    "Global bar uses grey-teal chrome #CBDBDB",
+    "Uses the Podio pastel chip palette (3+ token pairs from tokens.md)",
+    "No blue primary color (blue-600 / #2563EB family absent)"
+  ]
+}

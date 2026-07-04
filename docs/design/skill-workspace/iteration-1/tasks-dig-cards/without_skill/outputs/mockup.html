@@ -1,0 +1,554 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>360iSuite — Tasks</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { height: 100%; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+    background: #eef1f4;
+    color: #333;
+    font-size: 13px;
+  }
+  a { text-decoration: none; color: inherit; }
+
+  /* ============ Top org bar ============ */
+  .topbar {
+    background: #2c3440;
+    color: #fff;
+    height: 48px;
+    display: flex;
+    align-items: center;
+    padding: 0 16px;
+    gap: 16px;
+  }
+  .topbar .logo {
+    font-weight: 700;
+    font-size: 16px;
+    letter-spacing: .2px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .topbar .logo .mark {
+    width: 26px; height: 26px;
+    border-radius: 6px;
+    background: linear-gradient(135deg, #23a7dd, #1a7fb5);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 13px;
+  }
+  .topbar .search {
+    flex: 1;
+    max-width: 420px;
+    background: rgba(255,255,255,.12);
+    border-radius: 4px;
+    padding: 6px 10px;
+    color: #b9c2cc;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .topbar .spacer { flex: 1; }
+  .topbar .icon-btn {
+    width: 32px; height: 32px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 4px;
+    color: #cfd6dd;
+    cursor: pointer;
+    font-size: 15px;
+  }
+  .topbar .icon-btn:hover { background: rgba(255,255,255,.1); }
+  .topbar .avatar {
+    width: 30px; height: 30px;
+    border-radius: 50%;
+    background: #23a7dd;
+    color: #fff;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+    font-weight: 600;
+  }
+
+  /* ============ Workspace / app tab bar ============ */
+  .workspace-bar {
+    background: #3d4757;
+    color: #fff;
+    padding: 0 16px;
+    display: flex;
+    align-items: flex-end;
+    gap: 4px;
+    height: 44px;
+  }
+  .workspace-bar .ws-name {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-weight: 600;
+    font-size: 14px;
+    padding-bottom: 10px;
+    margin-right: 20px;
+    white-space: nowrap;
+  }
+  .workspace-bar .ws-name .ws-icon {
+    width: 22px; height: 22px;
+    border-radius: 4px;
+    background: #23a7dd;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+  }
+  .app-tabs { display: flex; align-items: flex-end; gap: 2px; overflow: hidden; }
+  .app-tab {
+    padding: 8px 14px 10px;
+    color: #b9c2cc;
+    font-size: 13px;
+    border-radius: 5px 5px 0 0;
+    cursor: pointer;
+    white-space: nowrap;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .app-tab:hover { color: #fff; background: rgba(255,255,255,.08); }
+  .app-tab.active {
+    background: #eef1f4;
+    color: #2c3440;
+    font-weight: 600;
+  }
+  .app-tab.more { font-size: 12px; }
+
+  /* ============ Layout ============ */
+  .layout {
+    display: flex;
+    align-items: stretch;
+    min-height: calc(100vh - 92px);
+  }
+
+  /* ---- Left views pane ---- */
+  .views-pane {
+    width: 232px;
+    flex-shrink: 0;
+    background: #fff;
+    border-right: 1px solid #dde2e8;
+    padding: 14px 0 20px;
+  }
+  .views-pane .pane-title {
+    font-size: 11px;
+    font-weight: 700;
+    color: #8a94a0;
+    text-transform: uppercase;
+    letter-spacing: .6px;
+    padding: 6px 16px;
+  }
+  .view-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 7px 16px;
+    cursor: pointer;
+    color: #3d4757;
+    border-left: 3px solid transparent;
+  }
+  .view-item:hover { background: #f4f7f9; }
+  .view-item.selected {
+    background: #e8f4fb;
+    border-left-color: #23a7dd;
+    color: #1a7fb5;
+    font-weight: 600;
+  }
+  .view-item .count {
+    font-size: 11px;
+    color: #8a94a0;
+    background: #eef1f4;
+    border-radius: 10px;
+    padding: 1px 8px;
+    min-width: 26px;
+    text-align: center;
+  }
+  .view-item.selected .count { background: #d2eaf7; color: #1a7fb5; }
+  .views-divider { border-top: 1px solid #e7ebef; margin: 12px 0; }
+  .member-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 16px;
+    cursor: pointer;
+    color: #3d4757;
+  }
+  .member-item:hover { background: #f4f7f9; }
+  .member-item .m-avatar {
+    width: 22px; height: 22px;
+    border-radius: 50%;
+    color: #fff;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 9px;
+    font-weight: 700;
+    flex-shrink: 0;
+  }
+  .member-item .m-name { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .member-item .count {
+    font-size: 11px;
+    color: #8a94a0;
+    background: #eef1f4;
+    border-radius: 10px;
+    padding: 1px 8px;
+  }
+  .av-blue   { background: #23a7dd; }
+  .av-green  { background: #4caf7d; }
+  .av-purple { background: #8e6bbf; }
+  .av-orange { background: #e8913f; }
+
+  /* ---- Main content ---- */
+  .main {
+    flex: 1;
+    padding: 16px 20px 40px;
+    min-width: 0;
+  }
+
+  /* ---- View toolbar ---- */
+  .toolbar {
+    background: #fff;
+    border: 1px solid #dde2e8;
+    border-radius: 6px;
+    padding: 8px 12px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin-bottom: 16px;
+  }
+  .filter-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: #e8f4fb;
+    border: 1px solid #b7dff2;
+    color: #1a7fb5;
+    border-radius: 14px;
+    padding: 4px 10px;
+    font-size: 12px;
+    font-weight: 500;
+    cursor: pointer;
+    white-space: nowrap;
+  }
+  .filter-chip .x {
+    font-weight: 700;
+    color: #6aa9c9;
+    font-size: 11px;
+  }
+  .filter-chip:hover .x { color: #1a7fb5; }
+  .result-count { color: #6a7480; white-space: nowrap; }
+  .result-count strong { color: #333; }
+  .show-all {
+    color: #1a7fb5;
+    font-weight: 600;
+    cursor: pointer;
+    white-space: nowrap;
+  }
+  .show-all:hover { text-decoration: underline; }
+  .toolbar .flex-spacer { flex: 1; }
+  .toggle {
+    display: inline-flex;
+    border: 1px solid #cfd6dd;
+    border-radius: 5px;
+    overflow: hidden;
+  }
+  .toggle button {
+    border: none;
+    background: #fff;
+    color: #6a7480;
+    padding: 5px 14px;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+  }
+  .toggle button + button { border-left: 1px solid #cfd6dd; }
+  .toggle button.on {
+    background: #3d4757;
+    color: #fff;
+  }
+  .tb-link {
+    color: #3d4757;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    white-space: nowrap;
+  }
+  .tb-link:hover { color: #1a7fb5; }
+  .btn-primary {
+    background: #23a7dd;
+    color: #fff;
+    border: none;
+    border-radius: 5px;
+    padding: 7px 16px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    white-space: nowrap;
+  }
+  .btn-primary:hover { background: #1a92c4; }
+
+  /* ---- Card grid ---- */
+  .card-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 16px;
+  }
+  .task-card {
+    background: #fff;
+    border: 1px solid #dde2e8;
+    border-radius: 6px;
+    padding: 14px 16px 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    cursor: pointer;
+    transition: box-shadow .12s ease, transform .12s ease;
+  }
+  .task-card:hover {
+    box-shadow: 0 3px 10px rgba(44,52,64,.12);
+    transform: translateY(-1px);
+  }
+  .task-card h3 {
+    font-size: 14px;
+    font-weight: 600;
+    color: #1a7fb5;
+    line-height: 1.35;
+  }
+  .excerpt {
+    background: #f4f6f8;
+    border-radius: 4px;
+    padding: 8px 10px;
+    color: #6a7480;
+    font-size: 12px;
+    line-height: 1.5;
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; }
+  .chip {
+    font-size: 11px;
+    font-weight: 600;
+    border-radius: 3px;
+    padding: 2px 8px;
+    color: #fff;
+    white-space: nowrap;
+  }
+  .chip-high      { background: #e8913f; }
+  .chip-urgent    { background: #d9534f; }
+  .chip-normal    { background: #8a94a0; }
+  .chip-review    { background: #8e6bbf; }
+  .chip-inprocess { background: #23a7dd; }
+  .chip-admin     { background: #4caf7d; }
+  .chip-onhold    { background: #b0885e; }
+  .card-footer {
+    margin-top: auto;
+    padding-top: 8px;
+    border-top: 1px solid #eef1f4;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    color: #8a94a0;
+    font-size: 11.5px;
+  }
+  .card-footer .comments {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+  }
+
+  @media (max-width: 1100px) {
+    .card-grid { grid-template-columns: repeat(2, 1fr); }
+  }
+  @media (max-width: 760px) {
+    .views-pane { display: none; }
+    .card-grid { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+
+  <!-- Top org bar -->
+  <header class="topbar">
+    <div class="logo"><span class="mark">◎</span> 360iSuite</div>
+    <div class="search">🔍 <span>Search 360iSuite…</span></div>
+    <div class="spacer"></div>
+    <div class="icon-btn" title="Notifications">🔔</div>
+    <div class="icon-btn" title="Calendar">📅</div>
+    <div class="icon-btn" title="Help">❔</div>
+    <div class="avatar" title="Fernan Delgado">FD</div>
+  </header>
+
+  <!-- App tab bar -->
+  <nav class="workspace-bar">
+    <div class="ws-name"><span class="ws-icon">🏢</span> 360iSuite Ops</div>
+    <div class="app-tabs">
+      <div class="app-tab">📊 Activity</div>
+      <div class="app-tab">📁 Projects</div>
+      <div class="app-tab active">✅ Tasks</div>
+      <div class="app-tab">👥 Contacts</div>
+      <div class="app-tab">🗓 Meetings</div>
+      <div class="app-tab">📄 Deliverables</div>
+      <div class="app-tab more">More ▾</div>
+    </div>
+  </nav>
+
+  <div class="layout">
+
+    <!-- Left views pane -->
+    <aside class="views-pane">
+      <div class="pane-title">Views</div>
+      <div class="view-item"><span>All Tasks</span><span class="count">745</span></div>
+      <div class="view-item selected"><span>Open Tasks</span><span class="count">134</span></div>
+      <div class="view-item"><span>Due This Week</span><span class="count">28</span></div>
+      <div class="view-item"><span>Completed</span><span class="count">611</span></div>
+
+      <div class="views-divider"></div>
+
+      <div class="pane-title">Responsible</div>
+      <div class="member-item">
+        <span class="m-avatar av-blue">FD</span>
+        <span class="m-name">Fernan Delgado</span>
+        <span class="count">47</span>
+      </div>
+      <div class="member-item">
+        <span class="m-avatar av-green">MR</span>
+        <span class="m-name">Maria Reyes</span>
+        <span class="count">36</span>
+      </div>
+      <div class="member-item">
+        <span class="m-avatar av-purple">JT</span>
+        <span class="m-name">James Tan</span>
+        <span class="count">29</span>
+      </div>
+      <div class="member-item">
+        <span class="m-avatar av-orange">AK</span>
+        <span class="m-name">Aisha Khan</span>
+        <span class="count">22</span>
+      </div>
+    </aside>
+
+    <!-- Main content -->
+    <main class="main">
+
+      <!-- View toolbar -->
+      <div class="toolbar">
+        <span class="filter-chip">Status: Open <span class="x">✕</span></span>
+        <span class="filter-chip">Priority: High, Urgent <span class="x">✕</span></span>
+        <span class="filter-chip">Created: Last 90 days <span class="x">✕</span></span>
+        <span class="result-count"><strong>134</strong> of 745</span>
+        <span class="show-all">Show all</span>
+        <span class="flex-spacer"></span>
+        <span class="toggle">
+          <button>⛏ Dig</button>
+          <button class="on">▦ Sheet</button>
+        </span>
+        <span class="tb-link">📈 Reports</span>
+        <span class="tb-link">➕ Create report</span>
+        <button class="btn-primary">Add Task</button>
+      </div>
+
+      <!-- Card grid -->
+      <div class="card-grid">
+
+        <div class="task-card">
+          <h3>Finalize Q3 client onboarding checklist</h3>
+          <div class="excerpt">Review the current onboarding flow with the account team and consolidate the intake form fields. Legal still needs to sign off on the updated engagement letter before we can publish the checklist to the portal.</div>
+          <div class="chips">
+            <span class="chip chip-high">High</span>
+            <span class="chip chip-review">Submitted for Review</span>
+          </div>
+          <div class="card-footer">
+            <span>05/18/2026 by Fernan Delgado</span>
+            <span class="comments">💬 4</span>
+          </div>
+        </div>
+
+        <div class="task-card">
+          <h3>Migrate billing exports to new data warehouse</h3>
+          <div class="excerpt">The nightly CSV exports from the billing system need to be repointed to the new warehouse schema. Coordinate with James on the cutover window and confirm the retention policy for the archived batches.</div>
+          <div class="chips">
+            <span class="chip chip-urgent">Urgent</span>
+            <span class="chip chip-inprocess">In-Process</span>
+          </div>
+          <div class="card-footer">
+            <span>05/22/2026 by James Tan</span>
+            <span class="comments">💬 9</span>
+          </div>
+        </div>
+
+        <div class="task-card">
+          <h3>Renew office insurance policy and file certificates</h3>
+          <div class="excerpt">Current policy lapses at the end of the month. Collect the updated certificates of insurance from the broker, file them in the compliance drive, and notify building management of the renewal.</div>
+          <div class="chips">
+            <span class="chip chip-high">High</span>
+            <span class="chip chip-admin">Admin Related</span>
+          </div>
+          <div class="card-footer">
+            <span>05/25/2026 by Maria Reyes</span>
+            <span class="comments">💬 2</span>
+          </div>
+        </div>
+
+        <div class="task-card">
+          <h3>Draft proposal for Westbrook expansion project</h3>
+          <div class="excerpt">Pull the scope notes from last week's discovery call and build out the phased pricing table. The client asked for a comparison against the retainer model, so include both options in the summary section.</div>
+          <div class="chips">
+            <span class="chip chip-urgent">Urgent</span>
+            <span class="chip chip-review">Submitted for Review</span>
+          </div>
+          <div class="card-footer">
+            <span>05/29/2026 by Fernan Delgado</span>
+            <span class="comments">💬 7</span>
+          </div>
+        </div>
+
+        <div class="task-card">
+          <h3>Update vendor contact records after ownership change</h3>
+          <div class="excerpt">Three of our print vendors merged under a new parent company. Update the contact app records, reassign the primary reps, and verify the remittance addresses before the next invoice cycle runs.</div>
+          <div class="chips">
+            <span class="chip chip-normal">Normal</span>
+            <span class="chip chip-admin">Admin Related</span>
+          </div>
+          <div class="card-footer">
+            <span>06/02/2026 by Aisha Khan</span>
+            <span class="comments">💬 1</span>
+          </div>
+        </div>
+
+        <div class="task-card">
+          <h3>QA pass on mobile timesheet submission flow</h3>
+          <div class="excerpt">Run through the full submission flow on iOS and Android builds, including offline entry and the approval push notification. Log any rendering issues against the sprint board before Friday's release cut.</div>
+          <div class="chips">
+            <span class="chip chip-high">High</span>
+            <span class="chip chip-inprocess">In-Process</span>
+          </div>
+          <div class="card-footer">
+            <span>06/05/2026 by Maria Reyes</span>
+            <span class="comments">💬 12</span>
+          </div>
+        </div>
+
+      </div>
+    </main>
+  </div>
+
+</body>
+</html>

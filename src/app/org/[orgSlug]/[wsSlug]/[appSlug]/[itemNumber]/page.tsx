@@ -4,6 +4,7 @@ import { ItemForm } from "../item-form";
 import { CommentsSection } from "./comments-section";
 import { TasksSection } from "./tasks-section";
 import { AttachLink } from "./attach-link";
+import { FilePickers } from "./file-pickers";
 import { ShareSection } from "./share-section";
 import { SendEmail } from "./send-email";
 
@@ -224,13 +225,14 @@ export default async function ItemDetailPage({
 
   return (
     <main className="mx-auto max-w-xl p-8">
-      <p className="text-xs text-slate-400">
+      <div className="rounded border border-podio-border bg-white p-6 shadow-sm">
+      <p className="text-xs text-podio-meta">
         {app.icon} {app.name} · #{item.item_number}
       </p>
-      <h1 className="text-2xl font-semibold">
+      <h1 className="text-xl font-semibold text-podio-ink">
         {item.title ?? `${app.item_name} #${item.item_number}`}
       </h1>
-      <p className="mt-1 text-xs text-slate-400">
+      <p className="mt-1 text-xs text-podio-meta">
         Created {new Date(item.created_at).toLocaleString()} · Updated{" "}
         {new Date(item.updated_at).toLocaleString()}
       </p>
@@ -254,32 +256,33 @@ export default async function ItemDetailPage({
           backHref={backHref}
         />
       </div>
+      </div>
 
       {((outgoingRels ?? []).length > 0 || (incomingRels ?? []).length > 0) && (
-        <section className="mt-10">
-          <h2 className="text-lg font-medium">Related items</h2>
+        <section className="mt-6 rounded border border-podio-border bg-white p-4 shadow-sm">
+          <h2 className="text-lg font-semibold text-podio-ink">Related items</h2>
           <ul className="mt-3 space-y-2">
             {(outgoingRels ?? []).map((r: any) =>
               r.target ? (
                 <li key={r.id}
-                  className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm">
-                  <span className="text-xs text-slate-400">{r.fields?.label} →</span>
-                  <a href={relHref(r.target)} className="font-medium text-blue-600 hover:underline">
+                  className="flex items-center gap-2 rounded border border-podio-border bg-podio-row-alt px-3 py-2 text-sm">
+                  <span className="text-xs text-podio-meta">{r.fields?.label} →</span>
+                  <a href={relHref(r.target)} className="font-medium text-podio-teal hover:underline">
                     {r.target.apps?.icon} {r.target.title ?? `#${r.target.item_number}`}
                   </a>
-                  <span className="ml-auto text-xs text-slate-400">{r.target.apps?.name}</span>
+                  <span className="ml-auto text-xs text-podio-meta">{r.target.apps?.name}</span>
                 </li>
               ) : null
             )}
             {(incomingRels ?? []).map((r: any) =>
               r.source ? (
                 <li key={r.id}
-                  className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm">
-                  <span className="text-xs text-slate-400">← via {r.fields?.label}</span>
-                  <a href={relHref(r.source)} className="font-medium text-blue-600 hover:underline">
+                  className="flex items-center gap-2 rounded border border-podio-border bg-podio-row-alt px-3 py-2 text-sm">
+                  <span className="text-xs text-podio-meta">← via {r.fields?.label}</span>
+                  <a href={relHref(r.source)} className="font-medium text-podio-teal hover:underline">
                     {r.source.apps?.icon} {r.source.title ?? `#${r.source.item_number}`}
                   </a>
-                  <span className="ml-auto text-xs text-slate-400">{r.source.apps?.name}</span>
+                  <span className="ml-auto text-xs text-podio-meta">{r.source.apps?.name}</span>
                 </li>
               ) : null
             )}
@@ -287,24 +290,28 @@ export default async function ItemDetailPage({
         </section>
       )}
 
-      <div className="mt-4">
+      <div className="mt-4 flex flex-wrap items-center gap-2">
         <AttachLink orgId={org.id} wsId={ws.id} itemId={item.id} currentUserId={user.id} />
+        <FilePickers orgId={org.id} wsId={ws.id} itemId={item.id} currentUserId={user.id} />
       </div>
 
-      <TasksSection
-        itemId={item.id}
-        orgId={org.id}
-        wsId={ws.id}
-        members={members}
-        tasks={(taskRows ?? []).map((t) => ({
-          id: t.id,
-          title: t.title,
-          status: t.status,
-          due_at: t.due_at,
-          assignee_name: t.assignee_id ? assigneeName.get(t.assignee_id) ?? null : null,
-        }))}
-      />
+      <div className="mt-6 rounded border border-podio-border bg-white p-4 shadow-sm">
+        <TasksSection
+          itemId={item.id}
+          orgId={org.id}
+          wsId={ws.id}
+          members={members}
+          tasks={(taskRows ?? []).map((t) => ({
+            id: t.id,
+            title: t.title,
+            status: t.status,
+            due_at: t.due_at,
+            assignee_name: t.assignee_id ? assigneeName.get(t.assignee_id) ?? null : null,
+          }))}
+        />
+      </div>
 
+      <div className="mt-6 rounded border border-podio-border bg-white p-4 shadow-sm">
       <CommentsSection
         itemId={item.id}
         orgId={org.id}
@@ -326,8 +333,11 @@ export default async function ItemDetailPage({
         attachmentsByComment={attachmentsByComment}
         reactionsByComment={reactionsByComment}
       />
+      </div>
 
-      <ShareSection itemId={item.id} shares={(shareRows ?? []) as any} />
+      <div className="mt-6 rounded border border-podio-border bg-white p-4 shadow-sm">
+        <ShareSection itemId={item.id} shares={(shareRows ?? []) as any} />
+      </div>
     </main>
   );
 }

@@ -21,7 +21,7 @@ export function MarkAllRead() {
           .is("read_at", null);
         router.refresh();
       }}
-      className="rounded-lg border border-slate-300 px-3 py-1.5 text-sm text-slate-600 hover:bg-slate-100"
+      className="rounded border border-podio-border bg-white px-3 py-1.5 text-sm text-podio-teal hover:bg-podio-row-hover"
     >
       Mark all read
     </button>
