@@ -42,11 +42,12 @@ export default async function ItemDetailPage({
     .single();
   if (!item) notFound();
 
-  const { data: fields } = await supabase
+  const { data: allFields } = await supabase
     .from("app_fields")
-    .select("id, label, type, is_required, help_text, config")
+    .select("id, label, type, is_required, is_hidden, help_text, config")
     .eq("app_id", app.id).eq("status", "active")
     .order("position");
+  const fields = (allFields ?? []).filter((f) => !f.is_hidden);
 
   const { data: values } = await supabase
     .from("item_field_values")

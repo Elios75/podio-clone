@@ -39,11 +39,13 @@ export default async function AppPage({
 
   const { data: allFields } = await supabase
     .from("app_fields")
-    .select("id, label, type, is_primary, position, config")
+    .select("id, label, type, is_primary, is_hidden, position, config")
     .eq("app_id", app.id).eq("status", "active")
     .order("position");
-  // Separators are form-only; skip in the table
-  const fields = (allFields ?? []).filter((f) => f.type !== "separator");
+  // Separators are form-only; hidden fields stay out of the table too
+  const fields = (allFields ?? []).filter(
+    (f) => f.type !== "separator" && !f.is_hidden
+  );
 
   const { data: items } = await supabase
     .from("items")
@@ -299,6 +301,10 @@ export default async function AppPage({
           {app.icon} {app.name}
         </h1>
         <div className="flex items-center gap-2">
+          <Link href={`${baseHref}/edit`}
+            className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-600 hover:bg-slate-100">
+            ✏️ Edit app
+          </Link>
           <Link href={`${baseHref}/import`}
             className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-600 hover:bg-slate-100">
             Import

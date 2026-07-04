@@ -22,11 +22,12 @@ export default async function NewItemPage({
     .eq("workspace_id", ws.id).eq("slug", appSlug).single();
   if (!app) notFound();
 
-  const { data: fields } = await supabase
+  const { data: allFields } = await supabase
     .from("app_fields")
-    .select("id, label, type, is_required, help_text, config")
+    .select("id, label, type, is_required, is_hidden, help_text, config")
     .eq("app_id", app.id).eq("status", "active")
     .order("position");
+  const fields = (allFields ?? []).filter((f) => !f.is_hidden);
 
   const { data: memberRows } = await supabase
     .from("workspace_members")
