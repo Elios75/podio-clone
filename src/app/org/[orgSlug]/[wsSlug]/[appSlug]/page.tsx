@@ -48,12 +48,42 @@ export default async function AppPage({
     (f) => f.type !== "separator" && !f.is_hidden
   );
 
-  const { data: items } = await supabase
-    .from("items")
-    .select("id, item_number, title, created_at, updated_at")
-    .eq("app_id", app.id).eq("is_deleted", false)
-    .order("created_at", { ascending: false })
-    .limit(500);
+  // ----- Saved views + filters/sort (needed before querying items) -----
+  const { data: savedViews } = await supabase
+    .from("app_views")
+    .select("id, name, layout, visibility, filters, sort, is_default, columns")
+    .eq("app_id", app.id)
+    .order("name");
+
+  // Explicit selection wins; otherwise fall back to the app's default view
+  const noExplicitState = !sp.viewId && !sp.f && !sp.s && !sp.view;
+  const activeView = sp.viewId
+    ? (savedViews ?? []).find((v) => v.id === sp.viewId) ?? null
+    : noExplicitState
+    ? (savedViews ?? []).find((v) => v.is_default) ?? null
+    : null;
+
+  function parseJson<T>(raw: string | undefined, fallback: T): T {
+    if (!raw) return fallback;
+    try {
+      return JSON.parse(raw) as T;
+    } catch {
+      return fallback;
+    }
+  }
+  const filters = parseJson<Filter[]>(sp.f, (activeView?.filters as Filter[]) ?? []);
+  const sort = parseJson<Sort[]>(sp.s, (activeView?.sort as Sort[]) ?? []);
+
+  // ----- Server-side view engine: filters + sort compile to indexed SQL -----
+  const { data: queryResult } = await supabase.rpc("query_items", {
+    p_app: app.id,
+    p_filters: filters.filter((f) => f.field_id && f.op),
+    p_sort: sort,
+    p_limit: 500,
+    p_offset: 0,
+  });
+  const items: any[] = queryResult?.items ?? [];
+  const totalItems: number = queryResult?.total ?? 0;
 
   const itemIds = (items ?? []).map((i) => i.id);
   const { data: values } = itemIds.length
@@ -176,32 +206,6 @@ export default async function AppPage({
     }
   }
 
-  // ----- Saved views + filters/sort -----
-  const { data: savedViews } = await supabase
-    .from("app_views")
-    .select("id, name, layout, visibility, filters, sort, is_default, columns")
-    .eq("app_id", app.id)
-    .order("name");
-
-  // Explicit selection wins; otherwise fall back to the app's default view
-  const noExplicitState = !sp.viewId && !sp.f && !sp.s && !sp.view;
-  const activeView = sp.viewId
-    ? (savedViews ?? []).find((v) => v.id === sp.viewId) ?? null
-    : noExplicitState
-    ? (savedViews ?? []).find((v) => v.is_default) ?? null
-    : null;
-
-  function parseJson<T>(raw: string | undefined, fallback: T): T {
-    if (!raw) return fallback;
-    try {
-      return JSON.parse(raw) as T;
-    } catch {
-      return fallback;
-    }
-  }
-  const filters = parseJson<Filter[]>(sp.f, (activeView?.filters as Filter[]) ?? []);
-  const sort = parseJson<Sort[]>(sp.s, (activeView?.sort as Sort[]) ?? []);
-
   // Visible table columns (URL > saved view > all)
   const colsList: string[] | null = sp.cols
     ? sp.cols.split(",").filter(Boolean)
@@ -223,53 +227,8 @@ export default async function AppPage({
     sp.view && LAYOUTS.includes(sp.view) ? sp.view : savedLayout ?? "table";
   const baseHref = `/org/${orgSlug}/${wsSlug}/${app.slug}`;
 
-  // ----- Apply filters + sort (in-memory over the EAV values; move to SQL at scale) -----
-  const dayOf = (d: string) => new Date(d).toISOString().slice(0, 10);
-  function matchesFilter(itemId: string, flt: Filter): boolean {
-    const v = valueMap.get(itemId)?.get(flt.field_id);
-    if (flt.op === "is_empty") return !v;
-    if (flt.op === "not_empty") return !!v;
-    if (!v) return false;
-    switch (flt.op) {
-      case "contains":
-        return (v.value_text ?? "").toLowerCase().includes(String(flt.value ?? "").toLowerCase());
-      case "equals":
-        return v.value_text === flt.value;
-      case "is":
-        return v.value_text === flt.value || v.ref_user_id === flt.value
-          || (Array.isArray(v.value) && v.value.includes(flt.value));
-      case "is_not":
-        return v.value_text !== flt.value && v.ref_user_id !== flt.value;
-      case "eq": return Number(v.value_number) === Number(flt.value);
-      case "gt": return Number(v.value_number) > Number(flt.value);
-      case "gte": return Number(v.value_number) >= Number(flt.value);
-      case "lt": return Number(v.value_number) < Number(flt.value);
-      case "lte": return Number(v.value_number) <= Number(flt.value);
-      case "on": return !!v.value_date && dayOf(v.value_date) === flt.value;
-      case "before": return !!v.value_date && dayOf(v.value_date) < flt.value;
-      case "after": return !!v.value_date && dayOf(v.value_date) > flt.value;
-      default: return true;
-    }
-  }
-
-  let visibleItems = (items ?? []).filter((it) =>
-    filters.every((flt) => (flt.field_id && flt.op ? matchesFilter(it.id, flt) : true))
-  );
-
-  if (sort[0]?.field_id) {
-    const { field_id, dir } = sort[0];
-    const mul = dir === "desc" ? -1 : 1;
-    visibleItems = [...visibleItems].sort((a, b) => {
-      const va = valueMap.get(a.id)?.get(field_id);
-      const vb = valueMap.get(b.id)?.get(field_id);
-      const ka = va?.value_number ?? va?.value_date ?? va?.value_text ?? "";
-      const kb = vb?.value_number ?? vb?.value_date ?? vb?.value_text ?? "";
-      if (ka === kb) return 0;
-      if (ka === "" || ka === null) return 1; // empties last
-      if (kb === "" || kb === null) return -1;
-      return (ka > kb ? 1 : -1) * mul;
-    });
-  }
+  // Filtering + sorting happened in SQL (query_items); results are already shaped.
+  const visibleItems = items;
   const categoryField = fields.find((f) => f.type === "category");
   const dateField = fields.find((f) => f.type === "date");
 
@@ -367,6 +326,11 @@ export default async function AppPage({
         )}
         <Link href={`${baseHref}?view=badge`} className={tabCls(view === "badge")}>Badge</Link>
         <Link href={`${baseHref}?view=stream`} className={tabCls(view === "stream")}>Stream</Link>
+        <span className="ml-auto text-xs text-slate-400">
+          {visibleItems.length === totalItems
+            ? `${totalItems.toLocaleString()} ${app.item_name.toLowerCase()}${totalItems === 1 ? "" : "s"}`
+            : `${visibleItems.length.toLocaleString()} of ${totalItems.toLocaleString()}`}
+        </span>
       </div>
 
       <ViewToolbar
