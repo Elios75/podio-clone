@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { PodioIcon } from "@/components/podio-icon";
 import { CreateAppModal } from "./create-app-modal";
 
 // Podio "Add app" chooser: build your own vs. install from the App Market.
@@ -25,7 +26,7 @@ export function AddAppChooser({
         onClick={() => setOpen(true)}
         className="flex w-20 shrink-0 flex-col items-center gap-1 px-2 py-3 text-[13px] uppercase text-podio-disabled hover:text-podio-secondary"
       >
-        <span className="text-2xl leading-none">⊕</span>
+        <PodioIcon icon="add" className="h-6 w-6" />
         Add app
       </button>
 
@@ -57,7 +58,7 @@ export function AddAppChooser({
                 }}
                 className="flex flex-1 flex-col items-center gap-4 border border-podio-border bg-podio-row-alt p-10 text-center hover:border-podio-teal"
               >
-                <span className="text-5xl">🛠️</span>
+                <PodioIcon icon="tools" className="h-12 w-12 text-podio-secondary" />
                 <span className="text-xl font-semibold text-podio-ink">
                   Create your own app
                 </span>
@@ -73,7 +74,7 @@ export function AddAppChooser({
                 onClick={() => setOpen(false)}
                 className="flex flex-1 flex-col items-center gap-4 border border-podio-border bg-podio-row-alt p-10 text-center hover:border-podio-teal"
               >
-                <span className="text-5xl">🏪</span>
+                <PodioIcon icon="store" className="h-12 w-12 text-podio-secondary" />
                 <span className="text-xl font-semibold text-podio-ink">
                   Go to the App Market
                 </span>

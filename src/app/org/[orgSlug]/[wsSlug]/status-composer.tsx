@@ -3,9 +3,10 @@
 import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { PodioIcon } from "@/components/podio-icon";
 
-// Podio-style workspace composer: share a status, attach files (📎), share a
-// link (🔗), or ask the workspace a question (❓). Files/links become `files`
+// Podio-style workspace composer: share a status, attach files (paperclip),
+// share a link (chain), or ask a question (?). Files/links become `files`
 // rows attached to the status post via file_attachments (target 'status_post');
 // question mode is stored in body_rich.kind so the feed can style it.
 export function StatusComposer({ wsId, orgId }: { wsId: string; orgId: string }) {
@@ -129,7 +130,8 @@ export function StatusComposer({ wsId, orgId }: { wsId: string; orgId: string })
           {pendingFiles.map((f, i) => (
             <li key={i}
               className="flex items-center gap-1 rounded bg-podio-row-alt px-2 py-0.5 text-xs text-podio-secondary">
-              📎 {f.name}
+              <PodioIcon icon="paperclip" className="h-3.5 w-3.5 shrink-0" />
+              {f.name}
               <button
                 onClick={() => setPendingFiles((p) => p.filter((_, j) => j !== i))}
                 className="text-podio-meta hover:text-red-600">✕</button>
@@ -158,11 +160,17 @@ export function StatusComposer({ wsId, orgId }: { wsId: string; orgId: string })
           }}
         />
         <button onClick={() => fileInput.current?.click()} title="Attach a file"
-          className="text-lg text-podio-secondary hover:text-podio-teal">📎</button>
+          className="text-podio-secondary hover:text-podio-teal">
+          <PodioIcon icon="paperclip" className="h-5 w-5" />
+        </button>
         <button onClick={() => setLinkOpen((v) => !v)} title="Share a link"
-          className={`text-lg hover:text-podio-teal ${linkOpen ? "text-podio-teal" : "text-podio-secondary"}`}>🔗</button>
+          className={`hover:text-podio-teal ${linkOpen ? "text-podio-teal" : "text-podio-secondary"}`}>
+          <PodioIcon icon="link" className="h-5 w-5" />
+        </button>
         <button onClick={() => setQuestion((v) => !v)} title="Ask a question"
-          className={`text-lg hover:text-podio-teal ${question ? "text-podio-teal" : "text-podio-secondary"}`}>❓</button>
+          className={`hover:text-podio-teal ${question ? "text-podio-teal" : "text-podio-secondary"}`}>
+          <PodioIcon icon="question" className="h-5 w-5" />
+        </button>
         {error && <span className="text-xs text-red-600">{error}</span>}
         <button
           onClick={post}

@@ -2,15 +2,11 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { CreateWorkspaceForm } from "./create-workspace-form";
-import { ApiKeysSection } from "./api-keys-section";
-import { WebhooksSection } from "./webhooks-section";
-import { BackupButton } from "./backup-button";
-import { BillingSection } from "./billing-section";
 import { MemberRoleSelect } from "@/components/member-role-select";
-import { SsoSettings } from "./sso-settings";
-import { BrandingSection } from "./branding-section";
-import { EmailTemplatesSection } from "./email-templates-section";
 
+// Org overview: just workspaces + members (Podio-style). All admin machinery
+// — API keys, webhooks, email templates, SSO, branding, billing, backup —
+// lives on /org/:slug/admin.
 export default async function OrgPage({
   params,
 }: {
@@ -21,7 +17,7 @@ export default async function OrgPage({
 
   const { data: org } = await supabase
     .from("organizations")
-    .select("id, name, slug, security_settings, logo_url, branding")
+    .select("id, name, slug")
     .eq("slug", orgSlug)
     .single();
   if (!org) notFound();
@@ -38,78 +34,41 @@ export default async function OrgPage({
     .select("id, role, user_id, user_profiles:user_id(full_name)")
     .eq("organization_id", org.id);
 
-  const { data: { user: authUser } } = await supabase.auth.getUser();
-  const isOwner = (members ?? []).some(
-    (m: any) => m.user_id === authUser?.id && m.role === "owner"
-  );
-
-  // Only org admins get rows back (RLS); empty for everyone else
-  const { data: apiKeys } = await supabase
-    .from("api_keys")
-    .select("id, name, prefix, scopes, last_used_at, revoked_at, created_at")
-    .eq("organization_id", org.id)
-    .order("created_at", { ascending: false });
-
-  const { data: emailTemplates } = await supabase
-    .from("email_templates")
-    .select("id, name, subject, body_text")
-    .eq("organization_id", org.id)
-    .order("name");
-
-  // Storage usage (approximate; scoped by what RLS lets this user see)
-  const { data: fileSizes } = await supabase
-    .from("files")
-    .select("size_bytes")
-    .eq("organization_id", org.id)
-    .is("deleted_at", null)
-    .limit(5000);
-  const storageBytes = (fileSizes ?? []).reduce(
-    (a, f) => a + Number(f.size_bytes ?? 0), 0);
-
-  const { data: hooks } = await supabase
-    .from("webhooks")
-    .select("id, url, events, is_verified, is_active, created_at")
-    .eq("organization_id", org.id)
-    .order("created_at", { ascending: false });
-  const hookIds = (hooks ?? []).map((h) => h.id);
-  const { data: hookDeliveries } = hookIds.length
-    ? await supabase
-        .from("webhook_deliveries")
-        .select("id, webhook_id, event_type, status, response_status, created_at")
-        .in("webhook_id", hookIds)
-        .order("created_at", { ascending: false })
-        .limit(50)
-    : { data: [] as any[] };
-
   return (
     <main className="mx-auto max-w-3xl p-8">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold">{org.name}</h1>
-        <Link href={`/org/${org.slug}/audit`}
-          className="text-sm text-slate-500 hover:underline">
-          Audit log
-        </Link>
+        <h1 className="text-2xl font-semibold text-podio-ink">{org.name}</h1>
+        <span className="flex items-center gap-4">
+          <Link href={`/org/${org.slug}/admin`}
+            className="text-sm text-podio-teal hover:underline">
+            Administration
+          </Link>
+          <Link href={`/org/${org.slug}/audit`}
+            className="text-sm text-podio-secondary hover:underline">
+            Audit log
+          </Link>
+        </span>
       </div>
-      <p className="mt-1 text-sm text-slate-500">
+      <p className="mt-1 text-sm text-podio-secondary">
         {(members ?? []).length} member{(members ?? []).length === 1 ? "" : "s"}
       </p>
 
-      <h2 className="mt-8 text-lg font-medium">Workspaces</h2>
+      <h2 className="mt-8 text-lg font-medium text-podio-ink">Workspaces</h2>
       <ul className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
         {(workspaces ?? []).map((ws) => (
           <li key={ws.id}>
             <Link
               href={`/org/${org.slug}/${ws.slug}`}
-              className="block rounded-lg border border-slate-200 bg-white p-4 hover:border-blue-400"
+              className="block rounded border border-podio-border bg-white p-4 hover:border-podio-teal"
             >
               <div className="flex items-center justify-between">
-                <span className="font-medium">{ws.name}</span>
-                <span className="rounded bg-slate-100 px-2 py-0.5 text-xs text-slate-600">
+                <span className="font-medium text-podio-ink">{ws.name}</span>
+                <span className="rounded bg-podio-row-alt px-2 py-0.5 text-xs text-podio-secondary">
                   {ws.privacy}
                 </span>
               </div>
               {ws.description && (
-                <p className="mt-1 truncate text-sm text-slate-500">
+                <p className="mt-1 truncate text-sm text-podio-secondary">
                   {ws.description}
                 </p>
               )}
@@ -122,14 +81,14 @@ export default async function OrgPage({
         <CreateWorkspaceForm orgId={org.id} orgSlug={org.slug} />
       </div>
 
-      <h2 className="mt-10 text-lg font-medium">Members</h2>
+      <h2 className="mt-10 text-lg font-medium text-podio-ink">Members</h2>
       <ul className="mt-3 space-y-2">
         {(members ?? []).map((m: any) => (
           <li
             key={m.id}
-            className="flex items-center justify-between rounded-lg border border-slate-200 bg-white px-4 py-2"
+            className="flex items-center justify-between rounded border border-podio-border bg-white px-4 py-2"
           >
-            <span className="text-sm">
+            <span className="text-sm text-podio-ink">
               {m.user_profiles?.full_name ?? m.user_id}
             </span>
             <MemberRoleSelect
@@ -141,28 +100,6 @@ export default async function OrgPage({
           </li>
         ))}
       </ul>
-
-      <ApiKeysSection orgId={org.id} keys={(apiKeys ?? []) as any} />
-      <WebhooksSection
-        orgId={org.id}
-        hooks={(hooks ?? []) as any}
-        deliveries={(hookDeliveries ?? []) as any}
-      />
-      <EmailTemplatesSection orgId={org.id} templates={(emailTemplates ?? []) as any} />
-      <SsoSettings orgId={org.id} settings={org.security_settings as any} />
-      <BrandingSection
-        orgId={org.id}
-        orgSlug={org.slug}
-        logoUrl={(org as any).logo_url ?? null}
-        branding={(org as any).branding ?? null}
-      />
-      <BillingSection orgId={org.id} isOwner={isOwner} />
-      <BackupButton orgId={org.id} orgSlug={org.slug} />
-
-      <p className="mt-10 text-xs text-slate-400">
-        Storage used: {(storageBytes / 1024 / 1024).toFixed(1)} MB of 1024 MB
-        (free plan baseline — enforcement arrives with billing in Phase 13).
-      </p>
     </main>
   );
 }

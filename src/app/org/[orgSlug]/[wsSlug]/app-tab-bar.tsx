@@ -28,7 +28,7 @@ export function AppTabBar({
             : "text-podio-secondary hover:bg-[#E4E4E4]"
         }`}
       >
-        <span className="text-2xl leading-none">〰️</span>
+        <PodioIcon icon="activity" className="h-6 w-6" />
         Activity
       </Link>
       {apps.map((a) => (

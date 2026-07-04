@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { PodioIcon } from "@/components/podio-icon";
 import { CreateWorkspaceForm } from "./create-workspace-form";
 
 export default async function OrgLayout({
@@ -36,20 +37,32 @@ export default async function OrgLayout({
           title="All organizations"
           className="flex items-center gap-3 hover:opacity-80"
         >
-          <span aria-hidden>☰</span>
+          <span aria-hidden>
+            <PodioIcon icon="menu" className="h-5 w-5" />
+          </span>
           <span className="truncate text-lg font-semibold text-podio-ink">
             {org.name}
           </span>
         </Link>
         <nav className="ml-6 flex items-center gap-5 text-[#4E5E5E]">
-          <Link href="/search" title="Search" className="hover:opacity-80">🔍</Link>
-          <Link href="/calendar" title="My calendar" className="hover:opacity-80">📅</Link>
-          <Link href="/messages" title="Messages" className="hover:opacity-80">💬</Link>
-          <Link href="/tasks" title="My tasks" className="hover:opacity-80">✓</Link>
+          <Link href="/search" title="Search" className="hover:opacity-80">
+            <PodioIcon icon="search" className="h-5 w-5" />
+          </Link>
+          <Link href="/calendar" title="My calendar" className="hover:opacity-80">
+            <PodioIcon icon="calendar" className="h-5 w-5" />
+          </Link>
+          <Link href="/messages" title="Messages" className="hover:opacity-80">
+            <PodioIcon icon="chat" className="h-5 w-5" />
+          </Link>
+          <Link href="/tasks" title="My tasks" className="hover:opacity-80">
+            <PodioIcon icon="check-square" className="h-5 w-5" />
+          </Link>
         </nav>
         <div className="mx-auto font-semibold tracking-wide">Podio Clone</div>
         <div className="flex items-center gap-4">
-          <Link href="/notifications" title="Notifications" className="hover:opacity-80">🔔</Link>
+          <Link href="/notifications" title="Notifications" className="hover:opacity-80">
+            <PodioIcon icon="bell" className="h-5 w-5" />
+          </Link>
         </div>
       </header>
 
@@ -57,11 +70,19 @@ export default async function OrgLayout({
       <div className="flex items-center gap-3 bg-podio-chrome px-4 py-3 text-podio-ink md:hidden">
         <Link href="/home" className="text-xs text-podio-secondary">←</Link>
         <span className="truncate font-semibold">{org.name}</span>
-        <span className="ml-auto flex gap-3 text-sm">
-          <Link href="/search">🔍</Link>
-          <Link href="/messages">💬</Link>
-          <Link href="/tasks">✓</Link>
-          <Link href="/notifications">🔔</Link>
+        <span className="ml-auto flex items-center gap-3 text-sm">
+          <Link href="/search" title="Search">
+            <PodioIcon icon="search" className="h-5 w-5" />
+          </Link>
+          <Link href="/messages" title="Messages">
+            <PodioIcon icon="chat" className="h-5 w-5" />
+          </Link>
+          <Link href="/tasks" title="My tasks">
+            <PodioIcon icon="check-square" className="h-5 w-5" />
+          </Link>
+          <Link href="/notifications" title="Notifications">
+            <PodioIcon icon="bell" className="h-5 w-5" />
+          </Link>
         </span>
       </div>
       {/* Mobile workspace strip */}

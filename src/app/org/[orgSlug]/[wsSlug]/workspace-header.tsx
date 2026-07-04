@@ -4,6 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { PodioIcon } from "@/components/podio-icon";
 
 type MemberAvatar = {
   id: string;
@@ -85,17 +86,17 @@ export function WorkspaceHeader({
     | { label: string; href: string; icon: string; danger?: boolean }
     | { heading: string }
   )[] = [
-    { label: "Manage members", href: `${base}/settings#members`, icon: "👥" },
-    { label: "Manage apps", href: `${base}/settings#apps`, icon: "🗂️" },
-    { label: "Workspace settings", href: `${base}/settings`, icon: "⚙️" },
-    { label: "Share in App Market", href: `${base}/market`, icon: "↗️" },
-    { label: "Leave workspace", href: `${base}/settings#danger`, icon: "⚠️", danger: true },
-    { label: "Delete workspace", href: `${base}/settings#danger`, icon: "🗑️", danger: true },
+    { label: "Manage members", href: `${base}/settings#members`, icon: "people" },
+    { label: "Manage apps", href: `${base}/settings#apps`, icon: "tray" },
+    { label: "Workspace settings", href: `${base}/settings`, icon: "gear" },
+    { label: "Share in App Market", href: `${base}/market`, icon: "store" },
+    { label: "Leave workspace", href: `${base}/settings#danger`, icon: "warning", danger: true },
+    { label: "Delete workspace", href: `${base}/settings#danger`, icon: "trash", danger: true },
     { heading: "Go to…" },
-    { label: "Workspace tasks", href: `${base}/tasks`, icon: "✓" },
-    { label: "Workspace calendar", href: "/calendar", icon: "📅" },
-    { label: "Workspace files", href: `${base}/files`, icon: "📄" },
-    { label: "Relationship map", href: `${base}/map`, icon: "🗺️" },
+    { label: "Workspace tasks", href: `${base}/tasks`, icon: "check-square" },
+    { label: "Workspace calendar", href: "/calendar", icon: "calendar" },
+    { label: "Workspace files", href: `${base}/files`, icon: "doc" },
+    { label: "Relationship map", href: `${base}/map`, icon: "map" },
   ];
 
   return (
@@ -108,9 +109,9 @@ export function WorkspaceHeader({
         <button
           onClick={() => setMenuOpen((v) => !v)}
           title="Workspace admin"
-          className="ml-auto text-lg text-podio-meta hover:text-podio-teal"
+          className="ml-auto text-podio-meta hover:text-podio-teal"
         >
-          🔧
+          <PodioIcon icon="wrench" className="h-5 w-5" />
         </button>
       </div>
       {description && (
@@ -133,7 +134,7 @@ export function WorkspaceHeader({
                   m.danger ? "text-red-600" : "text-podio-ink"
                 }`}
               >
-                <span className="w-5 text-center">{m.icon}</span>
+                <PodioIcon icon={m.icon} className="h-5 w-5 shrink-0" />
                 {m.label}
               </Link>
             )

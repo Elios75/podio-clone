@@ -75,16 +75,32 @@ font-family: "Source Sans 3", "Source Sans Pro", "Segoe UI", system-ui, sans-ser
 
 ## Iconography
 
-Podio's icons are **monochrome outline glyphs**, never colorful emoji. In the
-clone use the `PodioIcon` component (`src/components/podio-icon.tsx`): inline
-24px SVGs, `stroke: currentColor`, strokeWidth ~1.6, `fill: none`, round
-caps — colored by the text color of their context (usually
-`text-podio-secondary`). App icons are stored as keys (`brick`, `task`,
-`rocket`, `meeting`, `tray`, `idea`, `link`, `contact`, `event`, `doc`,
-`chart`, `gear`, `phone`, `mail`, `map`, `cart`); `PodioIcon` falls back to
-rendering legacy emoji strings as text. The default app icon is the brick.
-When adding new UI, never introduce colorful emoji for app/tool iconography —
-extend `PODIO_ICONS` instead.
+Podio's icons are **monochrome outline glyphs**, never colorful emoji. The
+set is **custom-drawn**: Podio ships its own proprietary icon font, and no
+public library matches its slightly playful geometry, so the clone draws each
+glyph by hand in `PodioIcon` (`src/components/podio-icon.tsx`): inline 24px
+SVGs (24x24 grid), `stroke: currentColor`, **strokeWidth 1.7**, `fill: none`,
+round caps and joins — colored by the text color of their context (usually
+`text-podio-secondary`).
+
+Two tiers share the same `PATHS` map:
+
+- **App icons** (offered in the app-icon picker via `PODIO_ICONS`): `brick`,
+  `task`, `rocket`, `meeting`, `tray`, `idea`, `link`, `contact`, `event`,
+  `doc`, `chart`, `gear`, `phone`, `mail`, `map`, `cart`. The default app
+  icon is the brick; `task` is a rounded square with a check overlapping its
+  top-right corner; `idea` is Podio's studded 3D box; `tray` is a wide open
+  tray with a concave dip in its top edge.
+- **UI-chrome icons** — same style and map, but **not offered in the
+  app-icon picker** (not listed in `PODIO_ICONS`): `activity`, `add`,
+  `people`, `calendar`, `check-square`, `search`, `bell`, `chat`, `help`,
+  `menu`, `paperclip`, `chain` (alias of `link`), `question`, `wrench`,
+  `pencil`, `store`, `tools`, `x`, `lock`, `person-plus`, `trash`,
+  `warning`.
+
+`PodioIcon` falls back to rendering legacy emoji strings as text. When adding
+new UI, never introduce colorful emoji for app/tool iconography — extend the
+`PATHS` map (and `PODIO_ICONS` only if the icon should be pickable for apps).
 
 ## Spacing & shape
 
