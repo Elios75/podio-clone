@@ -567,9 +567,13 @@ export function AppEditor({
         <div className="flex items-center gap-3">
           <button
             onClick={() => setFields([...fields, {
-              id: null, key: crypto.randomUUID(), label: "", type: "text",
+              id: null, key: crypto.randomUUID(), external_id: null,
+              label: "", type: "text",
               help_text: "", is_required: false, is_hidden: false,
-              is_primary: false, options: [], origType: null,
+              is_primary: false, options: [], multiple: false, endDate: false,
+              formula: "", calcMode: "formula", rollupSource: "",
+              rollupAgg: "sum", rollupValueField: "", defaultValue: "",
+              origType: null,
             }])}
             className="rounded-lg border border-slate-300 px-3 py-2 text-sm hover:bg-slate-100">
             + Add field
