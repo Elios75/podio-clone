@@ -25,6 +25,13 @@ export default async function NewAppPage({
     .single();
   if (!ws) notFound();
 
+  const { data: workspaceApps } = await supabase
+    .from("apps")
+    .select("id, name")
+    .eq("workspace_id", ws.id)
+    .eq("is_archived", false)
+    .order("name");
+
   return (
     <main className="mx-auto max-w-2xl p-8">
       <h1 className="text-2xl font-semibold">New app in {ws.name}</h1>
@@ -33,7 +40,12 @@ export default async function NewAppPage({
         queue. Define its fields below; you can change them anytime.
       </p>
       <div className="mt-6">
-        <AppBuilder wsId={ws.id} orgSlug={org.slug} wsSlug={ws.slug} />
+        <AppBuilder
+          wsId={ws.id}
+          orgSlug={org.slug}
+          wsSlug={ws.slug}
+          workspaceApps={workspaceApps ?? []}
+        />
       </div>
     </main>
   );

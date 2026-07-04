@@ -58,6 +58,22 @@ export default async function ItemDetailPage({
     full_name: m.user_profiles?.full_name ?? null,
   }));
 
+  // Options for relationship fields
+  const relFields = (fields ?? []).filter(
+    (f: any) => f.type === "relationship" && f.config?.related_app_id
+  );
+  const relatedItemsByField: Record<string, any[]> = {};
+  for (const rf of relFields) {
+    const { data: relItems } = await supabase
+      .from("items")
+      .select("id, title, item_number")
+      .eq("app_id", (rf as any).config.related_app_id)
+      .eq("is_deleted", false)
+      .order("created_at", { ascending: false })
+      .limit(100);
+    relatedItemsByField[rf.id] = relItems ?? [];
+  }
+
   const backHref = `/org/${orgSlug}/${wsSlug}/${app.slug}`;
 
   return (
@@ -77,6 +93,7 @@ export default async function ItemDetailPage({
           appId={app.id}
           fields={(fields ?? []) as any}
           members={members}
+          relatedItemsByField={relatedItemsByField}
           itemId={item.id}
           initialValues={initialValues}
           backHref={backHref}

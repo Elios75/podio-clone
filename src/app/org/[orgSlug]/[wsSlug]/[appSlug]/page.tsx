@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import type { CategoryOption } from "@/lib/fields";
+import { formatDuration, publicFileUrl, type CategoryOption } from "@/lib/fields";
 
 export default async function AppPage({
   params,
@@ -23,11 +23,13 @@ export default async function AppPage({
     .eq("workspace_id", ws.id).eq("slug", appSlug).single();
   if (!app) notFound();
 
-  const { data: fields } = await supabase
+  const { data: allFields } = await supabase
     .from("app_fields")
     .select("id, label, type, is_primary, position, config")
     .eq("app_id", app.id).eq("status", "active")
     .order("position");
+  // Separators are form-only; skip in the table
+  const fields = (allFields ?? []).filter((f) => f.type !== "separator");
 
   const { data: items } = await supabase
     .from("items")
@@ -40,16 +42,23 @@ export default async function AppPage({
   const { data: values } = itemIds.length
     ? await supabase
         .from("item_field_values")
-        .select("item_id, field_id, value_text, value_number, value_date, ref_user_id")
+        .select("item_id, field_id, value, value_text, value_number, value_date, ref_item_id, ref_user_id")
         .in("item_id", itemIds)
     : { data: [] as any[] };
 
-  // Profiles for contact fields
+  // Names for contact fields
   const userIds = [...new Set((values ?? []).map((v) => v.ref_user_id).filter(Boolean))];
   const { data: profiles } = userIds.length
     ? await supabase.from("user_profiles").select("user_id, full_name").in("user_id", userIds)
     : { data: [] as any[] };
   const nameByUser = new Map((profiles ?? []).map((p) => [p.user_id, p.full_name]));
+
+  // Titles for relationship fields
+  const refItemIds = [...new Set((values ?? []).map((v) => v.ref_item_id).filter(Boolean))];
+  const { data: refItems } = refItemIds.length
+    ? await supabase.from("items").select("id, title, item_number").in("id", refItemIds)
+    : { data: [] as any[] };
+  const refById = new Map((refItems ?? []).map((r) => [r.id, r]));
 
   const valueMap = new Map<string, Map<string, any>>();
   for (const v of values ?? []) {
@@ -57,31 +66,82 @@ export default async function AppPage({
     valueMap.get(v.item_id)!.set(v.field_id, v);
   }
 
-  function render(fieldId: string, itemId: string) {
-    const field = (fields ?? []).find((f) => f.id === fieldId);
-    const v = valueMap.get(itemId)?.get(fieldId);
-    if (!field || !v) return <span className="text-slate-300">—</span>;
-    if (field.type === "category") {
-      const opt = ((field.config?.options ?? []) as CategoryOption[]).find(
-        (o) => o.id === v.value_text
-      );
-      return opt ? (
-        <span
-          className="rounded px-2 py-0.5 text-xs font-medium text-white"
-          style={{ backgroundColor: opt.color }}
-        >
-          {opt.label}
-        </span>
-      ) : (
-        <span className="text-slate-300">—</span>
-      );
+  function render(field: any, itemId: string) {
+    const v = valueMap.get(itemId)?.get(field.id);
+    if (!v) return <span className="text-slate-300">—</span>;
+
+    switch (field.type) {
+      case "category": {
+        const opt = ((field.config?.options ?? []) as CategoryOption[]).find(
+          (o) => o.id === v.value_text
+        );
+        return opt ? (
+          <span className="rounded px-2 py-0.5 text-xs font-medium text-white"
+            style={{ backgroundColor: opt.color }}>
+            {opt.label}
+          </span>
+        ) : <span className="text-slate-300">—</span>;
+      }
+      case "contact":
+        return <span>{nameByUser.get(v.ref_user_id) ?? "Member"}</span>;
+      case "relationship": {
+        const ref = refById.get(v.ref_item_id);
+        return ref ? (
+          <span className="rounded bg-slate-100 px-2 py-0.5 text-xs">
+            #{ref.item_number} {ref.title ?? ""}
+          </span>
+        ) : <span className="text-slate-300">—</span>;
+      }
+      case "date":
+        return <span>{v.value_date ? new Date(v.value_date).toLocaleDateString() : "—"}</span>;
+      case "number":
+        return <span>{v.value_number}</span>;
+      case "money":
+        return (
+          <span>
+            {Number(v.value_number).toLocaleString()} {v.value?.currency ?? ""}
+          </span>
+        );
+      case "progress":
+        return (
+          <div className="flex items-center gap-2">
+            <div className="h-2 w-16 rounded bg-slate-200">
+              <div className="h-2 rounded bg-blue-500"
+                style={{ width: `${Math.min(100, Number(v.value_number ?? 0))}%` }} />
+            </div>
+            <span className="text-xs text-slate-500">{v.value_number}%</span>
+          </div>
+        );
+      case "duration":
+        return <span>{formatDuration(Number(v.value_number ?? 0))}</span>;
+      case "phone":
+        return <a href={`tel:${v.value_text}`} className="text-blue-600 hover:underline">{v.value_text}</a>;
+      case "email":
+        return <a href={`mailto:${v.value_text}`} className="text-blue-600 hover:underline">{v.value_text}</a>;
+      case "link":
+        return (
+          <a href={v.value_text} target="_blank" className="text-blue-600 hover:underline">
+            {v.value_text?.replace(/^https?:\/\//, "").slice(0, 30)}
+          </a>
+        );
+      case "image":
+        return v.value?.path ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={publicFileUrl(v.value.path)} alt={v.value_text ?? ""}
+            className="h-8 w-8 rounded object-cover" />
+        ) : <span className="text-slate-300">—</span>;
+      case "file":
+        return v.value?.path ? (
+          <a href={publicFileUrl(v.value.path)} target="_blank"
+            className="text-blue-600 hover:underline">
+            {v.value_text}
+          </a>
+        ) : <span className="text-slate-300">—</span>;
+      case "calculation":
+        return <span className="text-slate-300">ƒ</span>;
+      default:
+        return <span className="line-clamp-1">{v.value_text}</span>;
     }
-    if (field.type === "contact")
-      return <span>{nameByUser.get(v.ref_user_id) ?? "Member"}</span>;
-    if (field.type === "date")
-      return <span>{v.value_date ? new Date(v.value_date).toLocaleDateString() : "—"}</span>;
-    if (field.type === "number") return <span>{v.value_number}</span>;
-    return <span className="line-clamp-1">{v.value_text}</span>;
   }
 
   return (
@@ -103,7 +163,7 @@ export default async function AppPage({
           <thead className="border-b border-slate-200 bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
             <tr>
               <th className="px-4 py-3">#</th>
-              {(fields ?? []).map((f) => (
+              {fields.map((f) => (
                 <th key={f.id} className="px-4 py-3">{f.label}</th>
               ))}
             </tr>
@@ -119,17 +179,15 @@ export default async function AppPage({
                     {item.item_number}
                   </Link>
                 </td>
-                {(fields ?? []).map((f) => (
-                  <td key={f.id} className="px-4 py-3">{render(f.id, item.id)}</td>
+                {fields.map((f) => (
+                  <td key={f.id} className="px-4 py-3">{render(f, item.id)}</td>
                 ))}
               </tr>
             ))}
             {(items ?? []).length === 0 && (
               <tr>
-                <td
-                  colSpan={1 + (fields ?? []).length}
-                  className="px-4 py-10 text-center text-slate-400"
-                >
+                <td colSpan={1 + fields.length}
+                  className="px-4 py-10 text-center text-slate-400">
                   No {app.item_name.toLowerCase()}s yet.
                 </td>
               </tr>

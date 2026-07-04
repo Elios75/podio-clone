@@ -16,17 +16,21 @@ type DraftField = {
   label: string;
   type: FieldType;
   required: boolean;
-  options: CategoryOption[]; // category only
+  options: CategoryOption[]; // category
+  relatedAppId: string;      // relationship
+  formula: string;           // calculation
 };
 
 export function AppBuilder({
   wsId,
   orgSlug,
   wsSlug,
+  workspaceApps,
 }: {
   wsId: string;
   orgSlug: string;
   wsSlug: string;
+  workspaceApps: { id: string; name: string }[];
 }) {
   const router = useRouter();
   const supabase = createClient();
@@ -34,7 +38,7 @@ export function AppBuilder({
   const [icon, setIcon] = useState("📋");
   const [itemName, setItemName] = useState("Item");
   const [fields, setFields] = useState<DraftField[]>([
-    { key: crypto.randomUUID(), label: "Title", type: "text", required: true, options: [] },
+    { key: crypto.randomUUID(), label: "Title", type: "text", required: true, options: [], relatedAppId: "", formula: "" },
   ]);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -42,7 +46,7 @@ export function AppBuilder({
   function addField() {
     setFields([
       ...fields,
-      { key: crypto.randomUUID(), label: "", type: "text", required: false, options: [] },
+      { key: crypto.randomUUID(), label: "", type: "text", required: false, options: [], relatedAppId: "", formula: "" },
     ]);
   }
 
@@ -67,6 +71,9 @@ export function AppBuilder({
     if (!name.trim()) return setError("App name is required.");
     if (fields.some((f) => !f.label.trim()))
       return setError("Every field needs a label.");
+    const badRel = fields.find((f) => f.type === "relationship" && !f.relatedAppId);
+    if (badRel)
+      return setError(`Pick a related app for "${badRel.label}".`);
     setSaving(true);
 
     const { data: app, error: appError } = await supabase
@@ -100,7 +107,14 @@ export function AppBuilder({
       is_required: f.required,
       is_primary: i === firstTextIndex,
       position: i,
-      config: f.type === "category" ? { options: f.options } : {},
+      config:
+        f.type === "category"
+          ? { options: f.options }
+          : f.type === "relationship"
+          ? { related_app_id: f.relatedAppId }
+          : f.type === "calculation"
+          ? { formula: f.formula }
+          : {},
     }));
 
     const { error: fieldsError } = await supabase.from("app_fields").insert(rows);
@@ -140,40 +154,37 @@ export function AppBuilder({
 
       <div className="space-y-2">
         {fields.map((f, i) => (
-          <div
-            key={f.key}
-            className="rounded-lg border border-slate-200 bg-white p-3"
-          >
+          <div key={f.key} className="rounded-lg border border-slate-200 bg-white p-3">
             <div className="flex items-center gap-2">
               <div className="flex flex-col">
                 <button type="button" onClick={() => moveField(i, -1)} className="text-xs text-slate-400 hover:text-slate-700">▲</button>
                 <button type="button" onClick={() => moveField(i, 1)} className="text-xs text-slate-400 hover:text-slate-700">▼</button>
               </div>
               <input
-                placeholder="Field label"
+                placeholder={f.type === "separator" ? "Section title" : "Field label"}
                 value={f.label}
                 onChange={(e) => updateField(f.key, { label: e.target.value })}
                 className="flex-1 rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
               />
               <select
                 value={f.type}
-                onChange={(e) =>
-                  updateField(f.key, { type: e.target.value as FieldType })
-                }
+                onChange={(e) => updateField(f.key, { type: e.target.value as FieldType })}
                 className="rounded-lg border border-slate-300 px-2 py-2 text-sm"
               >
                 {FIELD_TYPES.map((t) => (
                   <option key={t.value} value={t.value}>{t.label}</option>
                 ))}
               </select>
-              <label className="flex items-center gap-1 text-xs text-slate-600">
-                <input
-                  type="checkbox"
-                  checked={f.required}
-                  onChange={(e) => updateField(f.key, { required: e.target.checked })}
-                />
-                required
-              </label>
+              {f.type !== "separator" && f.type !== "calculation" && (
+                <label className="flex items-center gap-1 text-xs text-slate-600">
+                  <input
+                    type="checkbox"
+                    checked={f.required}
+                    onChange={(e) => updateField(f.key, { required: e.target.checked })}
+                  />
+                  required
+                </label>
+              )}
               <button
                 type="button"
                 onClick={() => removeField(f.key)}
@@ -244,6 +255,37 @@ export function AppBuilder({
                 </button>
               </div>
             )}
+
+            {f.type === "relationship" && (
+              <div className="mt-2 pl-8">
+                <select
+                  value={f.relatedAppId}
+                  onChange={(e) => updateField(f.key, { relatedAppId: e.target.value })}
+                  className="rounded-lg border border-slate-300 px-2 py-1.5 text-sm"
+                >
+                  <option value="">— Link to which app? —</option>
+                  {workspaceApps.map((a) => (
+                    <option key={a.id} value={a.id}>{a.name}</option>
+                  ))}
+                </select>
+                {workspaceApps.length === 0 && (
+                  <p className="mt-1 text-xs text-amber-600">
+                    No other apps in this workspace yet — create the related app first.
+                  </p>
+                )}
+              </div>
+            )}
+
+            {f.type === "calculation" && (
+              <div className="mt-2 pl-8">
+                <input
+                  placeholder="Formula (stored now, evaluated when the calc engine ships)"
+                  value={f.formula}
+                  onChange={(e) => updateField(f.key, { formula: e.target.value })}
+                  className="w-full rounded-lg border border-slate-300 px-2 py-1.5 text-sm"
+                />
+              </div>
+            )}
           </div>
         ))}
       </div>
@@ -267,8 +309,7 @@ export function AppBuilder({
       </div>
       {error && <p className="text-sm text-red-600">{error}</p>}
       <p className="text-xs text-slate-400">
-        The first Text field becomes the item title. Drag-and-drop ordering,
-        more field types, and validation rules come later in Phase 2.
+        The first Text field becomes the item title.
       </p>
     </div>
   );
