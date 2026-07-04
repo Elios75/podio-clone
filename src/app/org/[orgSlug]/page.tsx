@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { CreateWorkspaceForm } from "./create-workspace-form";
+import { ApiKeysSection } from "./api-keys-section";
 
 export default async function OrgPage({
   params,
@@ -29,6 +30,13 @@ export default async function OrgPage({
     .from("organization_members")
     .select("id, role, user_id, user_profiles:user_id(full_name)")
     .eq("organization_id", org.id);
+
+  // Only org admins get rows back (RLS); empty for everyone else
+  const { data: apiKeys } = await supabase
+    .from("api_keys")
+    .select("id, name, prefix, scopes, last_used_at, revoked_at, created_at")
+    .eq("organization_id", org.id)
+    .order("created_at", { ascending: false });
 
   return (
     <main className="mx-auto max-w-3xl p-8">
@@ -81,6 +89,8 @@ export default async function OrgPage({
           </li>
         ))}
       </ul>
+
+      <ApiKeysSection orgId={org.id} keys={(apiKeys ?? []) as any} />
     </main>
   );
 }

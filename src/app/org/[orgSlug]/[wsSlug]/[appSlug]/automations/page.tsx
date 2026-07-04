@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { AutomationsBuilder } from "./automations-builder";
+import { AdvancedBuilder } from "./advanced-builder";
 
 export default async function AutomationsPage({
   params,
@@ -70,6 +71,14 @@ export default async function AutomationsPage({
           automations={(automations ?? []) as any}
           runs={(runs ?? []) as any}
         />
+        <div className="mt-4">
+          <AdvancedBuilder
+            appId={app.id}
+            wsId={ws.id}
+            fields={(fields ?? []) as any}
+            members={members}
+          />
+        </div>
       </div>
     </main>
   );

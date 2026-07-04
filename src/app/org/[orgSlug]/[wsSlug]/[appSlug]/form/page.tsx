@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { FormSettings } from "./form-settings";
+import { EmailToApp } from "./email-to-app";
 
 export default async function FormPage({
   params,
@@ -34,6 +35,12 @@ export default async function FormPage({
     .eq("app_id", app.id)
     .maybeSingle();
 
+  const { data: emailAddress } = await supabase
+    .from("app_email_addresses")
+    .select("*")
+    .eq("app_id", app.id)
+    .maybeSingle();
+
   const { data: submissions } = webform
     ? await supabase
         .from("webform_submissions")
@@ -59,6 +66,12 @@ export default async function FormPage({
           fields={(fields ?? []) as any}
           webform={webform}
           recentSubmissions={submissions ?? []}
+        />
+        <EmailToApp
+          appId={app.id}
+          appSlug={app.slug}
+          fields={(fields ?? []) as any}
+          address={emailAddress}
         />
       </div>
     </main>

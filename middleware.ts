@@ -3,6 +3,11 @@ import { NextResponse, type NextRequest } from "next/server";
 
 // Refreshes the auth session on every request and guards app routes.
 export async function middleware(request: NextRequest) {
+  // Public REST API authenticates via API keys, not cookies
+  if (request.nextUrl.pathname.startsWith("/api/")) {
+    return NextResponse.next();
+  }
+
   let response = NextResponse.next({ request });
 
   const supabase = createServerClient(

@@ -27,8 +27,32 @@ export default async function OrgLayout({
     .order("name");
 
   return (
-    <div className="flex min-h-screen">
-      <aside className="w-64 shrink-0 border-r border-slate-200 bg-white p-4">
+    <div className="flex min-h-screen flex-col md:flex-row">
+      {/* Mobile top bar */}
+      <div className="flex items-center gap-3 border-b border-slate-200 bg-white px-4 py-3 md:hidden">
+        <Link href="/home" className="text-xs text-slate-400">←</Link>
+        <span className="truncate font-semibold">{org.name}</span>
+        <span className="ml-auto flex gap-3 text-sm">
+          <Link href="/search">🔍</Link>
+          <Link href="/tasks">✓</Link>
+          <Link href="/notifications">🔔</Link>
+        </span>
+      </div>
+      {/* Mobile workspace strip */}
+      <div className="flex gap-2 overflow-x-auto border-b border-slate-200 bg-white px-4 py-2 md:hidden">
+        {(workspaces ?? []).map((ws) => (
+          <Link key={ws.id} href={`/org/${org.slug}/${ws.slug}`}
+            className="shrink-0 rounded-full border border-slate-200 px-3 py-1 text-xs text-slate-600">
+            {ws.name}
+          </Link>
+        ))}
+        <Link href={`/org/${org.slug}`}
+          className="shrink-0 rounded-full border border-blue-200 px-3 py-1 text-xs text-blue-600">
+          + New
+        </Link>
+      </div>
+
+      <aside className="hidden w-64 shrink-0 border-r border-slate-200 bg-white p-4 md:block">
         <div className="flex items-center justify-between">
           <Link href="/home" className="text-xs text-slate-400 hover:text-slate-600">
             ← All organizations

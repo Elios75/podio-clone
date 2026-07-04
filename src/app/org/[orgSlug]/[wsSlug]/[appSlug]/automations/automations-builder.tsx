@@ -17,6 +17,7 @@ const TRIGGERS = [
   { value: "item_created", label: "Item is created" },
   { value: "item_updated", label: "Item is updated" },
   { value: "form_submitted", label: "Webform is submitted" },
+  { value: "email_received", label: "Email is received" },
 ];
 
 const ACTION_TYPES = [
@@ -24,6 +25,7 @@ const ACTION_TYPES = [
   { value: "update_field", label: "Update a field" },
   { value: "notify", label: "Notify a member" },
   { value: "add_comment", label: "Add a comment" },
+  { value: "send_email", label: "Send an email" },
 ];
 
 export function AutomationsBuilder({
@@ -258,6 +260,16 @@ export function AutomationsBuilder({
                   <input placeholder="Comment body" value={a.body ?? ""}
                     onChange={(e) => setAction(i, { body: e.target.value })}
                     className="flex-1 rounded border border-slate-300 px-2 py-1.5 text-sm" />
+                )}
+                {a.type === "send_email" && (
+                  <>
+                    <input type="email" placeholder="to@example.com" value={a.to ?? ""}
+                      onChange={(e) => setAction(i, { to: e.target.value })}
+                      className="w-44 rounded border border-slate-300 px-2 py-1.5 text-sm" />
+                    <input placeholder="Subject" value={a.subject ?? ""}
+                      onChange={(e) => setAction(i, { subject: e.target.value })}
+                      className="flex-1 rounded border border-slate-300 px-2 py-1.5 text-sm" />
+                  </>
                 )}
                 <button onClick={() => setActions(actions.filter((_, xi) => xi !== i))}
                   className="text-xs text-slate-400 hover:text-red-600">✕</button>
