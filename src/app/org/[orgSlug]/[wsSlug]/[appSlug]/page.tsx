@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { formatDuration, publicFileUrl, type CategoryOption } from "@/lib/fields";
+import { formatDuration, type CategoryOption } from "@/lib/fields";
 import { BoardView } from "./board-view";
 import { CalendarView } from "./calendar-view";
 import { ViewToolbar, type Filter, type Sort } from "./view-toolbar";
@@ -107,6 +107,19 @@ export default async function AppPage({
     : { data: [] as any[] };
   const refById = new Map((refItems ?? []).map((r) => [r.id, r]));
 
+  // Signed URLs for file/image values (bucket is private)
+  const filePaths = [
+    ...new Set(
+      (values ?? []).map((v: any) => v.value?.path).filter(Boolean) as string[]
+    ),
+  ];
+  const { data: signedArr } = filePaths.length
+    ? await supabase.storage.from("podio-files").createSignedUrls(filePaths, 3600)
+    : { data: [] as any[] };
+  const signedByPath = new Map(
+    (signedArr ?? []).filter((s) => s.signedUrl).map((s) => [s.path, s.signedUrl])
+  );
+
   const valueMap = new Map<string, Map<string, any>>();
   for (const v of values ?? []) {
     if (!valueMap.has(v.item_id)) valueMap.set(v.item_id, new Map());
@@ -183,14 +196,14 @@ export default async function AppPage({
           </a>
         );
       case "image":
-        return v.value?.path ? (
+        return v.value?.path && signedByPath.get(v.value.path) ? (
           // eslint-disable-next-line @next/next/no-img-element
-          <img src={publicFileUrl(v.value.path)} alt={v.value_text ?? ""}
+          <img src={signedByPath.get(v.value.path)} alt={v.value_text ?? ""}
             className="h-8 w-8 rounded object-cover" />
         ) : <span className="text-slate-300">—</span>;
       case "file":
-        return v.value?.path ? (
-          <a href={publicFileUrl(v.value.path)} target="_blank"
+        return v.value?.path && signedByPath.get(v.value.path) ? (
+          <a href={signedByPath.get(v.value.path)} target="_blank"
             className="text-blue-600 hover:underline">
             {v.value_text}
           </a>

@@ -13,14 +13,10 @@ type Comment = {
   author_name: string | null;
 };
 type Member = { user_id: string; full_name: string | null };
-type Attachment = { id: string; name: string; path: string };
+type Attachment = { id: string; name: string; url: string | null };
 type Reaction = { emoji: string; count: number; mine: boolean };
 
 const EMOJIS = ["👍", "❤️", "🎉"];
-
-function fileUrl(path: string) {
-  return `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/podio-files/${path}`;
-}
 type Activity = {
   id: string;
   event_type: string;
@@ -266,12 +262,19 @@ export function CommentsSection({
               )}
 
               {/* Attachments */}
-              {(attachmentsByComment[c.id] ?? []).map((a) => (
-                <a key={a.id} href={fileUrl(a.path)} target="_blank"
-                  className="mt-2 inline-flex items-center gap-1 rounded border border-slate-200 bg-slate-50 px-2 py-1 text-xs text-blue-600 hover:underline">
-                  📎 {a.name}
-                </a>
-              ))}
+              {(attachmentsByComment[c.id] ?? []).map((a) =>
+                a.url ? (
+                  <a key={a.id} href={a.url} target="_blank"
+                    className="mt-2 inline-flex items-center gap-1 rounded border border-slate-200 bg-slate-50 px-2 py-1 text-xs text-blue-600 hover:underline">
+                    📎 {a.name}
+                  </a>
+                ) : (
+                  <span key={a.id}
+                    className="mt-2 inline-flex items-center gap-1 rounded border border-slate-200 bg-slate-50 px-2 py-1 text-xs text-slate-400">
+                    📎 {a.name}
+                  </span>
+                )
+              )}
 
               {/* Reactions */}
               <div className="mt-2 flex gap-1">

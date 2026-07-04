@@ -127,12 +127,31 @@ export default async function ItemDetailPage({
         .eq("target_type", "comment")
         .in("target_id", commentIds)
     : { data: [] as any[] };
+  // Signed URLs (private bucket): field values + comment attachments in one batch
+  const allPaths = [
+    ...new Set(
+      [
+        ...Object.values(initialValues)
+          .map((v: any) => v?.path)
+          .filter(Boolean),
+        ...(attachRows ?? []).map((a: any) => a.files?.storage_path).filter(Boolean),
+      ] as string[]
+    ),
+  ];
+  const { data: signedArr } = allPaths.length
+    ? await supabase.storage.from("podio-files").createSignedUrls(allPaths, 3600)
+    : { data: [] as any[] };
+  const signedUrls: Record<string, string> = {};
+  for (const s of signedArr ?? []) {
+    if (s.signedUrl) signedUrls[s.path] = s.signedUrl;
+  }
+
   const attachmentsByComment: Record<string, any[]> = {};
   for (const a of attachRows ?? []) {
     (attachmentsByComment[a.target_id] ??= []).push({
       id: a.id,
       name: (a as any).files?.name,
-      path: (a as any).files?.storage_path,
+      url: signedUrls[(a as any).files?.storage_path] ?? null,
     });
   }
 
@@ -209,6 +228,7 @@ export default async function ItemDetailPage({
           relatedItemsByField={relatedItemsByField}
           itemId={item.id}
           initialValues={initialValues}
+          signedUrls={signedUrls}
           backHref={backHref}
         />
       </div>

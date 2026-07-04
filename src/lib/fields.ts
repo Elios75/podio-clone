@@ -41,6 +41,5 @@ export function formatDuration(totalSeconds: number) {
   return h > 0 ? `${h}h ${m}m` : `${m}m`;
 }
 
-export function publicFileUrl(path: string) {
-  return `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/podio-files/${path}`;
-}
+// Bucket is private since migration 30: use createSignedUrls server-side
+// (or client-side for authenticated users) instead of public URLs.

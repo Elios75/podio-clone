@@ -5,7 +5,6 @@ import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import {
   CURRENCIES,
-  publicFileUrl,
   type CategoryOption,
   type FieldType,
 } from "@/lib/fields";
@@ -39,6 +38,7 @@ export function ItemForm({
   relatedItemsByField,
   itemId,
   initialValues,
+  signedUrls,
   backHref,
 }: {
   appId: string;
@@ -47,6 +47,7 @@ export function ItemForm({
   relatedItemsByField: Record<string, RelatedItem[]>;
   itemId?: string;
   initialValues?: Record<string, any>;
+  signedUrls?: Record<string, string>;
   backHref: string;
 }) {
   const router = useRouter();
@@ -55,6 +56,7 @@ export function ItemForm({
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState<string | null>(null);
+  const [localPreviews, setLocalPreviews] = useState<Record<string, string>>({});
 
   function set(fieldId: string, v: any) {
     setValues((prev) => ({ ...prev, [fieldId]: v }));
@@ -72,8 +74,12 @@ export function ItemForm({
       setError(upError.message);
       return;
     }
+    setLocalPreviews((p) => ({ ...p, [path]: URL.createObjectURL(file) }));
     set(fieldId, { path, name: file.name });
   }
+
+  const fileHref = (path: string) =>
+    localPreviews[path] ?? signedUrls?.[path] ?? null;
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -267,16 +273,20 @@ export function ItemForm({
         const v = values[f.id];
         return (
           <div className="space-y-2">
-            {v?.path && f.type === "image" && (
+            {v?.path && f.type === "image" && fileHref(v.path) && (
               // eslint-disable-next-line @next/next/no-img-element
-              <img src={publicFileUrl(v.path)} alt={v.name}
+              <img src={fileHref(v.path)!} alt={v.name}
                 className="h-24 rounded-lg border border-slate-200 object-cover" />
             )}
             {v?.path && f.type === "file" && (
-              <a href={publicFileUrl(v.path)} target="_blank"
-                className="text-sm text-blue-600 hover:underline">
-                {v.name}
-              </a>
+              fileHref(v.path) ? (
+                <a href={fileHref(v.path)!} target="_blank"
+                  className="text-sm text-blue-600 hover:underline">
+                  {v.name}
+                </a>
+              ) : (
+                <span className="text-sm text-slate-500">{v.name}</span>
+              )
             )}
             <input type="file"
               accept={f.type === "image" ? "image/*" : undefined}
