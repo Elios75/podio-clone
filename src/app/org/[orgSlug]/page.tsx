@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { CreateWorkspaceForm } from "./create-workspace-form";
 import { ApiKeysSection } from "./api-keys-section";
 import { WebhooksSection } from "./webhooks-section";
+import { MemberRoleSelect } from "@/components/member-role-select";
 
 export default async function OrgPage({
   params,
@@ -99,9 +100,12 @@ export default async function OrgPage({
             <span className="text-sm">
               {m.user_profiles?.full_name ?? m.user_id}
             </span>
-            <span className="rounded bg-slate-100 px-2 py-0.5 text-xs text-slate-600">
-              {m.role}
-            </span>
+            <MemberRoleSelect
+              table="organization_members"
+              memberId={m.id}
+              role={m.role}
+              options={["owner", "admin", "employee", "light", "external", "guest"]}
+            />
           </li>
         ))}
       </ul>

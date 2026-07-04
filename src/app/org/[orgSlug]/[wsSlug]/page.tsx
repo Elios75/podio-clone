@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { DashboardTiles, type TileData } from "./dashboard-tiles";
+import { MemberRoleSelect } from "@/components/member-role-select";
 
 export default async function WorkspacePage({
   params,
@@ -230,9 +231,12 @@ export default async function WorkspacePage({
             <span className="text-sm">
               {m.user_profiles?.full_name ?? m.user_id}
             </span>
-            <span className="rounded bg-slate-100 px-2 py-0.5 text-xs text-slate-600">
-              {m.role}
-            </span>
+            <MemberRoleSelect
+              table="workspace_members"
+              memberId={m.id}
+              role={m.role}
+              options={["admin", "member", "light", "guest"]}
+            />
           </li>
         ))}
       </ul>
