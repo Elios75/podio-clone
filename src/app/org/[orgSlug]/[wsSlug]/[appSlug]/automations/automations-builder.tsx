@@ -43,6 +43,7 @@ const ACTION_TYPES = [
   { value: "http_request", label: "Make an HTTP request" },
   { value: "update_related_item", label: "Update related items" },
   { value: "generate_pdf", label: "Generate a PDF" },
+  { value: "chat_message", label: "Post to Slack / Teams" },
 ];
 
 function StatusBadge({ status, isTest }: { status: string; isTest?: boolean }) {
@@ -631,6 +632,16 @@ export function AutomationsBuilder({
                         onChange={(e) => setAction(i, { body_raw: e.target.value })}
                         className="w-full rounded border border-slate-300 px-2 py-1.5 text-sm font-mono" />
                     )}
+                  </>
+                )}
+                {a.type === "chat_message" && (
+                  <>
+                    <input placeholder="Incoming webhook URL (Slack or Teams)" value={a.url ?? ""}
+                      onChange={(e) => setAction(i, { url: e.target.value })}
+                      className="flex-1 rounded border border-slate-300 px-2 py-1.5 text-sm font-mono" />
+                    <input placeholder="Message text" value={a.text ?? ""}
+                      onChange={(e) => setAction(i, { text: e.target.value })}
+                      className="w-full rounded border border-slate-300 px-2 py-1.5 text-sm" />
                   </>
                 )}
                 {a.type === "generate_pdf" && (

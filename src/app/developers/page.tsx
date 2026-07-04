@@ -139,6 +139,37 @@ export default function DevelopersPage() {
           event type can be subscribed to.
         </p>
       </section>
+      <section className="mt-8">
+        <h2 className="text-lg font-medium">Integration recipes</h2>
+        <div className="mt-2 space-y-3 text-sm text-slate-600">
+          <p>
+            <strong>Slack / Microsoft Teams:</strong> create an incoming webhook in your
+            Slack workspace or Teams channel, then add a "Post to Slack / Teams" action to
+            any automation and paste the webhook URL. Messages send as{" "}
+            <code className="rounded bg-slate-100 px-1">{'{"text": "…"}'}</code>, which both accept.
+          </p>
+          <p>
+            <strong>Zapier / Make (Integromat):</strong> use "Webhooks by Zapier" or the
+            Make HTTP module. <em>Inbound to Podio Clone:</em> POST to an automation's
+            inbound-webhook URL (create an automation with the "Inbound webhook received"
+            trigger, copy its URL) or call the REST API with an API key.{" "}
+            <em>Outbound from Podio Clone:</em> point an organization webhook at your
+            Zap/scenario's catch-hook URL — remember to echo the verification token first.
+          </p>
+          <p>
+            <strong>Stripe billing:</strong> set{" "}
+            <code className="rounded bg-slate-100 px-1">STRIPE_SECRET_KEY</code>,{" "}
+            <code className="rounded bg-slate-100 px-1">STRIPE_WEBHOOK_SECRET</code>,{" "}
+            <code className="rounded bg-slate-100 px-1">STRIPE_PRICE_TEAM / _BUSINESS / _ENTERPRISE</code>{" "}
+            and <code className="rounded bg-slate-100 px-1">STRIPE_RPC_PROOF</code> (matching the{" "}
+            <code className="rounded bg-slate-100 px-1">stripe_rpc_proof</code> Vault secret), then
+            point a Stripe webhook at{" "}
+            <code className="rounded bg-slate-100 px-1">/api/billing/webhook</code> for{" "}
+            <code className="rounded bg-slate-100 px-1">checkout.session.completed</code> and{" "}
+            <code className="rounded bg-slate-100 px-1">customer.subscription.deleted</code>.
+          </p>
+        </div>
+      </section>
     </main>
   );
 }

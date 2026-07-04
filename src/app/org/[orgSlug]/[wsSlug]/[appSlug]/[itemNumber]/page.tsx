@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { ItemForm } from "../item-form";
 import { CommentsSection } from "./comments-section";
 import { TasksSection } from "./tasks-section";
+import { AttachLink } from "./attach-link";
 import { ShareSection } from "./share-section";
 import { SendEmail } from "./send-email";
 
@@ -285,6 +286,10 @@ export default async function ItemDetailPage({
           </ul>
         </section>
       )}
+
+      <div className="mt-4">
+        <AttachLink orgId={org.id} wsId={ws.id} itemId={item.id} currentUserId={user.id} />
+      </div>
 
       <TasksSection
         itemId={item.id}

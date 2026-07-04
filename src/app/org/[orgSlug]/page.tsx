@@ -5,6 +5,7 @@ import { CreateWorkspaceForm } from "./create-workspace-form";
 import { ApiKeysSection } from "./api-keys-section";
 import { WebhooksSection } from "./webhooks-section";
 import { BackupButton } from "./backup-button";
+import { BillingSection } from "./billing-section";
 import { MemberRoleSelect } from "@/components/member-role-select";
 import { SsoSettings } from "./sso-settings";
 import { EmailTemplatesSection } from "./email-templates-section";
@@ -35,6 +36,11 @@ export default async function OrgPage({
     .from("organization_members")
     .select("id, role, user_id, user_profiles:user_id(full_name)")
     .eq("organization_id", org.id);
+
+  const { data: { user: authUser } } = await supabase.auth.getUser();
+  const isOwner = (members ?? []).some(
+    (m: any) => m.user_id === authUser?.id && m.role === "owner"
+  );
 
   // Only org admins get rows back (RLS); empty for everyone else
   const { data: apiKeys } = await supabase
@@ -143,6 +149,7 @@ export default async function OrgPage({
       />
       <EmailTemplatesSection orgId={org.id} templates={(emailTemplates ?? []) as any} />
       <SsoSettings orgId={org.id} settings={org.security_settings as any} />
+      <BillingSection orgId={org.id} isOwner={isOwner} />
       <BackupButton orgId={org.id} orgSlug={org.slug} />
 
       <p className="mt-10 text-xs text-slate-400">

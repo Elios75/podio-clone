@@ -63,6 +63,8 @@ The builder is create-only. Podio's core promise is *modify anytime*.
 
 ## Phase 13 — Integrations & billing
 
+> **Status: Phase 13a shipped** (migration 38): billing plans (free/team/business/enterprise) with enforced limits — users, items, storage, automations/month via DB triggers + bounded counts; usage dashboard + upgrade UI on the org page; Stripe Checkout + signature-verified webhook (env-gated, manual set-plan fallback for dev; Covantia org grandfathered to business); chat_message action posting to Slack/Teams incoming webhooks; external file links (Drive/Dropbox/OneDrive URLs) attachable to items; plan-based retention cron (runs, webhook deliveries, item revisions, daily 03:30 UTC); Zapier/Make/Stripe recipes on /developers. Remaining in Phase 13: OAuth file pickers, Twilio SMS action (needs edge-function worker for form-encoded API), calendar push sync, hard SSO enforcement via Auth Hook, IdP group→role mapping.
+
 - File pickers: Google Drive, OneDrive, Dropbox (attach as external files).
 - Calendar sync out (ICS from Phase 10 → push integration), Slack/Teams notification channel (webhook consumer recipes), Zapier/Make templates over the public API, Twilio SMS action.
 - **Billing**: Stripe subscriptions mapped to `organizations.billing_plan`; plan-gated limits (users, items, storage, automations/month) enforced by the existing limit checks; upgrade UI. (Free/Team/Business/Enterprise from spec §19.)

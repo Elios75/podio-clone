@@ -50,6 +50,8 @@ export function AdvancedBuilder({
           <option value="notify">Notify</option>
           <option value="add_comment">Comment</option>
           <option value="send_email">Send email</option>
+          <option value="chat_message">Slack/Teams</option>
+          <option value="generate_pdf">Generate PDF</option>
         </select>
         {value.type === "create_task" && (
           <>
@@ -109,6 +111,16 @@ export function AdvancedBuilder({
           <input placeholder="Comment" value={value.body ?? ""}
             onChange={(e) => onChange({ ...value, body: e.target.value })}
             className="w-48 rounded border border-slate-300 px-1.5 py-1 text-xs" />
+        )}
+        {value.type === "chat_message" && (
+          <>
+            <input placeholder="webhook URL" value={value.url ?? ""}
+              onChange={(e) => onChange({ ...value, url: e.target.value })}
+              className="w-44 rounded border border-slate-300 px-1.5 py-1 text-xs font-mono" />
+            <input placeholder="message" value={value.text ?? ""}
+              onChange={(e) => onChange({ ...value, text: e.target.value })}
+              className="w-36 rounded border border-slate-300 px-1.5 py-1 text-xs" />
+          </>
         )}
         {value.type === "send_email" && (
           <>
