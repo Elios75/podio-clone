@@ -199,10 +199,9 @@ export function AppFromCsv({
       (createdFields ?? []).map((f) => [f.external_id, f.id])
     );
 
-    // 3. Rows through the standard pipeline
-    let done = 0;
+    // 3. Shape all rows, then batch through bulk_import_items
+    const shapedRows: Record<string, any>[] = [];
     let errors = 0;
-    setProgress({ done, errors });
     for (const row of rows.slice(1)) {
       const values: Record<string, any> = {};
       included.forEach((c, i) => {
@@ -211,17 +210,21 @@ export function AppFromCsv({
         const shaped = shapeValue(c, row[c.index] ?? "");
         if (shaped !== null) values[fid] = shaped;
       });
-      if (Object.keys(values).length === 0) {
-        errors++;
-      } else {
-        const { error: rpcError } = await supabase.rpc("save_item", {
-          p_app: app.id,
-          p_item: null,
-          p_values: values,
-        });
-        if (rpcError) errors++;
-        else done++;
-      }
+      if (Object.keys(values).length === 0) errors++;
+      else shapedRows.push(values);
+    }
+
+    let done = 0;
+    setProgress({ done, errors });
+    const CHUNK = 250;
+    for (let i = 0; i < shapedRows.length; i += CHUNK) {
+      const batch = shapedRows.slice(i, i + CHUNK);
+      const { data: res, error: rpcError } = await supabase.rpc(
+        "bulk_import_items",
+        { p_app: app.id, p_rows: batch }
+      );
+      if (rpcError) errors += batch.length;
+      else done += res?.imported ?? batch.length;
       setProgress({ done, errors });
     }
 
@@ -300,7 +303,7 @@ export function AppFromCsv({
         <button onClick={create} disabled={running}
           className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50">
           {running
-            ? `Creating… ${progress?.done ?? 0}/${rows.length - 1}`
+            ? `Creating… ${(progress?.done ?? 0) + (progress?.errors ?? 0)}/${rows.length - 1}`
             : `Create app + import ${rows.length - 1} rows`}
         </button>
         <button onClick={() => { setRows([]); setColumns([]); setProgress(null); }}

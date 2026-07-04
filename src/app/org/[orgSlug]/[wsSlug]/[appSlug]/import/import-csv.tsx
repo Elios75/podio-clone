@@ -100,7 +100,8 @@ export function ImportCsv({
       .select()
       .single();
 
-    let done = 0;
+    // Shape all rows up front, then send in batches (one transaction per batch)
+    const shaped: Record<string, any>[] = [];
     let errors = 0;
     for (const row of dataRows) {
       const values: Record<string, any> = {};
@@ -108,20 +109,23 @@ export function ImportCsv({
         if (!fieldId) continue;
         const field = importable.find((f) => f.id === fieldId);
         if (!field) continue;
-        const shaped = shapeValue(field, row[Number(colStr)] ?? "");
-        if (shaped !== null) values[fieldId] = shaped;
+        const sv = shapeValue(field, row[Number(colStr)] ?? "");
+        if (sv !== null) values[fieldId] = sv;
       }
-      if (Object.keys(values).length === 0) {
-        errors++;
-      } else {
-        const { error: rpcError } = await supabase.rpc("save_item", {
-          p_app: appId,
-          p_item: null,
-          p_values: values,
-        });
-        if (rpcError) errors++;
-        else done++;
-      }
+      if (Object.keys(values).length === 0) errors++;
+      else shaped.push(values);
+    }
+
+    let done = 0;
+    const CHUNK = 250;
+    for (let i = 0; i < shaped.length; i += CHUNK) {
+      const batch = shaped.slice(i, i + CHUNK);
+      const { data: res, error: rpcError } = await supabase.rpc(
+        "bulk_import_items",
+        { p_app: appId, p_rows: batch }
+      );
+      if (rpcError) errors += batch.length;
+      else done += res?.imported ?? batch.length;
       setProgress({ done, errors });
     }
 
@@ -204,7 +208,7 @@ export function ImportCsv({
               className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
             >
               {running
-                ? `Importing… ${progress?.done ?? 0}/${rows.length - 1}`
+                ? `Importing… ${(progress?.done ?? 0) + (progress?.errors ?? 0)}/${rows.length - 1}`
                 : `Import ${rows.length - 1} rows`}
             </button>
             <button
