@@ -43,9 +43,13 @@ export function shortTypeLabel(label: string): string {
 export function FieldsPalette({
   onAdd,
   onDone,
+  onDragStateChange,
 }: {
   onAdd: (type: FieldType) => void;
   onDone: () => void;
+  // Lets the canvas show its "Drop a field here" zone while a palette row
+  // is mid-drag (native DnD has no global "is dragging" signal).
+  onDragStateChange?: (dragging: boolean) => void;
 }) {
   const types = [...FIELD_TYPES].sort(
     (a, b) => PALETTE_ORDER.indexOf(a.value) - PALETTE_ORDER.indexOf(b.value)
@@ -64,8 +68,15 @@ export function FieldsPalette({
               <button
                 type="button"
                 onClick={() => onAdd(t.value)}
-                title={`Add a ${label} field`}
-                className="flex w-full items-center gap-3 px-4 py-2 text-left text-[15px] text-podio-ink hover:bg-podio-row-hover"
+                draggable
+                onDragStart={(e) => {
+                  e.dataTransfer.setData("application/x-field-type", t.value);
+                  e.dataTransfer.effectAllowed = "copy";
+                  onDragStateChange?.(true);
+                }}
+                onDragEnd={() => onDragStateChange?.(false)}
+                title={`Add a ${label} field (click, or drag into the template)`}
+                className="flex w-full cursor-grab items-center gap-3 px-4 py-2 text-left text-[15px] text-podio-ink hover:bg-podio-row-hover active:cursor-grabbing"
               >
                 <PodioIcon
                   icon={FIELD_TYPE_ICONS[t.value]}

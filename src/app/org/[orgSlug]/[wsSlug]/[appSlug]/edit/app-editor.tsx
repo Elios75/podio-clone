@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, type DragEvent } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
@@ -222,6 +222,9 @@ export function AppEditor({
   const [saved, setSaved] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [dragIndex, setDragIndex] = useState<number | null>(null);
+  const [overIndex, setOverIndex] = useState<number | null>(null);
+  const [dragging, setDragging] = useState(false);
+  const [justAdded, setJustAdded] = useState<string | null>(null);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState("");
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -247,6 +250,16 @@ export function AppEditor({
     setFields(next);
   }
 
+  // Move a field from one index to an arbitrary drop index (drag-and-drop).
+  function moveTo(from: number, to: number) {
+    if (from === to || from < 0 || from >= fields.length) return;
+    const next = [...fields];
+    const [moved] = next.splice(from, 1);
+    next.splice(Math.min(to, next.length), 0, moved);
+    setSchemaDirty(true);
+    setFields(next);
+  }
+
   function remove(f: EditField) {
     const cnt = f.id ? countByField[f.id] ?? 0 : 0;
     if (cnt > 0) {
@@ -260,17 +273,62 @@ export function AppEditor({
     setFields(fields.filter((x) => x.key !== f.key));
   }
 
-  function addField(type: FieldType) {
-    setSchemaDirty(true);
-    setFields([...fields, {
-      id: null, key: crypto.randomUUID(), external_id: null,
+  // Scroll a freshly added block into view, focus its label input and flash
+  // a teal ring so adding a field is never invisible.
+  function flashField(key: string) {
+    setJustAdded(key);
+    requestAnimationFrame(() => {
+      document
+        .getElementById(`field-block-${key}`)
+        ?.scrollIntoView({ behavior: "smooth", block: "center" });
+      (document.getElementById(`field-label-${key}`) as HTMLInputElement | null)
+        ?.focus({ preventScroll: true });
+    });
+    window.setTimeout(() => setJustAdded((k) => (k === key ? null : k)), 1500);
+  }
+
+  function addField(type: FieldType, at?: number) {
+    const key = crypto.randomUUID();
+    const next = [...fields];
+    next.splice(at ?? next.length, 0, {
+      id: null, key, external_id: null,
       label: "", type,
       help_text: "", is_required: false, is_hidden: false,
       is_primary: false, options: [], multiple: false, endDate: false,
       formula: "", calcMode: "formula", rollupSource: "",
       rollupAgg: "sum", rollupValueField: "", defaultValue: "",
       origType: null,
-    }]);
+    });
+    setSchemaDirty(true);
+    setFields(next);
+    flashField(key);
+  }
+
+  // --- Native HTML5 drag-and-drop plumbing -------------------------------
+  // Two payload kinds, distinguished by custom MIME types (the only thing
+  // readable during dragover is `types`; the data itself only on drop):
+  //   application/x-field-reorder — index of an existing block being moved
+  //   application/x-field-type    — a field type dragged in from the palette
+  function isFieldDrag(e: DragEvent) {
+    return (
+      e.dataTransfer.types.includes("application/x-field-reorder") ||
+      e.dataTransfer.types.includes("application/x-field-type")
+    );
+  }
+
+  function handleCanvasDrop(e: DragEvent, index: number) {
+    if (!isFieldDrag(e)) return;
+    e.preventDefault();
+    const reorder = e.dataTransfer.getData("application/x-field-reorder");
+    const droppedType = e.dataTransfer.getData("application/x-field-type");
+    setDragIndex(null);
+    setOverIndex(null);
+    setDragging(false);
+    if (reorder !== "") {
+      moveTo(Number(reorder), index);
+    } else if (FIELD_TYPES.some((t) => t.value === droppedType)) {
+      addField(droppedType as FieldType, index);
+    }
   }
 
   function done() {
@@ -427,7 +485,7 @@ export function AppEditor({
 
       {/* Two-column body: fields palette + canvas */}
       <div className="flex items-start gap-4 p-4 lg:gap-6 lg:p-6">
-        <FieldsPalette onAdd={addField} onDone={done} />
+        <FieldsPalette onAdd={addField} onDone={done} onDragStateChange={setDragging} />
 
         <section className="min-w-0 flex-1 space-y-3">
           {error && (
@@ -555,23 +613,60 @@ export function AppEditor({
             return (
               <div
                 key={f.key}
-                draggable
-                onDragStart={() => setDragIndex(i)}
-                onDragOver={(e) => e.preventDefault()}
-                onDrop={() => {
-                  if (dragIndex === null || dragIndex === i) return;
-                  const next = [...fields];
-                  const [moved] = next.splice(dragIndex, 1);
-                  next.splice(i, 0, moved);
-                  setSchemaDirty(true);
-                  setFields(next);
-                  setDragIndex(null);
+                id={`field-block-${f.key}`}
+                onDragOver={(e) => {
+                  if (!isFieldDrag(e)) return;
+                  e.preventDefault();
+                  e.dataTransfer.dropEffect =
+                    e.dataTransfer.types.includes("application/x-field-reorder")
+                      ? "move"
+                      : "copy";
+                  if (overIndex !== i) setOverIndex(i);
                 }}
+                onDragLeave={(e) => {
+                  if (!e.currentTarget.contains(e.relatedTarget as Node | null))
+                    setOverIndex((v) => (v === i ? null : v));
+                }}
+                onDrop={(e) => handleCanvasDrop(e, i)}
                 className={`rounded border bg-white shadow-sm ${
                   dragIndex === i ? "border-podio-teal opacity-60" : "border-podio-border"
-                }`}
+                } ${
+                  overIndex === i && dragIndex !== i
+                    ? "border-t-2 border-t-podio-teal"
+                    : ""
+                } ${justAdded === f.key ? "ring-2 ring-podio-teal" : ""}`}
               >
                 <div className="flex items-start gap-3 p-4">
+                  {/* Grip handle — the only draggable element, so text
+                      selection in the inputs keeps working. */}
+                  <div
+                    draggable
+                    onDragStart={(e) => {
+                      e.dataTransfer.setData("application/x-field-reorder", String(i));
+                      e.dataTransfer.effectAllowed = "move";
+                      const block = document.getElementById(`field-block-${f.key}`);
+                      if (block) e.dataTransfer.setDragImage(block, 24, 24);
+                      setDragIndex(i);
+                      setDragging(true);
+                    }}
+                    onDragEnd={() => {
+                      setDragIndex(null);
+                      setOverIndex(null);
+                      setDragging(false);
+                    }}
+                    title="Drag to reorder"
+                    aria-label="Drag to reorder"
+                    className="-ml-1.5 flex shrink-0 cursor-grab items-center self-stretch rounded-sm px-1 text-podio-disabled hover:bg-podio-row-hover hover:text-podio-secondary active:cursor-grabbing"
+                  >
+                    <svg viewBox="0 0 10 16" className="h-4 w-2.5" fill="currentColor" aria-hidden="true">
+                      <circle cx="2.5" cy="2.5" r="1.5" />
+                      <circle cx="2.5" cy="8" r="1.5" />
+                      <circle cx="2.5" cy="13.5" r="1.5" />
+                      <circle cx="7.5" cy="2.5" r="1.5" />
+                      <circle cx="7.5" cy="8" r="1.5" />
+                      <circle cx="7.5" cy="13.5" r="1.5" />
+                    </svg>
+                  </div>
                   {/* Type indicator: icon + ⌄ with an invisible select on top
                       so changing the type keeps working. */}
                   <div
@@ -595,6 +690,7 @@ export function AppEditor({
                   <div className="min-w-0 flex-1">
                     {/* Large underlined label input */}
                     <input
+                      id={`field-label-${f.key}`}
                       value={f.label}
                       placeholder="Field label"
                       onChange={(e) => upd(f.key, { label: e.target.value })}
@@ -794,7 +890,6 @@ export function AppEditor({
                         new
                       </span>
                     )}
-                    <span className="cursor-grab text-podio-disabled" title="Drag to reorder">⠿</span>
                     <div className="flex flex-col leading-none">
                       <button onClick={() => move(i, -1)} title="Move up"
                         className="text-xs text-podio-meta hover:text-podio-ink">▲</button>
@@ -809,9 +904,33 @@ export function AppEditor({
             );
           })}
 
-          {fields.length === 0 && (
+          {/* Append zone — only visible mid-drag, catches drops below the
+              last block (or on an empty canvas). */}
+          {dragging && (
+            <div
+              onDragOver={(e) => {
+                if (!isFieldDrag(e)) return;
+                e.preventDefault();
+                if (overIndex !== fields.length) setOverIndex(fields.length);
+              }}
+              onDragLeave={() =>
+                setOverIndex((v) => (v === fields.length ? null : v))
+              }
+              onDrop={(e) => handleCanvasDrop(e, fields.length)}
+              className={`rounded border-2 border-dashed px-4 py-6 text-center text-sm ${
+                overIndex === fields.length
+                  ? "border-podio-teal bg-podio-row-alt text-podio-teal"
+                  : "border-podio-border text-podio-meta"
+              }`}
+            >
+              Drop a field here
+            </div>
+          )}
+
+          {fields.length === 0 && !dragging && (
             <div className="rounded border border-dashed border-podio-border bg-white p-8 text-center text-sm text-podio-meta">
-              Click a field type in the palette to add your first field.
+              Click a field type in the palette — or drag one here — to add
+              your first field.
             </div>
           )}
 
