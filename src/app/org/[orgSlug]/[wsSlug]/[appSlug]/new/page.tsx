@@ -1,5 +1,7 @@
+import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { PodioIcon } from "@/components/podio-icon";
 import { ItemForm } from "../item-form";
 
 export default async function NewItemPage({
@@ -14,11 +16,12 @@ export default async function NewItemPage({
     .from("organizations").select("id, slug").eq("slug", orgSlug).single();
   if (!org) notFound();
   const { data: ws } = await supabase
-    .from("workspaces").select("id, slug")
+    .from("workspaces").select("id, name, slug")
     .eq("organization_id", org.id).eq("slug", wsSlug).single();
   if (!ws) notFound();
   const { data: app } = await supabase
-    .from("apps").select("id, name, slug, icon, item_name")
+    .from("apps")
+    .select("id, name, slug, icon, item_name, description, usage_instructions")
     .eq("workspace_id", ws.id).eq("slug", appSlug).single();
   if (!app) notFound();
 
@@ -62,22 +65,76 @@ export default async function NewItemPage({
     }
   }
 
-  const backHref = `/org/${orgSlug}/${wsSlug}/${app.slug}`;
+  const base = `/org/${orgSlug}/${wsSlug}`;
+  const appHref = `${base}/${app.slug}`;
+  const newLabel = `New ${app.item_name}`;
+  const instructions =
+    (app.usage_instructions ?? "").trim() ||
+    (app.description ?? "").trim() ||
+    `Fill in the fields and save to add a new ${app.item_name} to ${app.name}.`;
 
   return (
-    <main className="mx-auto max-w-xl p-8">
-      <h1 className="text-2xl font-semibold">
-        New {app.item_name.toLowerCase()} — {app.icon} {app.name}
-      </h1>
-      <div className="mt-6">
-        <ItemForm
-          appId={app.id}
-          fields={(fields ?? []) as any}
-          members={members}
-          relatedItemsByField={relatedItemsByField}
-          initialValues={defaults}
-          backHref={backHref}
-        />
+    <main className="min-h-full bg-podio-page">
+      {/* Creation header bar */}
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-2 border-b border-podio-border bg-white px-4 pt-2">
+        {/* Left cluster: tab-like chip + template/actions buttons */}
+        <span className="self-end rounded-t bg-podio-teal px-4 py-2.5 text-sm font-semibold text-white">
+          {newLabel}
+        </span>
+        <Link
+          href={`${base}/${app.slug}/edit`}
+          className="mb-2 rounded-sm bg-podio-row-hover px-3 py-1.5 text-sm font-semibold text-podio-ink hover:bg-podio-border"
+        >
+          Modify Template
+        </Link>
+        <button
+          type="button"
+          className="mb-2 px-1 py-1.5 text-sm text-podio-secondary hover:text-podio-ink"
+        >
+          Actions ⌄
+        </button>
+
+        {/* Center: breadcrumb */}
+        <nav className="mx-auto mb-2 hidden items-center gap-1.5 text-sm md:flex">
+          <Link href={base} className="text-podio-teal hover:underline">
+            {ws.name}
+          </Link>
+          <span className="text-podio-meta">›</span>
+          <Link
+            href={appHref}
+            className="flex items-center gap-1.5 text-podio-teal hover:underline"
+          >
+            <PodioIcon icon={app.icon} name={app.name} className="h-5 w-5" />
+            {app.name}
+          </Link>
+          <span className="text-podio-meta">›</span>
+          <span className="text-podio-ink">{newLabel}</span>
+        </nav>
+        {/* Right spacer keeps the breadcrumb roughly centered */}
+        <span className="hidden lg:block lg:w-40" aria-hidden />
+      </div>
+
+      {/* Two-column body: form + Instructions rail */}
+      <div className="flex items-start gap-6 p-4 lg:p-6">
+        <section className="min-w-0 flex-1 rounded border border-podio-border bg-white p-6 shadow-sm">
+          <ItemForm
+            appId={app.id}
+            fields={(fields ?? []) as any}
+            members={members}
+            relatedItemsByField={relatedItemsByField}
+            initialValues={defaults}
+            backHref={appHref}
+            itemName={app.item_name}
+          />
+        </section>
+        <aside className="hidden w-80 shrink-0 lg:block">
+          <div className="rounded border border-podio-border bg-white p-5 shadow-sm">
+            <h2 className="text-lg font-semibold text-podio-teal">Instructions</h2>
+            <p className="mt-2 whitespace-pre-line text-[15px] text-podio-ink">
+              {instructions}
+            </p>
+          </div>
+        </aside>
       </div>
     </main>
   );

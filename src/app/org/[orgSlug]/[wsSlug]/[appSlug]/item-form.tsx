@@ -29,7 +29,9 @@ type Member = { user_id: string; full_name: string | null };
 type RelatedItem = { id: string; title: string | null; item_number: number };
 
 const inputCls =
-  "w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none";
+  "w-full rounded border border-podio-border bg-white px-3 py-2 text-[15px] text-podio-ink focus:border-podio-teal focus:outline-none";
+const compactInputCls =
+  "rounded border border-podio-border bg-white px-3 py-2 text-[15px] text-podio-ink focus:border-podio-teal focus:outline-none";
 
 export function ItemForm({
   appId,
@@ -40,6 +42,7 @@ export function ItemForm({
   initialValues,
   signedUrls,
   backHref,
+  itemName = "Item",
 }: {
   appId: string;
   fields: Field[];
@@ -49,6 +52,7 @@ export function ItemForm({
   initialValues?: Record<string, any>;
   signedUrls?: Record<string, string>;
   backHref: string;
+  itemName?: string;
 }) {
   const router = useRouter();
   const supabase = createClient();
@@ -202,7 +206,7 @@ export function ItemForm({
               className={inputCls} />
             <select value={v.currency ?? "USD"}
               onChange={(e) => set(f.id, { ...v, currency: e.target.value })}
-              className="rounded-lg border border-slate-300 px-2 py-2 text-sm">
+              className={compactInputCls}>
               {CURRENCIES.map((c) => <option key={c} value={c}>{c}</option>)}
             </select>
           </div>
@@ -215,7 +219,7 @@ export function ItemForm({
               value={values[f.id] ?? 0}
               onChange={(e) => set(f.id, Number(e.target.value))}
               className="flex-1" />
-            <span className="w-12 text-right text-sm text-slate-600">
+            <span className="w-12 text-right text-sm text-podio-secondary">
               {values[f.id] ?? 0}%
             </span>
           </div>
@@ -229,13 +233,13 @@ export function ItemForm({
             <input type="number" min={0} value={h || ""}
               placeholder="0"
               onChange={(e) => set(f.id, Number(e.target.value || 0) * 3600 + m * 60)}
-              className="w-20 rounded-lg border border-slate-300 px-3 py-2 text-sm" />
-            <span className="text-sm text-slate-500">h</span>
+              className={`w-20 ${compactInputCls}`} />
+            <span className="text-sm text-podio-meta">h</span>
             <input type="number" min={0} max={59} value={m || ""}
               placeholder="0"
               onChange={(e) => set(f.id, h * 3600 + Number(e.target.value || 0) * 60)}
-              className="w-20 rounded-lg border border-slate-300 px-3 py-2 text-sm" />
-            <span className="text-sm text-slate-500">m</span>
+              className={`w-20 ${compactInputCls}`} />
+            <span className="text-sm text-podio-meta">m</span>
           </div>
         );
       }
@@ -247,58 +251,56 @@ export function ItemForm({
               value={v.start ?? ""}
               onChange={(e) =>
                 set(f.id, e.target.value ? { ...v, start: e.target.value } : null)}
-              className="rounded-lg border border-slate-300 px-3 py-2 text-sm" />
+              className={compactInputCls} />
             {f.config.end_date && (
               <>
-                <span className="text-xs text-slate-400">→</span>
+                <span className="text-xs text-podio-meta">→</span>
                 <input type="date" value={v.end ?? ""}
                   min={v.start ?? undefined}
                   onChange={(e) => set(f.id, { ...v, end: e.target.value || undefined })}
-                  className="rounded-lg border border-slate-300 px-3 py-2 text-sm" />
+                  className={compactInputCls} />
               </>
             )}
           </div>
         );
       }
       case "category": {
-        if (f.config.multiple) {
-          const selected: string[] = Array.isArray(values[f.id]) ? values[f.id] : [];
-          return (
-            <div className="flex flex-wrap gap-2">
-              {(f.config.options ?? []).map((o) => {
-                const on = selected.includes(o.id);
-                return (
-                  <button key={o.id} type="button"
-                    onClick={() =>
+        // Podio-style bordered pill buttons for both single and multi select.
+        const multi = !!f.config.multiple;
+        const selected: string[] = multi
+          ? (Array.isArray(values[f.id]) ? values[f.id] : [])
+          : (values[f.id] ? [values[f.id]] : []);
+        return (
+          <div className="flex flex-wrap gap-2">
+            {(f.config.options ?? []).map((o) => {
+              const on = selected.includes(o.id);
+              return (
+                <button key={o.id} type="button"
+                  onClick={() => {
+                    if (multi) {
                       set(f.id, on
                         ? selected.filter((x) => x !== o.id)
-                        : [...selected, o.id])}
-                    className={`rounded-full border px-3 py-1 text-xs font-medium ${
-                      on ? "text-white" : "text-slate-600 border-slate-300 hover:bg-slate-50"}`}
-                    style={on ? { backgroundColor: o.color, borderColor: o.color } : {}}>
-                    {o.label}
-                  </button>
-                );
-              })}
-            </div>
-          );
-        }
-        return (
-          <select required={f.is_required} value={values[f.id] ?? ""}
-            onChange={(e) => set(f.id, e.target.value || null)}
-            className="rounded-lg border border-slate-300 px-3 py-2 text-sm">
-            <option value="">— Select —</option>
-            {(f.config.options ?? []).map((o) => (
-              <option key={o.id} value={o.id}>{o.label}</option>
-            ))}
-          </select>
+                        : [...selected, o.id]);
+                    } else {
+                      set(f.id, on ? null : o.id);
+                    }
+                  }}
+                  className={`rounded border bg-white px-5 py-2.5 text-[15px] ${
+                    on
+                      ? "border-podio-teal font-semibold text-podio-teal"
+                      : "border-podio-border text-podio-ink hover:border-podio-teal"}`}>
+                  {o.label}
+                </button>
+              );
+            })}
+          </div>
         );
       }
       case "contact":
         return (
           <select required={f.is_required} value={values[f.id] ?? ""}
             onChange={(e) => set(f.id, e.target.value || null)}
-            className="rounded-lg border border-slate-300 px-3 py-2 text-sm">
+            className={compactInputCls}>
             <option value="">— Select member —</option>
             {members.map((m) => (
               <option key={m.user_id} value={m.user_id}>
@@ -311,8 +313,8 @@ export function ItemForm({
         return (
           <select required={f.is_required} value={values[f.id] ?? ""}
             onChange={(e) => set(f.id, e.target.value || null)}
-            className="rounded-lg border border-slate-300 px-3 py-2 text-sm">
-            <option value="">— Select item —</option>
+            className={compactInputCls}>
+            <option value="">Type to search for items</option>
             {(relatedItemsByField[f.id] ?? []).map((it) => (
               <option key={it.id} value={it.id}>
                 #{it.item_number} {it.title ?? ""}
@@ -328,16 +330,16 @@ export function ItemForm({
             {v?.path && f.type === "image" && fileHref(v.path) && (
               // eslint-disable-next-line @next/next/no-img-element
               <img src={fileHref(v.path)!} alt={v.name}
-                className="h-24 rounded-lg border border-slate-200 object-cover" />
+                className="h-24 rounded border border-podio-border object-cover" />
             )}
             {v?.path && f.type === "file" && (
               fileHref(v.path) ? (
                 <a href={fileHref(v.path)!} target="_blank"
-                  className="text-sm text-blue-600 hover:underline">
+                  className="text-sm text-podio-teal hover:underline">
                   {v.name}
                 </a>
               ) : (
-                <span className="text-sm text-slate-500">{v.name}</span>
+                <span className="text-sm text-podio-secondary">{v.name}</span>
               )
             )}
             <div className="flex items-center gap-2">
@@ -352,7 +354,7 @@ export function ItemForm({
                 <>
                   <button type="button"
                     onClick={() => cameraInputs.current[f.id]?.click()}
-                    className="shrink-0 rounded border border-slate-300 px-2 py-1 text-xs text-slate-600 hover:bg-slate-100">
+                    className="shrink-0 rounded border border-podio-border px-2 py-1 text-xs text-podio-secondary hover:bg-podio-row-hover">
                     📷 Camera
                   </button>
                   <input
@@ -367,7 +369,7 @@ export function ItemForm({
               )}
             </div>
             {uploading === f.id && (
-              <p className="text-xs text-slate-400">Uploading…</p>
+              <p className="text-xs text-podio-meta">Uploading…</p>
             )}
           </div>
         );
@@ -375,14 +377,14 @@ export function ItemForm({
       case "calculation": {
         const v = values[f.id];
         return (
-          <p className="rounded-lg bg-slate-50 px-3 py-2 text-sm">
+          <p className="rounded bg-podio-row-alt px-3 py-2 text-sm text-podio-ink">
             {typeof v === "number" ? (
               <span className="font-medium">= {v.toLocaleString()}</span>
             ) : (
-              <span className="text-slate-400">Computed on save</span>
+              <span className="text-podio-meta">Computed on save</span>
             )}
             {f.config.formula && (
-              <span className="ml-2 font-mono text-xs text-slate-400">
+              <span className="ml-2 font-mono text-xs text-podio-meta">
                 {f.config.formula}
               </span>
             )}
@@ -395,7 +397,7 @@ export function ItemForm({
   }
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4">
+    <form onSubmit={handleSubmit} className="space-y-5">
       {draftRestored && (
         <div className="flex items-center justify-between gap-3 rounded border border-[#E3E3E3] bg-[#CDEDED] px-3 py-2 text-sm text-[#136570]">
           <span>Draft restored from this device.</span>
@@ -413,32 +415,36 @@ export function ItemForm({
       )}
       {fields.map((f) =>
         f.type === "separator" ? (
-          <div key={f.id} className="border-t border-slate-200 pt-3">
-            <p className="text-xs font-medium uppercase tracking-wide text-slate-400">
+          <div key={f.id} className="border-t border-podio-border pt-3">
+            <p className="text-xs font-semibold uppercase tracking-wide text-podio-meta">
               {f.label}
             </p>
           </div>
         ) : (
-          <div key={f.id}>
-            <label className="block text-sm font-medium text-slate-700">
+          <div key={f.id} className="flex flex-col gap-1.5 sm:flex-row sm:items-start">
+            <label className="text-[15px] font-semibold text-podio-ink sm:w-44 sm:shrink-0 sm:pt-2.5 sm:text-right">
+              {f.is_required && <span className="text-[#E5484D]">* </span>}
               {f.label}
-              {f.is_required && <span className="text-red-500"> *</span>}
             </label>
-            {f.help_text && <p className="text-xs text-slate-400">{f.help_text}</p>}
-            <div className="mt-1">{renderInput(f)}</div>
+            <div className="min-w-0 flex-1">
+              {renderInput(f)}
+              {f.help_text && (
+                <p className="mt-1 text-sm text-podio-meta">{f.help_text}</p>
+              )}
+            </div>
           </div>
         )
       )}
 
-      {error && <p className="text-sm text-red-600">{error}</p>}
-      <div className="flex gap-2">
-        <button type="submit" disabled={saving || uploading !== null}
-          className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50">
-          {saving ? "Saving…" : "Save"}
-        </button>
+      {error && <p className="text-right text-sm text-[#E5484D]">{error}</p>}
+      <div className="flex justify-end pt-2">
         <button type="button" onClick={() => router.push(backHref)}
-          className="rounded-lg border border-slate-300 px-4 py-2 text-sm hover:bg-slate-100">
+          className="rounded-sm bg-podio-row-hover px-6 py-2.5 text-[15px] font-semibold text-podio-ink hover:bg-podio-border">
           Cancel
+        </button>
+        <button type="submit" disabled={saving || uploading !== null}
+          className="rounded-sm bg-podio-teal px-6 py-2.5 text-[15px] font-semibold text-white hover:bg-podio-teal-dark disabled:opacity-50">
+          {saving ? "Saving…" : `Save ${itemName}`}
         </button>
       </div>
     </form>

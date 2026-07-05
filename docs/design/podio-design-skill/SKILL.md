@@ -76,7 +76,11 @@ JSX/Tailwind for each pattern:
     lists; PACK-ribbon cards with capability-icon strips, teal star ratings,
     touching Get Pack/More info buttons; "Included in <Pack>" links;
     square-button pagination)
-12. Chat panel (💬 in the global bar opens a right slide-over that pushes
+12. Item creation view (chrome stays; creation header bar with teal
+    "New <ItemName>" chip + Modify Template + breadcrumb; label-left form
+    rows with red * before required labels; category pill buttons;
+    Instructions right rail; grey Cancel + teal Save <ItemName>)
+13. Chat panel (💬 in the global bar opens a right slide-over that pushes
     page content: avatar strip + connections list with presence dots,
     timestamped 1:1 conversations with 📎/🔗 composer)
 

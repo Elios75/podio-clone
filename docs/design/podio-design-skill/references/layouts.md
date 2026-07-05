@@ -365,7 +365,28 @@ ink semibold app name inline; grey truncated description; teal stars; teal
 install the template(s) into it (the clone's `install_app_template`, with
 the sample-data option). Categories map to `app_templates.category`.
 
-## 12. Chat panel
+## 12. Item creation view ("New Task" pattern)
+
+Reference: the New Task screenshot. Creating an item NEVER hides the chrome —
+the global bar stays, and a white **creation header bar** appears below it:
+far left a solid-teal tab-like chip "New `<ItemName>`", then a grey "Modify
+Template" button (→ the app builder) and a plain "Actions ⌄"; centered
+breadcrumb "`<Workspace>` › `<app icon+name>` › New `<ItemName>`" with teal
+links. Body on the page grey, two columns:
+
+- **Main**: white panel, label-left form rows — labels in a fixed right-
+  aligned left column (semibold ink, red `*` BEFORE the label when required);
+  category fields are **bordered pill buttons** (selected = teal border +
+  teal semibold text), not dropdowns; relationship fields say "Type to
+  search for items"; help text in meta grey under each control.
+- **Right rail (~320px)**: an "Instructions" panel — teal heading + the
+  app's usage instructions in ink prose.
+
+Footer bottom-right: touching grey **Cancel** + solid teal
+**Save `<ItemName>`** (rounded-sm). The same label-left form grammar applies
+when editing an item.
+
+## 13. Chat panel
 
 Reference: the two chat screenshots. Chat opens from the 💬 icon at the far
 right of the global bar as a **right slide-over that pushes the page

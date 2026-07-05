@@ -254,6 +254,7 @@ export default async function ItemDetailPage({
           initialValues={initialValues}
           signedUrls={signedUrls}
           backHref={backHref}
+          itemName={app.item_name}
         />
       </div>
       </div>
