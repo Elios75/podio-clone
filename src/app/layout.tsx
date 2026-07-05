@@ -35,7 +35,10 @@ export default function RootLayout({
 }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="en" className={sourceSans.variable}>
-      <body className={`${sourceSans.className} font-sans`}>
+      {/* suppressHydrationWarning: browser extensions (Grammarly, password
+          managers, …) inject attributes into <body> before React hydrates,
+          which otherwise triggers a spurious hydration-mismatch warning. */}
+      <body className={`${sourceSans.className} font-sans`} suppressHydrationWarning>
         <SwRegister />
         {children}
       </body>
