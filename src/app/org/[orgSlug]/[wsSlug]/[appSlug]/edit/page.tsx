@@ -14,7 +14,7 @@ export default async function EditAppPage({
     .from("organizations").select("id, slug").eq("slug", orgSlug).single();
   if (!org) notFound();
   const { data: ws } = await supabase
-    .from("workspaces").select("id, slug")
+    .from("workspaces").select("id, name, slug")
     .eq("organization_id", org.id).eq("slug", wsSlug).single();
   if (!ws) notFound();
   const { data: app } = await supabase
@@ -67,26 +67,19 @@ export default async function EditAppPage({
     .limit(10);
 
   return (
-    <main className="mx-auto max-w-2xl p-8">
-      <h1 className="text-2xl font-semibold">
-        Edit app — {app.icon} {app.name}
-      </h1>
-      <p className="mt-1 text-sm text-slate-500">
-        Schema version {app.schema_version}. Changes apply immediately; removed
-        fields keep their data and can be restored by support.
-      </p>
-      <div className="mt-6">
-        <AppEditor
-          app={app}
-          initialFields={(fields ?? []) as any}
-          countByField={countByField}
-          backHref={`/org/${orgSlug}/${wsSlug}/${app.slug}`}
-          wsHref={`/org/${orgSlug}/${wsSlug}`}
-          revisions={(revisions ?? []) as any}
-          rollupSources={rollupSources}
-          srcNumFields={(srcNumFields ?? []) as any}
-        />
-      </div>
+    <main className="min-h-full bg-podio-page">
+      <AppEditor
+        app={app}
+        wsName={ws.name}
+        initialFields={(fields ?? []) as any}
+        countByField={countByField}
+        backHref={`/org/${orgSlug}/${wsSlug}/${app.slug}`}
+        newHref={`/org/${orgSlug}/${wsSlug}/${app.slug}/new`}
+        wsHref={`/org/${orgSlug}/${wsSlug}`}
+        revisions={(revisions ?? []) as any}
+        rollupSources={rollupSources}
+        srcNumFields={(srcNumFields ?? []) as any}
+      />
     </main>
   );
 }

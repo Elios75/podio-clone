@@ -266,6 +266,30 @@ Menu contents (map to the clone's routes):
 | Workspace files | `<ws>/files` |
 | Workspace contacts | `<ws>/settings#members` |
 
+### 8b. Wrench app menu (app views pane)
+
+Reference: the app-wrench screenshot. Clicking the 🔧 in the app's views pane
+opens a WIDE mega-panel (w-[560px], white, rounded-lg, border-podio-border,
+shadow-xl, anchored below the wrench with a small rotated-square caret).
+Contents, top to bottom:
+
+- A solid-teal full-width **Modify Template** button (bg-podio-teal, white
+  semibold text) → `<app>/edit`.
+- Three sections, each an uppercase meta label (11px, tracking-wider,
+  text-podio-meta) over a hairline (border-podio-border), followed by a
+  **two-column grid** of icon + label rows (18px line icon, 14px ink text,
+  hover:bg-podio-row-hover; grid-flow-col so the markup order fills column 1
+  first):
+  - **APP** — App settings, Layout options, Developer | Workflows, Workflow
+    automation, Add to calendar
+  - **DATA** — Excel Import, Excel Export, Webform | Email to app,
+    Integration, Cleanup deleted field values
+  - **ACTIONS** — Clone app, Delete app (red) | Share app, Archive app
+- Not-yet-built rows render inert in text-podio-disabled with title
+  "Coming soon". Delete app is red; interactive controls (Excel Export,
+  Share app / publish-to-market) are passed in as slots and rendered in
+  their grid positions. Implemented in `[appSlug]/app-tools-menu.tsx`.
+
 ## 9. Modal dialog (e.g. "Create a new workspace")
 
 Reference: the create-workspace screenshot. Podio modals are plain white
@@ -425,6 +449,45 @@ items, and the share panel; right rail (~1/3) is one white panel with
 **Activity | Comments** underline tabs (teal underline on the active tab;
 default = Comments when comments exist, else Activity). Comments keep
 Podio's composer at the bottom of the tab.
+
+### 12b. Template editor ("Modify Template" builder)
+
+Reference: the Modify Template screenshots. `<app>/edit` reuses the creation
+header bar (§12) with the chips swapped: the grey "New `<ItemName>`" chip is
+now a LINK to `/new`, and **Modify Template** is the active solid-teal tab
+chip (rounded-t, self-end); breadcrumb stays centered; the primary action
+sits header-right as a solid teal **Publish changes** button next to a quiet
+"Back to app" link. Body on the page grey, two columns:
+
+- **Fields palette** (left, `w-64 sticky top-4 self-start`, white card):
+  teal "Fields" title + wrench line icon; a vertical list of field-type rows
+  (monochrome line icon + short name — Text, Category, Date, Relationship,
+  Contact, Phone, Email, Number, Link, Money, …) where CLICKING a row
+  APPENDS a new field of that type to the canvas; footer = full-width solid
+  teal **Done** button → back to the app (`confirm()` first when there are
+  unpublished changes).
+- **Canvas** (flex-1): one white block per field. Left segment: the
+  field-type icon + ⌄ (an invisible overlaid `<select>` keeps type changes
+  working); the field LABEL is a large (text-xl semibold) borderless input
+  with only a bottom hairline (teal on focus). A subtle row beneath holds
+  the help-text input + required/hidden/title-field toggles; per-type config
+  renders below (default value, date range, calculation formula/rollup with
+  the ✨ AI assist). **Category options** are full-width rows inside one
+  bordered list: borderless label input + a small color-swatch button (⌄)
+  opening a CATEGORY_COLORS popover + ✕, closed by a `bg-podio-row-alt` row
+  with an "Enter a category option" input that adds on Enter. Reorder via
+  ▲▼ (drag also works); remove via ✕; per-field "`n` values" / teal "new"
+  badges keep the data-loss warnings honest. A quieter collapsible
+  **App settings** block (IconPicker for the app icon, name, item name,
+  description, save/archive/delete) tops the canvas; the schema-history
+  panel closes it.
+
+The field-type → line-icon map lives in `edit/fields-palette.tsx`
+(`FIELD_TYPE_ICONS`): text→`text-a`, number→`hash`, category→`grid`,
+money→`money`, calculation→`calc`, progress→`progress`,
+separator→`separator`, link→`globe`, organization→`people`; the rest reuse
+existing glyphs (calendar, contact, phone, mail, pin, clock, image,
+paperclip, link).
 
 ## 13. Chat panel
 

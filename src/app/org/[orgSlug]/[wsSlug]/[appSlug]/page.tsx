@@ -438,16 +438,17 @@ export default async function AppPage({
                 <PodioIcon icon="bell" className="h-5 w-5" />
               </span>
               <AppToolsMenu
-                links={[
-                  { label: "Edit app", href: `${baseHref}/edit`, icon: "pencil" },
-                  { label: "Import", href: `${baseHref}/import`, icon: "tray" },
-                  { label: "Webform", href: `${baseHref}/form`, icon: "doc" },
-                  { label: "Automations", href: `${baseHref}/automations`, icon: "bolt" },
-                ]}
-              >
-                <ExportButton appId={app.id} appName={app.name} fields={fields as any} />
-                <SaveTemplateButton appId={app.id} appName={app.name} />
-              </AppToolsMenu>
+                baseHref={baseHref}
+                appId={app.id}
+                appName={app.name}
+                wsId={ws.id}
+                exportSlot={
+                  <ExportButton appId={app.id} appName={app.name} fields={fields as any} />
+                }
+                shareSlot={
+                  <SaveTemplateButton appId={app.id} appName={app.name} label="Share app" />
+                }
+              />
               <span title="Expand" className="text-podio-meta">
                 <PodioIcon icon="expand" className="h-5 w-5" />
               </span>

@@ -67,12 +67,14 @@ export default async function FormPage({
           webform={webform}
           recentSubmissions={submissions ?? []}
         />
-        <EmailToApp
-          appId={app.id}
-          appSlug={app.slug}
-          fields={(fields ?? []) as any}
-          address={emailAddress}
-        />
+        <div id="email-to-app">
+          <EmailToApp
+            appId={app.id}
+            appSlug={app.slug}
+            fields={(fields ?? []) as any}
+            address={emailAddress}
+          />
+        </div>
       </div>
     </main>
   );

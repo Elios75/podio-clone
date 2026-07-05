@@ -556,6 +556,82 @@ const PATHS: Record<string, ReactNode> = {
       <path d="M15 3.5h5.5V9M20.5 3.5l-9 9" />
     </>
   ),
+  // Clone: two overlapping rounded squares (copy).
+  clone: (
+    <>
+      <rect x="8.5" y="8.5" width="12" height="12" rx="1.5" />
+      <path d="M15.5 5.5V5a1.5 1.5 0 0 0-1.5-1.5H5A1.5 1.5 0 0 0 3.5 5v9A1.5 1.5 0 0 0 5 15.5h.5" />
+    </>
+  ),
+  // Layout: page frame with a left sidebar divider.
+  layout: (
+    <>
+      <rect x="3.5" y="4.5" width="17" height="15" rx="1.5" />
+      <path d="M9.5 4.5v15" />
+    </>
+  ),
+  // Broom: angled handle with a wide brush head (cleanup).
+  broom: (
+    <>
+      <path d="M19.5 4.5 13 11" />
+      <path d="M13 11c-2.4-.9-4.9-.2-6.5 1.4L4 15l5 5 2.6-2.6c1.6-1.6 2.3-4.1 1.4-6.4z" />
+      <path d="m7.5 17.5 2-2" />
+    </>
+  ),
+  // Archive box: lid, body, and a grab handle.
+  archive: (
+    <>
+      <rect x="3.5" y="4.5" width="17" height="4.5" rx="1" />
+      <path d="M5 9v9.5A1.5 1.5 0 0 0 6.5 20h11a1.5 1.5 0 0 0 1.5-1.5V9" />
+      <path d="M10 12.5h4" />
+    </>
+  ),
+
+  // ---- Field-type icons (template editor palette) -------------------------
+  // Capital A with crossbar (text field).
+  "text-a": (
+    <>
+      <path d="M6.5 19 12 5l5.5 14" />
+      <path d="M8.6 13.7h6.8" />
+    </>
+  ),
+  // Number sign (number field).
+  hash: (
+    <>
+      <path d="M9.5 4.5 8 19.5M16 4.5l-1.5 15" />
+      <path d="M5 9.5h15M4 14.5h15" />
+    </>
+  ),
+  // Dollar-in-circle (money field).
+  money: (
+    <>
+      <circle cx="12" cy="12" r="8.5" />
+      <path d="M14.5 9.4c-.5-.9-1.4-1.4-2.5-1.4-1.5 0-2.7.9-2.7 2.1s1.2 1.7 2.7 1.9c1.5.2 2.7.8 2.7 2s-1.2 2.1-2.7 2.1c-1.1 0-2-.5-2.5-1.4" />
+      <path d="M12 6.2V8M12 16.1v1.7" />
+    </>
+  ),
+  // Pocket calculator (calculation field).
+  calc: (
+    <>
+      <rect x="5.5" y="3" width="13" height="18" rx="1.5" />
+      <path d="M8.5 6.5h7" />
+      <path d="M8.7 11h.01M12 11h.01M15.3 11h.01M8.7 14.5h.01M12 14.5h.01M15.3 14.5h.01M8.7 18h.01M12 18h.01M15.3 18h.01" />
+    </>
+  ),
+  // Meter with a partial fill line (progress field).
+  progress: (
+    <>
+      <rect x="3" y="9" width="18" height="6" rx="3" />
+      <path d="M6.5 12h5.5" />
+    </>
+  ),
+  // A rule between two text lines (separator field).
+  separator: (
+    <>
+      <path d="M3.5 12h17" />
+      <path d="M7 6.5h10M7 17.5h10" />
+    </>
+  ),
 };
 
 // `chain` is an alias for the existing chain-link glyph.
