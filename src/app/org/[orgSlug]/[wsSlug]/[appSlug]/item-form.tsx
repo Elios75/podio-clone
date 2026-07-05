@@ -8,6 +8,7 @@ import {
   type CategoryOption,
   type FieldType,
 } from "@/lib/fields";
+import { PodioIcon } from "@/components/podio-icon";
 
 type Field = {
   id: string;
@@ -354,8 +355,8 @@ export function ItemForm({
                 <>
                   <button type="button"
                     onClick={() => cameraInputs.current[f.id]?.click()}
-                    className="shrink-0 rounded border border-podio-border px-2 py-1 text-xs text-podio-secondary hover:bg-podio-row-hover">
-                    📷 Camera
+                    className="flex shrink-0 items-center gap-1 rounded border border-podio-border px-2 py-1 text-xs text-podio-secondary hover:bg-podio-row-hover">
+                    <PodioIcon icon="camera" className="h-4 w-4" /> Camera
                   </button>
                   <input
                     ref={(el) => { cameraInputs.current[f.id] = el; }}

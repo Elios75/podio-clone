@@ -2,7 +2,8 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { PodioIcon, PODIO_ICONS } from "@/components/podio-icon";
+import { PodioIcon } from "@/components/podio-icon";
+import { IconPicker } from "@/components/icon-picker";
 
 // Podio "Create New App" modal: ink title on a white header row, General /
 // Advanced left rail, App Name + Item Name + App Type + App Icon, and a
@@ -81,11 +82,11 @@ export function CreateAppModal({
       onClick={onClose}
     >
       <div
-        className="w-full max-w-2xl rounded bg-white shadow-lg"
+        className="flex max-h-[calc(100vh-6.5rem)] w-full max-w-2xl flex-col rounded bg-white shadow-lg"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header: ink title on white, bottom border, grey ✕ */}
-        <div className="flex items-center border-b border-podio-border bg-white px-6 py-4">
+        <div className="flex shrink-0 items-center border-b border-podio-border bg-white px-6 py-4">
           <h2 className="text-xl font-semibold text-podio-ink">
             Create New App
           </h2>
@@ -98,7 +99,8 @@ export function CreateAppModal({
           </button>
         </div>
 
-        <div className="flex">
+        {/* Body scrolls when the viewport is short; header/footer stay pinned */}
+        <div className="flex min-h-0 flex-1 overflow-y-auto">
           {/* Left rail tabs */}
           <aside className="w-36 shrink-0 border-r border-podio-border bg-podio-row-alt">
             <div className="relative z-10 -mr-px border-b border-podio-border bg-white px-4 py-3 text-[15px] font-semibold text-podio-ink">
@@ -171,7 +173,7 @@ export function CreateAppModal({
               </div>
             </fieldset>
 
-            <div className="relative">
+            <div>
               <span className="text-[15px] font-semibold text-podio-ink">
                 App Icon
               </span>
@@ -192,29 +194,12 @@ export function CreateAppModal({
                   </span>
                 </button>
               </div>
+              {/* Inline (in-flow) picker: the modal body scrolls, so this is
+                  always reachable. Picking keeps it open for browsing; the
+                  button above toggles it closed. */}
               {iconOpen && (
-                <div className="absolute left-0 top-full z-10 mt-1 grid w-72 grid-cols-8 gap-1 rounded border border-podio-border bg-white p-2 shadow-lg">
-                  {PODIO_ICONS.map((i) => (
-                    <button
-                      key={i.key}
-                      type="button"
-                      title={i.label}
-                      onClick={() => {
-                        setIcon(i.key);
-                        setIconOpen(false);
-                      }}
-                      className={`flex h-8 w-8 items-center justify-center rounded ${
-                        icon === i.key
-                          ? "bg-podio-row-hover ring-1 ring-podio-teal"
-                          : "hover:bg-podio-row-alt"
-                      }`}
-                    >
-                      <PodioIcon
-                        icon={i.key}
-                        className="h-5 w-5 text-podio-secondary"
-                      />
-                    </button>
-                  ))}
+                <div className="mt-2">
+                  <IconPicker value={icon} onChange={setIcon} />
                 </div>
               )}
             </div>
@@ -222,7 +207,7 @@ export function CreateAppModal({
         </div>
 
         {/* Footer: grey Cancel + teal Create App, touching */}
-        <div className="flex justify-end border-t border-podio-border px-6 py-4">
+        <div className="flex shrink-0 justify-end border-t border-podio-border px-6 py-4">
           <button
             onClick={onClose}
             className="rounded-sm bg-podio-row-hover px-6 py-2.5 font-semibold text-podio-ink hover:bg-[#E0E0E0]"

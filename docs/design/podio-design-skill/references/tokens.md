@@ -85,12 +85,17 @@ round caps and joins — colored by the text color of their context (usually
 
 Two tiers share the same `PATHS` map:
 
-- **App icons** (offered in the app-icon picker via `PODIO_ICONS`): `brick`,
-  `task`, `rocket`, `meeting`, `tray`, `idea`, `link`, `contact`, `event`,
-  `doc`, `chart`, `gear`, `phone`, `mail`, `map`, `cart`. The default app
-  icon is the brick; `task` is a rounded square with a check overlapping its
-  top-right corner; `idea` is Podio's studded 3D box; `tray` is a wide open
-  tray with a concave dip in its top edge.
+- **App icons** (offered in the app-icon picker via `PODIO_ICONS`, ~46 keys):
+  the original core set — `brick`, `task`, `rocket`, `meeting`, `tray`,
+  `idea`, `link`, `contact`, `event`, `doc`, `chart`, `gear`, `phone`,
+  `mail`, `map`, `cart` — plus the expansion set: `camera`, `star`, `heart`,
+  `flag`, `key`, `trophy`, `truck`, `globe`, `folder`, `book`, `clock`,
+  `target`, `home`, `plane`, `wallet`, `tag`, `gift`, `pin`, `shield`,
+  `leaf`, `printer`, `coffee`, `music`, `image`, `bug`, `scale`, `grad-cap`,
+  `stethoscope`, `hammer`, `bolt`. The default app icon is the brick; `task`
+  is a rounded square with a check overlapping its top-right corner; `idea`
+  is Podio's studded 3D box; `tray` is a wide open tray with a concave dip
+  in its top edge.
 - **UI-chrome icons** — same style and map, but **not offered in the
   app-icon picker** (not listed in `PODIO_ICONS`): `activity`, `add`,
   `people`, `calendar`, `check-square`, `search`, `bell`, `chat`, `help`,
@@ -101,6 +106,13 @@ Two tiers share the same `PATHS` map:
 `PodioIcon` falls back to rendering legacy emoji strings as text. When adding
 new UI, never introduce colorful emoji for app/tool iconography — extend the
 `PATHS` map (and `PODIO_ICONS` only if the icon should be pickable for apps).
+
+**Choosing an app icon**: use the `IconPicker` component
+(`src/components/icon-picker.tsx`) — a searchable inline grid (filter input +
+scrollable `grid-cols-8` of icon buttons) rendered in normal flow below a
+square icon-preview button that toggles it. It is the standard picker for app
+icons everywhere (Create New App modal, app builder); picking keeps the panel
+open for browsing.
 
 ## Spacing & shape
 

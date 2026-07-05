@@ -9,6 +9,7 @@ import { CalendarView } from "./calendar-view";
 import { ViewToolbar, type Filter, type Sort, type LayoutToggle } from "./view-toolbar";
 import { ExportButton } from "./export-button";
 import { SaveTemplateButton } from "./save-template-button";
+import { AppToolsMenu } from "./app-tools-menu";
 
 export default async function AppPage({
   params,
@@ -94,6 +95,14 @@ export default async function AppPage({
   });
   const items: any[] = queryResult?.items ?? [];
   const totalItems: number = queryResult?.total ?? 0;
+
+  // Unfiltered total for the Podio "X of Y" toolbar count (head-only, cheap)
+  const { count: unfilteredCount } = await supabase
+    .from("items")
+    .select("*", { count: "exact", head: true })
+    .eq("app_id", app.id)
+    .eq("is_deleted", false);
+  const totalCount = unfilteredCount ?? totalItems;
 
   const itemIds = (items ?? []).map((i) => i.id);
   const { data: values } = itemIds.length
@@ -296,8 +305,10 @@ export default async function AppPage({
     full_name: m.user_profiles?.full_name ?? null,
   }));
 
-  // Layout toggles for the view toolbar (active one renders as the orange pill)
+  // Layout toggles for the view toolbar (active one renders as the orange
+  // pill). Podio order: Dig | Sheet | Board | Calendar | Stream.
   const layoutToggles: LayoutToggle[] = [
+    { key: "badge", label: "Dig", href: `${baseHref}?view=badge` },
     { key: "table", label: "Sheet", href: baseHref },
     categoryField
       ? { key: "board", label: "Board", href: `${baseHref}?view=board` }
@@ -305,14 +316,8 @@ export default async function AppPage({
     dateField
       ? { key: "calendar", label: "Calendar", href: `${baseHref}?view=calendar` }
       : { key: "calendar", label: "Calendar", disabledTitle: "Add a Date field to use the calendar" },
-    { key: "badge", label: "Badge", href: `${baseHref}?view=badge` },
     { key: "stream", label: "Stream", href: `${baseHref}?view=stream` },
   ];
-
-  const countLabel =
-    visibleItems.length === totalItems
-      ? `${totalItems.toLocaleString()} ${app.item_name.toLowerCase()}${totalItems === 1 ? "" : "s"}`
-      : `${visibleItems.length.toLocaleString()} of ${totalItems.toLocaleString()}`;
 
   return (
     <main>
@@ -326,32 +331,42 @@ export default async function AppPage({
       <div className="flex flex-col lg:flex-row lg:items-stretch">
         {/* Left views pane */}
         <aside className="w-full shrink-0 border-b border-podio-border bg-white p-4 lg:w-72 lg:border-b-0 lg:border-r">
-          <h1 className="flex items-center gap-2 text-xl font-semibold text-podio-teal">
-            <PodioIcon icon={app.icon} name={app.name} className="h-6 w-6 shrink-0" />
-            <span className="min-w-0 truncate">{app.name}</span>
-          </h1>
+          {/* App title + compact utility icon row (share, bell, wrench, expand) */}
+          <div className="flex items-center gap-2">
+            <h1 className="flex min-w-0 items-center gap-2 text-xl font-semibold text-podio-teal">
+              <PodioIcon icon={app.icon} name={app.name} className="h-6 w-6 shrink-0" />
+              <span className="min-w-0 truncate">{app.name}</span>
+            </h1>
+            <span className="ml-auto flex shrink-0 items-center gap-2.5">
+              <Link
+                href={`${baseHref}/form`}
+                title="Webform"
+                className="text-podio-meta hover:text-podio-teal"
+              >
+                <PodioIcon icon="share-out" className="h-5 w-5" />
+              </Link>
+              <span title="Notifications" className="text-podio-meta">
+                <PodioIcon icon="bell" className="h-5 w-5" />
+              </span>
+              <AppToolsMenu
+                links={[
+                  { label: "Edit app", href: `${baseHref}/edit`, icon: "pencil" },
+                  { label: "Import", href: `${baseHref}/import`, icon: "tray" },
+                  { label: "Webform", href: `${baseHref}/form`, icon: "doc" },
+                  { label: "Automations", href: `${baseHref}/automations`, icon: "bolt" },
+                ]}
+              >
+                <ExportButton appId={app.id} appName={app.name} fields={fields as any} />
+                <SaveTemplateButton appId={app.id} appName={app.name} />
+              </AppToolsMenu>
+              <span title="Expand" className="text-podio-meta">
+                <PodioIcon icon="expand" className="h-5 w-5" />
+              </span>
+            </span>
+          </div>
           {app.description && (
             <p className="mt-2 text-sm text-podio-secondary">{app.description}</p>
           )}
-
-          <div className="mt-4 flex flex-wrap gap-x-4 gap-y-1 text-sm">
-            <Link href={`${baseHref}/edit`} className="text-podio-teal hover:underline">
-              Edit app
-            </Link>
-            <Link href={`${baseHref}/import`} className="text-podio-teal hover:underline">
-              Import
-            </Link>
-            <Link href={`${baseHref}/form`} className="text-podio-teal hover:underline">
-              Webform
-            </Link>
-            <Link href={`${baseHref}/automations`} className="text-podio-teal hover:underline">
-              Automations
-            </Link>
-          </div>
-          <div className="mt-3 flex flex-wrap items-center gap-2">
-            <ExportButton appId={app.id} appName={app.name} fields={fields as any} />
-            <SaveTemplateButton appId={app.id} appName={app.name} />
-          </div>
 
           <h2 className="mt-5 text-lg font-semibold text-podio-ink">Views</h2>
           <ul className="mt-2 space-y-0.5 text-[15px]">
@@ -363,7 +378,7 @@ export default async function AppPage({
                 }`}
               >
                 All {app.item_name.toLowerCase()}s
-                <span className="ml-auto text-podio-ink">{totalItems.toLocaleString()}</span>
+                <span className="ml-auto text-podio-ink">{totalCount.toLocaleString()}</span>
               </Link>
             </li>
             {(savedViews ?? []).map((v) => (
@@ -378,7 +393,7 @@ export default async function AppPage({
                 >
                   <span className="truncate">{v.name}</span>
                   {v.visibility === "private" && (
-                    <span className="ml-auto text-xs text-podio-meta">🔒</span>
+                    <PodioIcon icon="lock" className="ml-auto h-4 w-4 shrink-0 text-podio-meta" />
                   )}
                 </Link>
               </li>
@@ -395,7 +410,8 @@ export default async function AppPage({
         layouts={layoutToggles}
         newHref={`${baseHref}/new`}
         itemName={app.item_name.toLowerCase()}
-        countLabel={countLabel}
+        filteredCount={totalItems}
+        totalCount={totalCount}
         fields={fields as any}
         tableFields={fields.map((f) => ({ id: f.id, label: f.label }))}
         initialCols={colsList}

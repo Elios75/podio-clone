@@ -4,6 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { PodioIcon } from "@/components/podio-icon";
 import type { CategoryOption, FieldType } from "@/lib/fields";
 
 type Field = {
@@ -68,7 +69,8 @@ export function ViewToolbar({
   layouts,
   newHref,
   itemName,
-  countLabel,
+  filteredCount,
+  totalCount,
   fields,
   members,
   activeViewId,
@@ -83,7 +85,8 @@ export function ViewToolbar({
   layouts: LayoutToggle[];
   newHref: string;
   itemName: string;
-  countLabel: string;
+  filteredCount: number;
+  totalCount: number;
   fields: Field[];
   members: Member[];
   activeViewId: string | null;
@@ -234,20 +237,28 @@ export function ViewToolbar({
     <div className="mt-1">
       {/* Main toolbar row */}
       <div className="flex flex-wrap items-center gap-3 py-2 text-[15px]">
+        {/* Quiet layout/sort affordances (visual parity with Podio) */}
+        <span className="text-podio-secondary" aria-hidden>
+          <PodioIcon icon="grid" className="h-5 w-5" />
+        </span>
+        <span className="text-podio-secondary" aria-hidden>
+          <PodioIcon icon="sort" className="h-5 w-5" />
+        </span>
         <button
           onClick={() => setPanelOpen(!panelOpen)}
           className="flex items-center gap-1.5 text-podio-secondary hover:text-podio-ink"
           title="Filter & sort"
         >
-          <span aria-hidden>⏳</span>
-          Filters
           {activeFilterCount > 0 && (
             <span className="rounded-full bg-[#4E5E5E] px-1.5 text-xs font-semibold text-white">
               {activeFilterCount}
             </span>
           )}
+          <PodioIcon icon="funnel" className="h-5 w-5" />
         </button>
-        <span className="text-podio-secondary">{countLabel}</span>
+        <span className="text-podio-secondary">
+          {filteredCount.toLocaleString()} of {totalCount.toLocaleString()}
+        </span>
         {activeFilterCount > 0 && (
           <button onClick={showAll} className="text-podio-teal hover:underline">
             Show all

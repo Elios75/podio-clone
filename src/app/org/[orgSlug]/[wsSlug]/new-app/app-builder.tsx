@@ -4,6 +4,8 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { slugify } from "@/lib/slug";
+import { PodioIcon } from "@/components/podio-icon";
+import { IconPicker } from "@/components/icon-picker";
 import {
   FIELD_TYPES,
   CATEGORY_COLORS,
@@ -122,6 +124,7 @@ export function AppBuilder({
   const supabase = createClient();
   const [name, setName] = useState(initialName);
   const [icon, setIcon] = useState(initialIcon);
+  const [iconOpen, setIconOpen] = useState(false);
   const [itemName, setItemName] = useState(initialItemName);
   const [fields, setFields] = useState<DraftField[]>(() => {
     // Default fields, plus type-specific seeds from the Create New App modal.
@@ -224,12 +227,26 @@ export function AppBuilder({
   return (
     <div className="space-y-4">
       <div className="flex gap-2">
-        <input
-          value={icon}
-          onChange={(e) => setIcon(e.target.value)}
-          className="w-16 rounded-lg border border-slate-300 px-3 py-2 text-center text-sm"
-          title="Icon (emoji)"
-        />
+        {/* Square icon button + ⌄ toggles the inline picker below. A legacy
+            emoji / unknown key still renders via PodioIcon's fallback; picking
+            replaces it with a proper line-icon key. */}
+        <button
+          type="button"
+          onClick={() => setIconOpen(!iconOpen)}
+          title="App icon"
+          className="flex shrink-0 items-stretch rounded-lg border border-slate-300 bg-white hover:border-podio-teal"
+        >
+          <span className="flex w-10 items-center justify-center">
+            <PodioIcon
+              icon={icon}
+              name={name}
+              className="h-5 w-5 text-podio-secondary"
+            />
+          </span>
+          <span className="flex w-6 items-center justify-center rounded-r-lg border-l border-slate-300 bg-podio-row-alt text-podio-secondary">
+            ⌄
+          </span>
+        </button>
         <input
           required
           placeholder="App name (e.g. Leads, Projects, Tickets)"
@@ -244,6 +261,8 @@ export function AppBuilder({
           className="w-40 rounded-lg border border-slate-300 px-3 py-2 text-sm"
         />
       </div>
+
+      {iconOpen && <IconPicker value={icon} onChange={setIcon} />}
 
       <div className="space-y-2">
         {fields.map((f, i) => (

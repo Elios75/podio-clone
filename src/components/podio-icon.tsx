@@ -25,6 +25,36 @@ export const PODIO_ICONS: { key: string; label: string }[] = [
   { key: "mail", label: "Email" },
   { key: "map", label: "Locations" },
   { key: "cart", label: "Orders" },
+  { key: "camera", label: "Photos" },
+  { key: "star", label: "Reviews" },
+  { key: "heart", label: "Favorites" },
+  { key: "flag", label: "Milestones" },
+  { key: "key", label: "Access" },
+  { key: "trophy", label: "Achievements" },
+  { key: "truck", label: "Deliveries" },
+  { key: "globe", label: "Websites" },
+  { key: "folder", label: "Folders" },
+  { key: "book", label: "Knowledge" },
+  { key: "clock", label: "Time tracking" },
+  { key: "target", label: "Goals" },
+  { key: "home", label: "Properties" },
+  { key: "plane", label: "Travel" },
+  { key: "wallet", label: "Finance" },
+  { key: "tag", label: "Tags" },
+  { key: "gift", label: "Perks" },
+  { key: "pin", label: "Places" },
+  { key: "shield", label: "Security" },
+  { key: "leaf", label: "Environment" },
+  { key: "printer", label: "Printing" },
+  { key: "coffee", label: "Coffee" },
+  { key: "music", label: "Music" },
+  { key: "image", label: "Media" },
+  { key: "bug", label: "Bugs" },
+  { key: "scale", label: "Legal" },
+  { key: "grad-cap", label: "Education" },
+  { key: "stethoscope", label: "Health" },
+  { key: "hammer", label: "Construction" },
+  { key: "bolt", label: "Energy" },
 ];
 
 // Each icon is a few simple elements on a 24x24 grid, drawn for a 1.7px
@@ -154,6 +184,208 @@ const PATHS: Record<string, ReactNode> = {
       <circle cx="16.5" cy="19.5" r="1.4" />
       <path d="M3.5 4.5H6l2.2 10h9.6l2.2-7H7" />
     </>
+  ),
+  camera: (
+    <>
+      <path d="M3.5 8.5A1.5 1.5 0 0 1 5 7h2.6l1.5-2.5h5.8L16.4 7H19a1.5 1.5 0 0 1 1.5 1.5V18a1.5 1.5 0 0 1-1.5 1.5H5A1.5 1.5 0 0 1 3.5 18V8.5z" />
+      <circle cx="12" cy="13" r="3.4" />
+    </>
+  ),
+  star: (
+    <path d="m12 3.5 2.5 5.2 5.7.7-4.2 3.9 1.1 5.7-5.1-2.8-5.1 2.8 1.1-5.7-4.2-3.9 5.7-.7L12 3.5z" />
+  ),
+  heart: (
+    <path d="M12 20.5s-8.3-4.9-8.3-10.7a4.4 4.4 0 0 1 8.3-2 4.4 4.4 0 0 1 8.3 2c0 5.8-8.3 10.7-8.3 10.7z" />
+  ),
+  // Wavy banner on a pole.
+  flag: (
+    <>
+      <path d="M5.5 21V3.5" />
+      <path d="M5.5 4.8c2.3-1.3 4.7-1.3 7 0s4.7 1.3 7 0v9.5c-2.3 1.3-4.7 1.3-7 0s-4.7-1.3-7 0" />
+    </>
+  ),
+  key: (
+    <>
+      <circle cx="7.5" cy="16.5" r="4" />
+      <path d="m10.3 13.7 9.2-9.2" />
+      <path d="m16.5 7.5 3 3M13.8 10.2l2.2 2.2" />
+    </>
+  ),
+  trophy: (
+    <>
+      <path d="M8 3.5h8V10a4 4 0 0 1-8 0V3.5z" />
+      <path d="M8 5H4.5v1a3.5 3.5 0 0 0 3.5 3.5M16 5h3.5v1a3.5 3.5 0 0 1-3.5 3.5" />
+      <path d="M12 14v4" />
+      <path d="M8.5 20.5h7" />
+    </>
+  ),
+  truck: (
+    <>
+      <path d="M2.5 6.5h12V16h-12z" />
+      <path d="M14.5 10h3.6l3.4 3.4V16h-7" />
+      <circle cx="7" cy="17.8" r="1.8" />
+      <circle cx="17.3" cy="17.8" r="1.8" />
+    </>
+  ),
+  globe: (
+    <>
+      <circle cx="12" cy="12" r="8.5" />
+      <path d="M3.5 12h17" />
+      <ellipse cx="12" cy="12" rx="4" ry="8.5" />
+    </>
+  ),
+  folder: (
+    <path d="M3.5 6a1.5 1.5 0 0 1 1.5-1.5h4.3L11.5 7H19A1.5 1.5 0 0 1 20.5 8.5V18a1.5 1.5 0 0 1-1.5 1.5H5A1.5 1.5 0 0 1 3.5 18V6z" />
+  ),
+  // Open book with a center crease.
+  book: (
+    <>
+      <path d="M12 6.5C10.2 5 7.5 4.5 4 5v13.5c3.5-.5 6.2 0 8 1.5 1.8-1.5 4.5-2 8-1.5V5c-3.5-.5-6.2 0-8 1.5z" />
+      <path d="M12 6.5V20" />
+    </>
+  ),
+  clock: (
+    <>
+      <circle cx="12" cy="12" r="8.5" />
+      <path d="M12 7v5l3.5 2" />
+    </>
+  ),
+  // Bullseye.
+  target: (
+    <>
+      <circle cx="12" cy="12" r="8.5" />
+      <circle cx="12" cy="12" r="5" />
+      <circle cx="12" cy="12" r="1.5" />
+    </>
+  ),
+  home: (
+    <>
+      <path d="M4 10.5 12 3.5l8 7" />
+      <path d="M5.5 9.5V20h13V9.5" />
+      <path d="M10 20v-5.5h4V20" />
+    </>
+  ),
+  // Paper plane.
+  plane: (
+    <>
+      <path d="M21 3.5 10.5 14" />
+      <path d="M21 3.5 14.3 20.5l-3.8-6.5-6.5-3.8L21 3.5z" />
+    </>
+  ),
+  // Billfold with a clasp dot.
+  wallet: (
+    <>
+      <path d="M18.5 8V6.5A1.5 1.5 0 0 0 17 5H5.5a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h13a2 2 0 0 0 2-2v-7a2 2 0 0 0-2-2h-13" />
+      <path d="M16.5 13.5v.01" />
+    </>
+  ),
+  tag: (
+    <>
+      <path d="M3.5 3.5H11l9.5 9.5a1.5 1.5 0 0 1 0 2.1L15.1 20.5a1.5 1.5 0 0 1-2.1 0L3.5 11V3.5z" />
+      <circle cx="8" cy="8" r="1.3" />
+    </>
+  ),
+  // Wrapped box with a ribbon bow.
+  gift: (
+    <>
+      <path d="M4.5 11.5h15v8a1 1 0 0 1-1 1h-13a1 1 0 0 1-1-1v-8z" />
+      <path d="M3.5 7.5h17v4h-17z" />
+      <path d="M12 7.5v13" />
+      <path d="M12 7.5c-4 0-5-1.5-4.2-3 .8-1.4 3.2-.8 4.2 3 1-3.8 3.4-4.4 4.2-3 .8 1.5-.2 3-4.2 3z" />
+    </>
+  ),
+  // Map marker.
+  pin: (
+    <>
+      <path d="M12 21.5s-7-6.6-7-11.5a7 7 0 0 1 14 0c0 4.9-7 11.5-7 11.5z" />
+      <circle cx="12" cy="10" r="2.5" />
+    </>
+  ),
+  shield: (
+    <>
+      <path d="M12 2.5 4.5 5.5v6.2c0 4.7 3.2 7.8 7.5 9.8 4.3-2 7.5-5.1 7.5-9.8V5.5L12 2.5z" />
+      <path d="m9 11.5 2.2 2.2 3.8-4.7" />
+    </>
+  ),
+  // Leaf blade with a stem vein.
+  leaf: (
+    <>
+      <path d="M20 4c.5 9.5-4 16-12.5 16C5.5 14 9.5 6 20 4z" />
+      <path d="M4 20c2.5-6.5 7-11 12-13" />
+    </>
+  ),
+  printer: (
+    <>
+      <path d="M7 8V3.5h10V8" />
+      <rect x="3.5" y="8" width="17" height="8.5" rx="1.5" />
+      <path d="M7 13.5h10v7H7z" />
+    </>
+  ),
+  // Mug with a handle and steam.
+  coffee: (
+    <>
+      <path d="M4.5 9.5h12V16a4 4 0 0 1-4 4h-4a4 4 0 0 1-4-4V9.5z" />
+      <path d="M16.5 10.5H18a2.5 2.5 0 0 1 0 5h-1.5" />
+      <path d="M8 3.5V6M12 3.5V6" />
+    </>
+  ),
+  // Beamed eighth notes.
+  music: (
+    <>
+      <circle cx="7" cy="17.5" r="2.5" />
+      <circle cx="17" cy="15.5" r="2.5" />
+      <path d="M9.5 17.5V6.5l10-2.5v11.5" />
+    </>
+  ),
+  // Picture frame: sun over mountains.
+  image: (
+    <>
+      <rect x="3.5" y="4.5" width="17" height="15" rx="1.5" />
+      <circle cx="9" cy="9.5" r="1.6" />
+      <path d="m4 17 4.5-4.5 3.5 3 4-4.5 4.5 5" />
+    </>
+  ),
+  // Beetle: body, antennae, legs.
+  bug: (
+    <>
+      <path d="M12 20a5 5 0 0 0 5-5v-3a5 5 0 0 0-10 0v3a5 5 0 0 0 5 5z" />
+      <path d="m9.5 7.5-2-2.5M14.5 7.5l2-2.5" />
+      <path d="M7 12H3.5M7 15.5l-2.5 2M17 12h3.5M17 15.5l2.5 2" />
+    </>
+  ),
+  // Scales of justice.
+  scale: (
+    <>
+      <path d="M12 3.5v17M8.5 20.5h7" />
+      <path d="M5.5 6.5h13" />
+      <path d="M2.5 13a3 3 0 0 0 6 0L5.5 6.5 2.5 13zM15.5 13a3 3 0 0 0 6 0l-3-6.5-3 6.5z" />
+    </>
+  ),
+  // Mortarboard with a hanging tassel.
+  "grad-cap": (
+    <>
+      <path d="m2.5 9 9.5-4.5L21.5 9 12 13.5 2.5 9z" />
+      <path d="M6.5 11v4.5c0 1.5 2.5 3 5.5 3s5.5-1.5 5.5-3V11" />
+      <path d="M21.5 9v5" />
+    </>
+  ),
+  stethoscope: (
+    <>
+      <path d="M4.8 3.5H4A1.5 1.5 0 0 0 2.5 5v5a5.5 5.5 0 0 0 11 0V5A1.5 1.5 0 0 0 12 3.5h-.8" />
+      <path d="M8 15.5v1a5 5 0 0 0 10 0v-3" />
+      <circle cx="18" cy="11" r="2.5" />
+    </>
+  ),
+  // Angled head with a rounded handle.
+  hammer: (
+    <>
+      <path d="M9.5 7 13.5 3 21 10.5l-4 4L9.5 7z" />
+      <path d="M14 11.5 7 18.5a1.6 1.6 0 0 1-2.25-2.25l7-7" />
+    </>
+  ),
+  // Lightning strike.
+  bolt: (
+    <path d="m13 2.5-8.5 11h6L9.5 21.5 18 10.5h-6l1-8z" />
   ),
 
   // ---- UI-chrome icons (NOT in PODIO_ICONS / the app-icon picker) --------
@@ -290,6 +522,40 @@ const PATHS: Record<string, ReactNode> = {
       <path d="M12 17v.01" />
     </>
   ),
+  // Filter funnel: wide triangle narrowing to a folded stem.
+  funnel: (
+    <path d="M3.5 5h17l-6.7 7.6v5.9l-3.6-2.2v-3.7L3.5 5z" />
+  ),
+  // Sort: two opposing vertical arrows.
+  sort: (
+    <>
+      <path d="M8 19.5v-15M4.5 8 8 4.5 11.5 8" />
+      <path d="M16 4.5v15M12.5 16l3.5 3.5L19.5 16" />
+    </>
+  ),
+  // 2x2 squares (layout toggle).
+  grid: (
+    <>
+      <rect x="4" y="4" width="7" height="7" rx="1" />
+      <rect x="13" y="4" width="7" height="7" rx="1" />
+      <rect x="4" y="13" width="7" height="7" rx="1" />
+      <rect x="13" y="13" width="7" height="7" rx="1" />
+    </>
+  ),
+  // Expand: two diagonal arrows pointing out.
+  expand: (
+    <>
+      <path d="M14 4.5h5.5V10M19.5 4.5l-6 6" />
+      <path d="M10 19.5H4.5V14M4.5 19.5l6-6" />
+    </>
+  ),
+  // Share out: box with an arrow leaving through the top-right.
+  "share-out": (
+    <>
+      <path d="M19.5 13v5.5a2 2 0 0 1-2 2h-11a2 2 0 0 1-2-2v-11a2 2 0 0 1 2-2H11" />
+      <path d="M15 3.5h5.5V9M20.5 3.5l-9 9" />
+    </>
+  ),
 };
 
 // `chain` is an alias for the existing chain-link glyph.
@@ -339,7 +605,14 @@ const NAME_HINTS: [RegExp, string][] = [
   [/setting|config/i, "gear"],
   [/call|phone/i, "phone"],
   [/mail|email|inbox/i, "mail"],
-  [/municipal|location|city|school|district|site|address|map|region|territor|propert/i, "map"],
+  [/photo|image|media/i, "image"],
+  [/school|class|course|training/i, "grad-cap"],
+  [/health|patient|clinic/i, "stethoscope"],
+  [/delivery|shipping|fleet/i, "truck"],
+  [/legal|contract/i, "scale"],
+  [/goal|okr/i, "target"],
+  [/time|hour/i, "clock"],
+  [/municipal|location|city|district|site|address|map|region|territor|propert/i, "map"],
   [/order|cart|deal|sale|purchase|invoice|expense|budget|payment|quote/i, "cart"],
   [/file|librar|document|doc|proof|import|record|archive|asset/i, "doc"],
 ];
