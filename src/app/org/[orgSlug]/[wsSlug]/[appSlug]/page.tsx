@@ -406,7 +406,9 @@ export default async function AppPage({
         activeAppSlug={app.slug}
       />
 
-      <div className="flex flex-col lg:flex-row lg:items-stretch">
+      {/* One continuous white surface below the tab bar: views pane + main
+          column share the same top edge, flush under the active tab card. */}
+      <div className="flex min-h-[calc(100vh-8.5rem)] flex-col bg-white lg:flex-row lg:items-stretch">
         {/* Left views pane (client: collapse, tabs, + Add form) */}
         <ViewsPane
           appId={app.id}
@@ -453,8 +455,10 @@ export default async function AppPage({
           }
         />
 
-        {/* Main view area */}
-        <section className="min-w-0 flex-1 px-4 pb-8 pt-3 lg:px-6">
+        {/* Main view area: toolbar row level with the pane's title row, then
+            a hairline under it (inside ViewToolbar) and the view content on
+            the shared white surface. */}
+        <section className="flex min-w-0 flex-1 flex-col bg-white">
       <ViewToolbar
         baseHref={baseHref}
         layout={view}
@@ -472,8 +476,9 @@ export default async function AppPage({
         initialSort={sort}
       />
 
+      <div className="px-4 pb-8 pt-4 lg:px-6">
       {view === "board" && categoryField && (
-        <div className="mt-4">
+        <div>
           <BoardView
             fieldId={categoryField.id}
             options={(categoryField.config?.options ?? []) as CategoryOption[]}
@@ -484,7 +489,7 @@ export default async function AppPage({
       )}
 
       {view === "calendar" && dateField && (
-        <div className="mt-4">
+        <div>
           <CalendarView
             monthStr={monthStr}
             cardsByDay={cardsByDay}
@@ -495,7 +500,7 @@ export default async function AppPage({
       )}
 
       {view === "badge" && (
-        <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {visibleItems.map((item) => (
             <Link key={item.id}
               href={`${baseHref}/${item.item_number}`}
@@ -530,7 +535,7 @@ export default async function AppPage({
       )}
 
       {view === "stream" && (
-        <ul className="mt-4 space-y-2">
+        <ul className="space-y-2">
           {[...visibleItems]
             .sort((a, b) => (a.updated_at < b.updated_at ? 1 : -1))
             .map((item) => (
@@ -562,7 +567,9 @@ export default async function AppPage({
       )}
 
       {view === "table" && (
-      <div className="mt-4 overflow-x-auto rounded border border-podio-border bg-white shadow-sm">
+      // Sheet sits directly on the white surface (no floating card wrapper);
+      // the table keeps its own header background and row hairlines.
+      <div className="overflow-x-auto">
         <table className="w-full text-left text-[15px]">
           <thead className="bg-podio-row-alt font-semibold text-podio-ink">
             <tr>
@@ -608,6 +615,7 @@ export default async function AppPage({
         </table>
       </div>
       )}
+      </div>
         </section>
       </div>
     </main>

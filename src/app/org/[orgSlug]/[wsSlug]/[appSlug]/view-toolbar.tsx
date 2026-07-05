@@ -199,7 +199,10 @@ export function ViewToolbar({
   }
 
   return (
-    <div>
+    // Full-width band at the top of the main column: py-3 gives the toolbar
+    // row the same top offset as the views pane's title row (pane pt-3), and
+    // the border-b hairline runs edge to edge under it.
+    <div className="border-b border-podio-border px-4 py-3 lg:px-6">
       {/* Main toolbar row — min-h-10 matches the views pane's app title row
           so both top rows sit at the same height. */}
       <div className="flex min-h-10 flex-wrap items-center gap-3 text-[15px]">
