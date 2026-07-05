@@ -413,6 +413,19 @@ Footer bottom-right: touching grey **Cancel** + solid teal
 **Save `<ItemName>`** (rounded-sm). The same label-left form grammar applies
 when editing an item.
 
+**Record view (existing-item variant).** An open record reuses the same
+header bar, with two changes: the teal chip stays "New `<ItemName>`" but is
+now a quick-create **link** to the app's /new route, and the breadcrumb ends
+with the **item title** (ink, truncated). Far right of the bar a new cluster:
+🔔 **Following `<n>`** (bell icon; a working follow/unfollow toggle, count =
+item followers) and **Share** (share-out icon; anchors to the share panel,
+`#share`). Body stays grey, two columns: left (~2/3) stacks white panels —
+title + edit-mode label-left form, then tasks, attachments, email, related
+items, and the share panel; right rail (~1/3) is one white panel with
+**Activity | Comments** underline tabs (teal underline on the active tab;
+default = Comments when comments exist, else Activity). Comments keep
+Podio's composer at the bottom of the tab.
+
 ## 13. Chat panel
 
 Reference: the two chat screenshots. Chat opens from the 💬 icon at the far

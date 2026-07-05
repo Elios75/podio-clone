@@ -1,5 +1,7 @@
+import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { PodioIcon } from "@/components/podio-icon";
 import { ItemForm } from "../item-form";
 import { CommentsSection } from "./comments-section";
 import { TasksSection } from "./tasks-section";
@@ -7,6 +9,8 @@ import { AttachLink } from "./attach-link";
 import { FilePickers } from "./file-pickers";
 import { ShareSection } from "./share-section";
 import { SendEmail } from "./send-email";
+import { RecordRail } from "./record-rail";
+import { FollowToggleHeader } from "./follow-toggle-header";
 
 export default async function ItemDetailPage({
   params,
@@ -29,7 +33,7 @@ export default async function ItemDetailPage({
     .from("organizations").select("id, slug").eq("slug", orgSlug).single();
   if (!org) notFound();
   const { data: ws } = await supabase
-    .from("workspaces").select("id, slug")
+    .from("workspaces").select("id, name, slug")
     .eq("organization_id", org.id).eq("slug", wsSlug).single();
   if (!ws) notFound();
   const { data: app } = await supabase
@@ -120,6 +124,11 @@ export default async function ItemDetailPage({
     .eq("item_id", item.id)
     .eq("user_id", user.id)
     .maybeSingle();
+
+  const { count: followerCount } = await supabase
+    .from("item_followers")
+    .select("*", { count: "exact", head: true })
+    .eq("item_id", item.id);
 
   // Attachments on comments
   const commentIds = (commentRows ?? []).map((c) => c.id);
@@ -223,121 +232,207 @@ export default async function ItemDetailPage({
     : { data: [] as any[] };
   const assigneeName = new Map((assigneeProfiles ?? []).map((p) => [p.user_id, p.full_name]));
 
+  const base = `/org/${orgSlug}/${wsSlug}`;
+  const itemTitle = item.title ?? `${app.item_name} #${item.item_number}`;
+
   return (
-    <main className="mx-auto max-w-xl p-8">
-      <div className="rounded border border-podio-border bg-white p-6 shadow-sm">
-      <p className="text-xs text-podio-meta">
-        {app.icon} {app.name} · #{item.item_number}
-      </p>
-      <h1 className="text-xl font-semibold text-podio-ink">
-        {item.title ?? `${app.item_name} #${item.item_number}`}
-      </h1>
-      <p className="mt-1 text-xs text-podio-meta">
-        Created {new Date(item.created_at).toLocaleString()} · Updated{" "}
-        {new Date(item.updated_at).toLocaleString()}
-      </p>
-      <div className="mt-3">
-        <SendEmail
-          itemId={item.id}
-          itemTitle={item.title ?? `${app.item_name} #${item.item_number}`}
-          defaultTo={defaultTo}
-          templates={(emailTemplates ?? []) as any}
-        />
-      </div>
-      <div className="mt-6">
-        <ItemForm
-          appId={app.id}
-          fields={(fields ?? []) as any}
-          members={members}
-          relatedItemsByField={relatedItemsByField}
-          itemId={item.id}
-          initialValues={initialValues}
-          signedUrls={signedUrls}
-          backHref={backHref}
-          itemName={app.item_name}
-        />
-      </div>
+    <main className="min-h-full bg-podio-page">
+      {/* Record header bar (same grammar as the New-Item creation bar) */}
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-2 border-b border-podio-border bg-white px-4 pt-2">
+        {/* Left cluster: quick-create chip + template/actions buttons */}
+        <Link
+          href={`${backHref}/new`}
+          className="self-end rounded-t bg-podio-teal px-4 py-2.5 text-sm font-semibold text-white hover:brightness-105"
+        >
+          New {app.item_name}
+        </Link>
+        <Link
+          href={`${backHref}/edit`}
+          className="mb-2 rounded-sm bg-podio-row-hover px-3 py-1.5 text-sm font-semibold text-podio-ink hover:bg-podio-border"
+        >
+          Modify Template
+        </Link>
+        <button
+          type="button"
+          className="mb-2 px-1 py-1.5 text-sm text-podio-secondary hover:text-podio-ink"
+        >
+          Actions ⌄
+        </button>
+
+        {/* Center: breadcrumb */}
+        <nav className="mx-auto mb-2 hidden items-center gap-1.5 text-sm md:flex">
+          <Link href={base} className="text-podio-teal hover:underline">
+            {ws.name}
+          </Link>
+          <span className="text-podio-meta">›</span>
+          <Link
+            href={backHref}
+            className="flex items-center gap-1.5 text-podio-teal hover:underline"
+          >
+            <PodioIcon icon={app.icon} name={app.name} className="h-5 w-5" />
+            {app.name}
+          </Link>
+          <span className="text-podio-meta">›</span>
+          <span className="max-w-56 truncate text-podio-ink">{itemTitle}</span>
+        </nav>
+
+        {/* Right cluster: follow toggle + share anchor */}
+        <div className="mb-2 flex items-center gap-3">
+          <FollowToggleHeader
+            itemId={item.id}
+            currentUserId={user.id}
+            isFollowing={!!followRow}
+            followerCount={followerCount ?? 0}
+          />
+          <a
+            href="#share"
+            className="flex items-center gap-1.5 px-1 py-1.5 text-sm text-podio-secondary hover:text-podio-ink"
+          >
+            <PodioIcon icon="share-out" className="h-5 w-5" />
+            Share
+          </a>
+        </div>
       </div>
 
-      {((outgoingRels ?? []).length > 0 || (incomingRels ?? []).length > 0) && (
-        <section className="mt-6 rounded border border-podio-border bg-white p-4 shadow-sm">
-          <h2 className="text-lg font-semibold text-podio-ink">Related items</h2>
-          <ul className="mt-3 space-y-2">
-            {(outgoingRels ?? []).map((r: any) =>
-              r.target ? (
-                <li key={r.id}
-                  className="flex items-center gap-2 rounded border border-podio-border bg-podio-row-alt px-3 py-2 text-sm">
-                  <span className="text-xs text-podio-meta">{r.fields?.label} →</span>
-                  <a href={relHref(r.target)} className="font-medium text-podio-teal hover:underline">
-                    {r.target.apps?.icon} {r.target.title ?? `#${r.target.item_number}`}
-                  </a>
-                  <span className="ml-auto text-xs text-podio-meta">{r.target.apps?.name}</span>
-                </li>
-              ) : null
-            )}
-            {(incomingRels ?? []).map((r: any) =>
-              r.source ? (
-                <li key={r.id}
-                  className="flex items-center gap-2 rounded border border-podio-border bg-podio-row-alt px-3 py-2 text-sm">
-                  <span className="text-xs text-podio-meta">← via {r.fields?.label}</span>
-                  <a href={relHref(r.source)} className="font-medium text-podio-teal hover:underline">
-                    {r.source.apps?.icon} {r.source.title ?? `#${r.source.item_number}`}
-                  </a>
-                  <span className="ml-auto text-xs text-podio-meta">{r.source.apps?.name}</span>
-                </li>
-              ) : null
-            )}
-          </ul>
-        </section>
-      )}
+      {/* Two-column body: record panels + Activity/Comments rail */}
+      <div className="flex flex-col items-stretch gap-6 p-4 lg:flex-row lg:items-start lg:p-6">
+        <div className="min-w-0 flex-1 space-y-6">
+          <section className="rounded border border-podio-border bg-white p-6 shadow-sm">
+            <h1 className="text-xl font-semibold text-podio-ink">{itemTitle}</h1>
+            <p className="mt-1 text-xs text-podio-meta">
+              #{item.item_number} · Created {new Date(item.created_at).toLocaleString()} · Updated{" "}
+              {new Date(item.updated_at).toLocaleString()}
+            </p>
+            <div className="mt-6">
+              <ItemForm
+                appId={app.id}
+                fields={(fields ?? []) as any}
+                members={members}
+                relatedItemsByField={relatedItemsByField}
+                itemId={item.id}
+                initialValues={initialValues}
+                signedUrls={signedUrls}
+                backHref={backHref}
+                itemName={app.item_name}
+              />
+            </div>
+          </section>
 
-      <div className="mt-4 flex flex-wrap items-center gap-2">
-        <AttachLink orgId={org.id} wsId={ws.id} itemId={item.id} currentUserId={user.id} />
-        <FilePickers orgId={org.id} wsId={ws.id} itemId={item.id} currentUserId={user.id} />
-      </div>
+          <section className="rounded border border-podio-border bg-white p-4 shadow-sm">
+            <TasksSection
+              itemId={item.id}
+              orgId={org.id}
+              wsId={ws.id}
+              members={members}
+              tasks={(taskRows ?? []).map((t) => ({
+                id: t.id,
+                title: t.title,
+                status: t.status,
+                due_at: t.due_at,
+                assignee_name: t.assignee_id ? assigneeName.get(t.assignee_id) ?? null : null,
+              }))}
+            />
+          </section>
 
-      <div className="mt-6 rounded border border-podio-border bg-white p-4 shadow-sm">
-        <TasksSection
-          itemId={item.id}
-          orgId={org.id}
-          wsId={ws.id}
-          members={members}
-          tasks={(taskRows ?? []).map((t) => ({
-            id: t.id,
-            title: t.title,
-            status: t.status,
-            due_at: t.due_at,
-            assignee_name: t.assignee_id ? assigneeName.get(t.assignee_id) ?? null : null,
-          }))}
-        />
-      </div>
+          <section className="rounded border border-podio-border bg-white p-4 shadow-sm">
+            <div className="flex flex-wrap items-center gap-2">
+              <AttachLink orgId={org.id} wsId={ws.id} itemId={item.id} currentUserId={user.id} />
+              <FilePickers orgId={org.id} wsId={ws.id} itemId={item.id} currentUserId={user.id} />
+            </div>
+          </section>
 
-      <div className="mt-6 rounded border border-podio-border bg-white p-4 shadow-sm">
-      <CommentsSection
-        itemId={item.id}
-        orgId={org.id}
-        wsId={ws.id}
-        currentUserId={user.id}
-        comments={(commentRows ?? []).map((c) => ({
-          ...c,
-          author_name: actorName.get(c.created_by) ?? null,
-        }))}
-        members={members}
-        activity={(activityRows ?? []).map((a) => ({
-          id: a.id,
-          event_type: a.event_type,
-          actor_name: a.actor_id ? actorName.get(a.actor_id) ?? null : null,
-          created_at: a.created_at,
-          payload: a.payload,
-        }))}
-        isFollowing={!!followRow}
-        attachmentsByComment={attachmentsByComment}
-        reactionsByComment={reactionsByComment}
-      />
-      </div>
+          <section className="rounded border border-podio-border bg-white p-4 shadow-sm">
+            <SendEmail
+              itemId={item.id}
+              itemTitle={itemTitle}
+              defaultTo={defaultTo}
+              templates={(emailTemplates ?? []) as any}
+            />
+          </section>
 
-      <div className="mt-6 rounded border border-podio-border bg-white p-4 shadow-sm">
-        <ShareSection itemId={item.id} shares={(shareRows ?? []) as any} />
+          {((outgoingRels ?? []).length > 0 || (incomingRels ?? []).length > 0) && (
+            <section className="rounded border border-podio-border bg-white p-4 shadow-sm">
+              <h2 className="text-lg font-semibold text-podio-ink">Related items</h2>
+              <ul className="mt-3 space-y-2">
+                {(outgoingRels ?? []).map((r: any) =>
+                  r.target ? (
+                    <li key={r.id}
+                      className="flex items-center gap-2 rounded border border-podio-border bg-podio-row-alt px-3 py-2 text-sm">
+                      <span className="text-xs text-podio-meta">{r.fields?.label} →</span>
+                      <a href={relHref(r.target)} className="font-medium text-podio-teal hover:underline">
+                        {r.target.apps?.icon} {r.target.title ?? `#${r.target.item_number}`}
+                      </a>
+                      <span className="ml-auto text-xs text-podio-meta">{r.target.apps?.name}</span>
+                    </li>
+                  ) : null
+                )}
+                {(incomingRels ?? []).map((r: any) =>
+                  r.source ? (
+                    <li key={r.id}
+                      className="flex items-center gap-2 rounded border border-podio-border bg-podio-row-alt px-3 py-2 text-sm">
+                      <span className="text-xs text-podio-meta">← via {r.fields?.label}</span>
+                      <a href={relHref(r.source)} className="font-medium text-podio-teal hover:underline">
+                        {r.source.apps?.icon} {r.source.title ?? `#${r.source.item_number}`}
+                      </a>
+                      <span className="ml-auto text-xs text-podio-meta">{r.source.apps?.name}</span>
+                    </li>
+                  ) : null
+                )}
+              </ul>
+            </section>
+          )}
+
+          <section id="share" className="scroll-mt-4 rounded border border-podio-border bg-white p-4 shadow-sm">
+            <ShareSection itemId={item.id} shares={(shareRows ?? []) as any} />
+          </section>
+        </div>
+
+        {/* Right rail: Activity | Comments tabs */}
+        <aside className="w-full shrink-0 lg:w-[34%] lg:max-w-md">
+          <div className="rounded border border-podio-border bg-white p-4 shadow-sm">
+            <RecordRail
+              defaultTab={(commentRows ?? []).length > 0 ? "comments" : "activity"}
+              activitySlot={
+                <ul className="mt-3 space-y-1.5">
+                  {(activityRows ?? []).map((a) => (
+                    <li key={a.id} className="flex items-center gap-2 text-sm text-slate-500">
+                      <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-slate-300" />
+                      <span className="font-medium text-slate-700">
+                        {(a.actor_id ? actorName.get(a.actor_id) : null) ?? "Someone"}
+                      </span>
+                      <span>
+                        {a.event_type === "item_created" && "created this item"}
+                        {a.event_type === "item_updated" && "updated this item"}
+                        {a.event_type === "comment_added" && "commented"}
+                      </span>
+                      <span className="ml-auto shrink-0 text-xs text-slate-400">
+                        {new Date(a.created_at).toLocaleString()}
+                      </span>
+                    </li>
+                  ))}
+                  {(activityRows ?? []).length === 0 && (
+                    <li className="text-sm text-slate-400">No activity yet.</li>
+                  )}
+                </ul>
+              }
+              commentsSlot={
+                <CommentsSection
+                  itemId={item.id}
+                  orgId={org.id}
+                  wsId={ws.id}
+                  currentUserId={user.id}
+                  comments={(commentRows ?? []).map((c) => ({
+                    ...c,
+                    author_name: actorName.get(c.created_by) ?? null,
+                  }))}
+                  members={members}
+                  attachmentsByComment={attachmentsByComment}
+                  reactionsByComment={reactionsByComment}
+                />
+              }
+            />
+          </div>
+        </aside>
       </div>
     </main>
   );

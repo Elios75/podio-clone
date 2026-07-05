@@ -17,13 +17,6 @@ type Attachment = { id: string; name: string; url: string | null };
 type Reaction = { emoji: string; count: number; mine: boolean };
 
 const EMOJIS = ["👍", "❤️", "🎉"];
-type Activity = {
-  id: string;
-  event_type: string;
-  actor_name: string | null;
-  created_at: string;
-  payload: any;
-};
 
 export function CommentsSection({
   itemId,
@@ -32,8 +25,6 @@ export function CommentsSection({
   currentUserId,
   comments,
   members,
-  activity,
-  isFollowing,
   attachmentsByComment,
   reactionsByComment,
 }: {
@@ -43,8 +34,6 @@ export function CommentsSection({
   currentUserId: string;
   comments: Comment[];
   members: Member[];
-  activity: Activity[];
-  isFollowing: boolean;
   attachmentsByComment: Record<string, Attachment[]>;
   reactionsByComment: Record<string, Reaction[]>;
 }) {
@@ -174,45 +163,15 @@ export function CommentsSection({
     router.refresh();
   }
 
-  async function toggleFollow() {
-    if (isFollowing) {
-      await supabase
-        .from("item_followers")
-        .delete()
-        .eq("item_id", itemId)
-        .eq("user_id", currentUserId);
-    } else {
-      await supabase
-        .from("item_followers")
-        .upsert(
-          { item_id: itemId, user_id: currentUserId },
-          { onConflict: "item_id,user_id" }
-        );
-    }
-    router.refresh();
-  }
-
   const timeFmt = (d: string) => new Date(d).toLocaleString();
 
   return (
-    <div className="mt-10 space-y-8">
+    <div className="mt-3">
       {/* Comments */}
       <section>
-        <div className="flex items-center justify-between">
-          <h2 className="text-lg font-medium">Comments ({comments.length})</h2>
-          <button
-            onClick={toggleFollow}
-            className={`rounded-lg px-3 py-1.5 text-xs font-medium ${
-              isFollowing
-                ? "bg-slate-900 text-white hover:bg-slate-700"
-                : "border border-slate-300 text-slate-600 hover:bg-slate-100"
-            }`}
-          >
-            {isFollowing ? "Following ✓" : "Follow"}
-          </button>
-        </div>
+        <h2 className="sr-only">Comments ({comments.length})</h2>
 
-        <div className="mt-4 space-y-3">
+        <div className="space-y-3">
           {comments.map((c) => (
             <div key={c.id} className="rounded-lg border border-slate-200 bg-white p-3">
               <div className="flex items-center gap-2 text-xs text-slate-400">
@@ -345,32 +304,6 @@ export function CommentsSection({
           </div>
           {error && <p className="mt-1 text-xs text-red-600">{error}</p>}
         </div>
-      </section>
-
-      {/* Activity timeline */}
-      <section>
-        <h2 className="text-lg font-medium">Activity</h2>
-        <ul className="mt-3 space-y-1.5">
-          {activity.map((a) => (
-            <li key={a.id} className="flex items-center gap-2 text-sm text-slate-500">
-              <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-slate-300" />
-              <span className="font-medium text-slate-700">
-                {a.actor_name ?? "Someone"}
-              </span>
-              <span>
-                {a.event_type === "item_created" && "created this item"}
-                {a.event_type === "item_updated" && "updated this item"}
-                {a.event_type === "comment_added" && "commented"}
-              </span>
-              <span className="ml-auto shrink-0 text-xs text-slate-400">
-                {timeFmt(a.created_at)}
-              </span>
-            </li>
-          ))}
-          {activity.length === 0 && (
-            <li className="text-sm text-slate-400">No activity yet.</li>
-          )}
-        </ul>
       </section>
     </div>
   );
