@@ -2,8 +2,10 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { PodioIcon } from "@/components/podio-icon";
-import { CreateWorkspaceForm } from "./create-workspace-form";
+import { WorkspaceDrawer } from "./workspace-drawer";
 
+// Podio chrome: workspaces live behind the ☰ drawer (WorkspaceDrawer), so the
+// page content — including each app's views pane — owns the full width.
 export default async function OrgLayout({
   children,
   params,
@@ -28,22 +30,25 @@ export default async function OrgLayout({
     .eq("is_archived", false)
     .order("name");
 
+  const drawer = (
+    <WorkspaceDrawer
+      orgId={org.id}
+      orgName={org.name}
+      orgSlug={org.slug}
+      workspaces={(workspaces ?? []).map((ws) => ({
+        id: ws.id,
+        name: ws.name,
+        slug: ws.slug,
+        color: ws.color,
+      }))}
+    />
+  );
+
   return (
     <div className="flex min-h-screen flex-col">
       {/* Global top bar (desktop) */}
       <header className="hidden h-14 items-center gap-4 bg-podio-chrome px-4 text-podio-ink md:flex">
-        <Link
-          href="/home"
-          title="All organizations"
-          className="flex items-center gap-3 hover:opacity-80"
-        >
-          <span aria-hidden>
-            <PodioIcon icon="menu" className="h-5 w-5" />
-          </span>
-          <span className="truncate text-lg font-semibold text-podio-ink">
-            {org.name}
-          </span>
-        </Link>
+        {drawer}
         <nav className="ml-6 flex items-center gap-5 text-[#4E5E5E]">
           <Link href="/search" title="Search" className="hover:opacity-80">
             <PodioIcon icon="search" className="h-5 w-5" />
@@ -66,10 +71,9 @@ export default async function OrgLayout({
         </div>
       </header>
 
-      {/* Mobile top bar */}
+      {/* Mobile top bar: same drawer, compact icons */}
       <div className="flex items-center gap-3 bg-podio-chrome px-4 py-3 text-podio-ink md:hidden">
-        <Link href="/home" className="text-xs text-podio-secondary">←</Link>
-        <span className="truncate font-semibold">{org.name}</span>
+        {drawer}
         <span className="ml-auto flex items-center gap-3 text-sm">
           <Link href="/search" title="Search">
             <PodioIcon icon="search" className="h-5 w-5" />
@@ -85,50 +89,9 @@ export default async function OrgLayout({
           </Link>
         </span>
       </div>
-      {/* Mobile workspace strip */}
-      <div className="flex gap-2 overflow-x-auto border-b border-podio-border bg-white px-4 py-2 md:hidden">
-        {(workspaces ?? []).map((ws) => (
-          <Link key={ws.id} href={`/org/${org.slug}/${ws.slug}`}
-            className="shrink-0 rounded-full border border-podio-border px-3 py-1 text-xs text-podio-teal">
-            {ws.name}
-          </Link>
-        ))}
-        <Link href={`/org/${org.slug}`}
-          className="shrink-0 rounded-full border border-podio-border px-3 py-1 text-xs font-medium text-podio-teal">
-          + New
-        </Link>
-      </div>
 
-      <div className="flex flex-1 flex-col md:flex-row">
-        <aside className="hidden w-64 shrink-0 border-r border-podio-border bg-white p-4 md:block">
-          <p className="text-xs font-medium uppercase tracking-wide text-podio-meta">
-            Workspaces
-          </p>
-          <nav className="mt-2 space-y-0.5">
-            {(workspaces ?? []).map((ws) => (
-              <Link
-                key={ws.id}
-                href={`/org/${org.slug}/${ws.slug}`}
-                className="block truncate rounded px-2 py-1.5 text-sm text-podio-teal hover:bg-podio-row-hover"
-              >
-                <span
-                  className="mr-2 inline-block h-2 w-2 rounded-full"
-                  style={{ backgroundColor: ws.color ?? "#8A9494" }}
-                />
-                {ws.name}
-              </Link>
-            ))}
-            {(workspaces ?? []).length === 0 && (
-              <p className="px-2 text-sm text-podio-meta">None yet</p>
-            )}
-          </nav>
-
-          <div className="mt-6">
-            <CreateWorkspaceForm orgId={org.id} orgSlug={org.slug} trigger="sidebar" />
-          </div>
-        </aside>
-        <div className="flex-1">{children}</div>
-      </div>
+      {/* Full-width content: the app's views pane is now the leftmost column */}
+      <div className="flex-1">{children}</div>
     </div>
   );
 }

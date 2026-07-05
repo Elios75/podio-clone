@@ -1,12 +1,13 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { formatDuration, type CategoryOption } from "@/lib/fields";
+import { formatDuration, CATEGORY_COLORS, type CategoryOption } from "@/lib/fields";
 import { PodioIcon } from "@/components/podio-icon";
 import { AppTabBar } from "../app-tab-bar";
 import { BoardView } from "./board-view";
 import { CalendarView } from "./calendar-view";
 import { ViewToolbar, type Filter, type Sort, type LayoutToggle } from "./view-toolbar";
+import { ViewsPane, type PaneView } from "./views-pane";
 import { ExportButton } from "./export-button";
 import { SaveTemplateButton } from "./save-template-button";
 import { AppToolsMenu } from "./app-tools-menu";
@@ -62,7 +63,7 @@ export default async function AppPage({
   // ----- Saved views + filters/sort (needed before querying items) -----
   const { data: savedViews } = await supabase
     .from("app_views")
-    .select("id, name, layout, visibility, filters, sort, is_default, columns")
+    .select("id, name, layout, visibility, filters, sort, is_default, columns, settings")
     .eq("app_id", app.id)
     .order("name");
 
@@ -305,6 +306,83 @@ export default async function AppPage({
     full_name: m.user_profiles?.full_name ?? null,
   }));
 
+  // ----- Views pane data -----
+  // Per-view counts: query_items with p_limit 1 returns the total cheaply.
+  // Capped at the first 15 views (views are few; one RPC each).
+  const viewCounts = new Map<string, number>();
+  await Promise.all(
+    (savedViews ?? []).slice(0, 15).map(async (v) => {
+      const vFilters = ((v.filters as Filter[]) ?? []).filter(
+        (f) => f.field_id && f.op
+      );
+      const { data } = await supabase.rpc("query_items", {
+        p_app: app.id,
+        p_filters: vFilters,
+        p_sort: [],
+        p_limit: 1,
+        p_offset: 0,
+      });
+      viewCounts.set(v.id, data?.total ?? 0);
+    })
+  );
+
+  // Grouped sub-rows: for each distinct category field referenced by a view's
+  // settings.group_field_id, tally items per option (same precedent as the
+  // workspace dashboard tiles: value_text holds the option id).
+  const groupFieldIds = [
+    ...new Set(
+      (savedViews ?? [])
+        .map((v) => (v.settings as { group_field_id?: string } | null)?.group_field_id)
+        .filter((id): id is string => Boolean(id))
+    ),
+  ].filter((id) => fields.some((f) => f.id === id && f.type === "category"));
+  const groupTallies = new Map<string, Map<string, number>>();
+  await Promise.all(
+    groupFieldIds.map(async (fid) => {
+      const { data: groupVals } = await supabase
+        .from("item_field_values")
+        .select("value_text")
+        .eq("field_id", fid)
+        .limit(2000);
+      const tally = new Map<string, number>();
+      for (const r of groupVals ?? []) {
+        if (r.value_text) tally.set(r.value_text, (tally.get(r.value_text) ?? 0) + 1);
+      }
+      groupTallies.set(fid, tally);
+    })
+  );
+
+  const paneViews: PaneView[] = (savedViews ?? []).map((v) => {
+    const gfid =
+      (v.settings as { group_field_id?: string } | null)?.group_field_id ?? null;
+    const groupField = gfid
+      ? fields.find((f) => f.id === gfid && f.type === "category") ?? null
+      : null;
+    const groups = groupField
+      ? ((groupField.config?.options ?? []) as CategoryOption[]).map((o, idx) => ({
+          optionId: o.id,
+          label: o.label,
+          color: o.color || CATEGORY_COLORS[idx % CATEGORY_COLORS.length],
+          count: groupTallies.get(groupField.id)?.get(o.id) ?? 0,
+        }))
+      : null;
+    return {
+      id: v.id,
+      name: v.name,
+      visibility: (v.visibility === "private" ? "private" : "team") as
+        | "team"
+        | "private",
+      count: viewCounts.get(v.id) ?? null,
+      filters: ((v.filters as Filter[]) ?? []).filter((f) => f.field_id && f.op),
+      groupFieldId: groupField?.id ?? null,
+      groups,
+    };
+  });
+
+  const categoryFieldChoices = fields
+    .filter((f) => f.type === "category")
+    .map((f) => ({ id: f.id, label: f.label }));
+
   // Layout toggles for the view toolbar (active one renders as the orange
   // pill). Podio order: Dig | Sheet | Board | Calendar | Stream.
   const layoutToggles: LayoutToggle[] = [
@@ -329,15 +407,24 @@ export default async function AppPage({
       />
 
       <div className="flex flex-col lg:flex-row lg:items-stretch">
-        {/* Left views pane */}
-        <aside className="w-full shrink-0 border-b border-podio-border bg-white p-4 lg:w-72 lg:border-b-0 lg:border-r">
-          {/* App title + compact utility icon row (share, bell, wrench, expand) */}
-          <div className="flex items-center gap-2">
-            <h1 className="flex min-w-0 items-center gap-2 text-xl font-semibold text-podio-teal">
-              <PodioIcon icon={app.icon} name={app.name} className="h-6 w-6 shrink-0" />
-              <span className="min-w-0 truncate">{app.name}</span>
-            </h1>
-            <span className="ml-auto flex shrink-0 items-center gap-2.5">
+        {/* Left views pane (client: collapse, tabs, + Add form) */}
+        <ViewsPane
+          appId={app.id}
+          appName={app.name}
+          appIcon={app.icon}
+          description={app.description}
+          baseHref={baseHref}
+          itemName={app.item_name.toLowerCase()}
+          totalCount={totalCount}
+          views={paneViews}
+          activeViewId={activeView?.id ?? null}
+          categoryFields={categoryFieldChoices}
+          currentLayout={view}
+          currentFilters={filters}
+          currentSort={sort}
+          currentCols={colsList}
+          tools={
+            <>
               <Link
                 href={`${baseHref}/form`}
                 title="Webform"
@@ -362,49 +449,13 @@ export default async function AppPage({
               <span title="Expand" className="text-podio-meta">
                 <PodioIcon icon="expand" className="h-5 w-5" />
               </span>
-            </span>
-          </div>
-          {app.description && (
-            <p className="mt-2 text-sm text-podio-secondary">{app.description}</p>
-          )}
-
-          <h2 className="mt-5 text-lg font-semibold text-podio-ink">Views</h2>
-          <ul className="mt-2 space-y-0.5 text-[15px]">
-            <li>
-              <Link
-                href={baseHref}
-                className={`flex items-center rounded px-2 py-1.5 text-podio-teal ${
-                  !activeView ? "bg-podio-row-hover font-semibold" : "hover:bg-[#F3F3F3]"
-                }`}
-              >
-                All {app.item_name.toLowerCase()}s
-                <span className="ml-auto text-podio-ink">{totalCount.toLocaleString()}</span>
-              </Link>
-            </li>
-            {(savedViews ?? []).map((v) => (
-              <li key={v.id}>
-                <Link
-                  href={`${baseHref}?viewId=${v.id}`}
-                  className={`flex items-center rounded px-2 py-1.5 text-podio-teal ${
-                    activeView?.id === v.id
-                      ? "bg-podio-row-hover font-semibold"
-                      : "hover:bg-[#F3F3F3]"
-                  }`}
-                >
-                  <span className="truncate">{v.name}</span>
-                  {v.visibility === "private" && (
-                    <PodioIcon icon="lock" className="ml-auto h-4 w-4 shrink-0 text-podio-meta" />
-                  )}
-                </Link>
-              </li>
-            ))}
-          </ul>
-        </aside>
+            </>
+          }
+        />
 
         {/* Main view area */}
-        <section className="min-w-0 flex-1 px-4 pb-8 pt-2 lg:px-6">
+        <section className="min-w-0 flex-1 px-4 pb-8 pt-3 lg:px-6">
       <ViewToolbar
-        appId={app.id}
         baseHref={baseHref}
         layout={view}
         layouts={layoutToggles}

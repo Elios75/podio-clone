@@ -9,6 +9,12 @@ Full-width, grey-teal, ~56px tall. Left: hamburger + org name (semibold ink).
 Center-left: small tool icons (contacts, calendar, tasks). Center: brand.
 Right: help, search, avatar, notification bell with a yellow count pill, chat.
 
+**Workspace navigation lives behind the ☰ hamburger** as a left slide-over
+drawer (org name header, workspace rows with color dots, + New workspace,
+Administration, ← All organizations). There is NO persistent workspaces
+sidebar: page content owns the full width, so an app's views pane (§3) is
+the leftmost column on screen, exactly like real Podio.
+
 ```jsx
 <header className="flex h-14 items-center gap-4 bg-[#CBDBDB] px-4 text-[#333333]">
   <button aria-label="Menu">☰</button>
@@ -95,6 +101,27 @@ description in secondary text, then Views.
   </ul>
 </aside>
 ```
+
+Additional pane behaviors (implemented in `views-pane.tsx`):
+
+- **+ Add form** (inline under the Views header): view name input, a
+  Team/Private radio pair, and an optional "Group by" select listing the
+  app's category fields ("— no grouping —" default). It saves the CURRENT
+  filters/sort/columns and layout as the new view; a chosen group field is
+  stored as `settings: { group_field_id }`, which is what drives the
+  colored-dot sub-rows above. Note under the form: "Saves the current
+  filters and sort." View creation lives here, not in the view toolbar
+  (the toolbar keeps delete-view).
+- **Per-view counts**: right-aligned ink number on every view row ("All
+  items" shows the unfiltered total). Computed server-side via one
+  `query_items` call per view with `p_limit: 1` (it returns `total`),
+  capped at the first 15 views. Grouped sub-row counts are app-wide
+  tallies of `item_field_values.value_text` per option id.
+- **Collapse strip**: a thin `‹` button on the pane's right edge collapses
+  the whole pane to a ~28px `w-7` strip with a `›` to reopen (client
+  state, persisted in localStorage). The pane's app-title row and the main
+  column's toolbar row share the same top padding and `min-h-10` so both
+  top rows sit at the same height.
 
 ## 4. View toolbar
 

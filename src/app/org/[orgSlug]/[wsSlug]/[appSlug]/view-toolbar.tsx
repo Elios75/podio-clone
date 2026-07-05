@@ -60,10 +60,10 @@ function opGroup(t: FieldType): keyof typeof OPS {
 // Podio view toolbar: filter cluster + item count on the left; layout toggles
 // (active = orange pill, inactive = plain teal) and the single solid-teal
 // "Add <item>" action on the right. Filter/sort/column editing lives in a
-// collapsible white panel underneath.
+// collapsible white panel underneath. View CREATION lives in the left views
+// pane (views-pane.tsx); this toolbar keeps delete-view management.
 // See docs/design/podio-design-skill/references/layouts.md §4.
 export function ViewToolbar({
-  appId,
   baseHref,
   layout, // "table" | "board" | "calendar" | "badge" | "stream"
   layouts,
@@ -79,7 +79,6 @@ export function ViewToolbar({
   tableFields,
   initialCols,
 }: {
-  appId: string;
   baseHref: string;
   layout: string;
   layouts: LayoutToggle[];
@@ -106,10 +105,6 @@ export function ViewToolbar({
   const [panelOpen, setPanelOpen] = useState(
     initialFilters.length > 0 || initialSort.length > 0
   );
-  const [saveOpen, setSaveOpen] = useState(false);
-  const [viewName, setViewName] = useState("");
-  const [visibility, setVisibility] = useState<"team" | "private">("team");
-  const [makeDefault, setMakeDefault] = useState(false);
   const [colsOpen, setColsOpen] = useState(false);
   const [cols, setCols] = useState<string[] | null>(initialCols);
 
@@ -144,41 +139,11 @@ export function ViewToolbar({
     router.push(layout !== "table" ? `${baseHref}?view=${layout}` : baseHref);
   }
 
-  async function saveView() {
-    setError(null);
-    if (!viewName.trim()) return setError("View name required.");
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-    const { data: view, error: insError } = await supabase
-      .from("app_views")
-      .insert({
-        app_id: appId,
-        name: viewName,
-        layout: layout === "board" ? "card" : layout,
-        visibility,
-        owner_id: user?.id,
-        filters: filters.filter((f) => f.field_id && f.op),
-        sort: sortField ? [{ field_id: sortField, dir: sortDir }] : [],
-        columns: cols,
-      })
-      .select()
-      .single();
-    if (insError) return setError(insError.message);
-    if (makeDefault) {
-      await supabase.from("app_views").update({ is_default: false })
-        .eq("app_id", appId).neq("id", view.id);
-      await supabase.from("app_views").update({ is_default: true })
-        .eq("id", view.id);
-    }
-    setSaveOpen(false);
-    setViewName("");
-    router.push(`${baseHref}?viewId=${view.id}`);
-    router.refresh();
-  }
-
   async function deleteView(id: string) {
-    await supabase.from("app_views").delete().eq("id", id);
+    setError(null);
+    const { error: delError } = await supabase
+      .from("app_views").delete().eq("id", id);
+    if (delError) return setError(delError.message);
     router.push(baseHref);
     router.refresh();
   }
@@ -234,9 +199,10 @@ export function ViewToolbar({
   }
 
   return (
-    <div className="mt-1">
-      {/* Main toolbar row */}
-      <div className="flex flex-wrap items-center gap-3 py-2 text-[15px]">
+    <div>
+      {/* Main toolbar row — min-h-10 matches the views pane's app title row
+          so both top rows sit at the same height. */}
+      <div className="flex min-h-10 flex-wrap items-center gap-3 text-[15px]">
         {/* Quiet layout/sort affordances (visual parity with Podio) */}
         <span className="text-podio-secondary" aria-hidden>
           <PodioIcon icon="grid" className="h-5 w-5" />
@@ -298,7 +264,7 @@ export function ViewToolbar({
       </div>
 
       {panelOpen && (
-        <div className="rounded border border-podio-border bg-white p-3 shadow-sm">
+        <div className="mt-1 rounded border border-podio-border bg-white p-3 shadow-sm">
           {/* Sort row */}
           <div className="flex flex-wrap items-center gap-2">
             <span className="text-xs text-podio-meta">Sort:</span>
@@ -404,31 +370,6 @@ export function ViewToolbar({
               className="rounded bg-podio-teal px-3 py-1 text-xs font-semibold text-white hover:bg-podio-teal-dark">
               Apply
             </button>
-            <button onClick={() => setSaveOpen(!saveOpen)}
-              className="rounded border border-podio-border px-2 py-1 text-xs text-podio-ink hover:bg-podio-row-alt">
-              Save as view…
-            </button>
-            {saveOpen && (
-              <span className="flex items-center gap-2">
-                <input placeholder="View name" value={viewName}
-                  onChange={(e) => setViewName(e.target.value)}
-                  className="rounded border border-podio-border px-2 py-1 text-sm" />
-                <select value={visibility} onChange={(e) => setVisibility(e.target.value as any)}
-                  className="rounded border border-podio-border px-2 py-1 text-sm">
-                  <option value="team">Team view</option>
-                  <option value="private">Private view</option>
-                </select>
-                <label className="flex items-center gap-1 text-xs text-podio-secondary">
-                  <input type="checkbox" checked={makeDefault}
-                    onChange={(e) => setMakeDefault(e.target.checked)} />
-                  default view
-                </label>
-                <button onClick={saveView}
-                  className="rounded bg-podio-teal px-3 py-1 text-xs font-semibold text-white hover:bg-podio-teal-dark">
-                  Save
-                </button>
-              </span>
-            )}
             {error && <span className="text-xs text-red-600">{error}</span>}
           </div>
         </div>
