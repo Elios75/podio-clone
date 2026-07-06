@@ -316,8 +316,22 @@ export function AppEditor({
     );
   }
 
+  // Insertion index from the pointer's Y position: before the first block
+  // whose vertical midpoint the cursor is above, else at the end. This lets
+  // the WHOLE canvas column accept drops (gaps between blocks included) —
+  // dropping only on exact block rectangles feels broken.
+  function indexFromPointer(clientY: number): number {
+    for (let i = 0; i < fields.length; i++) {
+      const el = document.getElementById(`field-block-${fields[i].key}`);
+      if (!el) continue;
+      const r = el.getBoundingClientRect();
+      if (clientY < r.top + r.height / 2) return i;
+    }
+    return fields.length;
+  }
+
   function handleCanvasDrop(e: DragEvent, index: number) {
-    if (!isFieldDrag(e)) return;
+    if (!isFieldDrag(e) || e.defaultPrevented) return;
     e.preventDefault();
     const reorder = e.dataTransfer.getData("application/x-field-reorder");
     const droppedType = e.dataTransfer.getData("application/x-field-type");
@@ -487,7 +501,23 @@ export function AppEditor({
       <div className="flex items-start gap-4 p-4 lg:gap-6 lg:p-6">
         <FieldsPalette onAdd={addField} onDone={done} onDragStateChange={setDragging} />
 
-        <section className="min-w-0 flex-1 space-y-3">
+        <section
+          className="min-w-0 flex-1 space-y-3"
+          // The full column is a drop target: pointer position decides the
+          // insertion index, so drops in the gaps between blocks work too.
+          onDragOver={(e) => {
+            if (!isFieldDrag(e)) return;
+            e.preventDefault();
+            e.dataTransfer.dropEffect = e.dataTransfer.types.includes(
+              "application/x-field-reorder"
+            )
+              ? "move"
+              : "copy";
+            const idx = indexFromPointer(e.clientY);
+            if (overIndex !== idx) setOverIndex(idx);
+          }}
+          onDrop={(e) => handleCanvasDrop(e, indexFromPointer(e.clientY))}
+        >
           {error && (
             <p className="rounded border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
               {error}
@@ -627,7 +657,7 @@ export function AppEditor({
                   if (!e.currentTarget.contains(e.relatedTarget as Node | null))
                     setOverIndex((v) => (v === i ? null : v));
                 }}
-                onDrop={(e) => handleCanvasDrop(e, i)}
+                onDrop={(e) => handleCanvasDrop(e, indexFromPointer(e.clientY))}
                 className={`rounded border bg-white shadow-sm ${
                   dragIndex === i ? "border-podio-teal opacity-60" : "border-podio-border"
                 } ${

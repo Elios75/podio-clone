@@ -7,6 +7,7 @@ import { StatusComposer } from "./status-composer";
 import { AppTabBar } from "./app-tab-bar";
 import { WorkspaceHeader } from "./workspace-header";
 import { FollowToggle } from "./follow-toggle";
+import { PanelBoard } from "./panel-board";
 
 export default async function WorkspacePage({
   params,
@@ -252,10 +253,16 @@ export default async function WorkspacePage({
       />
 
       {/* Podio workspace landing = the Activity stream. Apps appear only in
-          the tab bar above; the body is a two-column feed + right rail. */}
-      <div className="grid grid-cols-1 gap-4 px-4 pt-4 md:px-6 lg:grid-cols-3">
-        {/* ------- Left: workspace card, composer, feed ------- */}
-        <div className="space-y-4 lg:col-span-2">
+          the tab bar above; the body is a two-column feed + right rail whose
+          panels can be dragged to rearrange (order kept in localStorage). */}
+      <PanelBoard
+        wsId={ws.id}
+        panels={[
+          {
+            id: "header",
+            title: "Workspace card",
+            column: "left",
+            node: (
           <WorkspaceHeader
             orgSlug={orgSlug}
             wsSlug={ws.slug}
@@ -271,7 +278,13 @@ export default async function WorkspacePage({
             }))}
             invitable={invitable}
           />
-
+            ),
+          },
+          {
+            id: "feed",
+            title: "Activity feed",
+            column: "left",
+            node: (
           <section className="rounded border border-podio-border bg-white p-4 shadow-sm">
             <StatusComposer wsId={ws.id} orgId={org.id} />
             {(statusRows ?? []).length > 0 && (
@@ -365,10 +378,13 @@ export default async function WorkspacePage({
               )}
             </div>
           </section>
-        </div>
-
-        {/* ------- Right rail: tasks, calendar, dashboard, tools, members ------- */}
-        <div className="space-y-4">
+            ),
+          },
+          {
+            id: "tasks",
+            title: `${ws.name} Tasks`,
+            column: "right",
+            node: (
           <section className="rounded border border-podio-border bg-white shadow-sm">
             <div className="p-4">
               <h2 className="font-semibold text-podio-teal">
@@ -406,7 +422,13 @@ export default async function WorkspacePage({
               + Create task
             </Link>
           </section>
-
+            ),
+          },
+          {
+            id: "calendar",
+            title: `${ws.name} Calendar`,
+            column: "right",
+            node: (
           <section className="rounded border border-podio-border bg-white p-4 shadow-sm">
             <h2 className="font-semibold text-podio-teal">
               {ws.name} Calendar
@@ -432,7 +454,13 @@ export default async function WorkspacePage({
               Open calendar
             </Link>
           </section>
-
+            ),
+          },
+          {
+            id: "dashboard",
+            title: "Dashboard",
+            column: "right",
+            node: (
           <section
             id="dashboard"
             className="rounded border border-podio-border bg-white p-4 shadow-sm"
@@ -442,7 +470,13 @@ export default async function WorkspacePage({
               <DashboardTiles wsId={ws.id} apps={appInfos} tiles={tiles} />
             </div>
           </section>
-
+            ),
+          },
+          {
+            id: "tools",
+            title: "Workspace tools",
+            column: "right",
+            node: (
           <section className="rounded border border-podio-border bg-white p-4 shadow-sm">
             <h2 className="font-semibold text-podio-teal">Workspace tools</h2>
             <ul className="mt-2 space-y-0.5 text-sm">
@@ -478,7 +512,13 @@ export default async function WorkspacePage({
               </li>
             </ul>
           </section>
-
+            ),
+          },
+          {
+            id: "members",
+            title: "Members",
+            column: "right",
+            node: (
           <section className="rounded border border-podio-border bg-white p-4 shadow-sm">
             <h2 className="font-semibold text-podio-teal">Members</h2>
             <ul className="mt-2 space-y-2">
@@ -497,16 +537,19 @@ export default async function WorkspacePage({
               ))}
             </ul>
           </section>
-
-          {/* Add-tile affordance — jumps up to the Dashboard panel */}
+            ),
+          },
+        ]}
+        rightFooter={
+          /* Add-tile affordance — jumps up to the Dashboard panel */
           <a
             href="#dashboard"
             className="flex h-28 w-full items-center justify-center rounded border-2 border-dashed border-podio-border text-sm font-semibold uppercase tracking-wide text-podio-meta hover:border-podio-meta hover:text-podio-secondary"
           >
             + Add tile
           </a>
-        </div>
-      </div>
+        }
+      />
     </main>
   );
 }

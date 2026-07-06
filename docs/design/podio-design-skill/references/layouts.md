@@ -241,6 +241,17 @@ generous padding when empty; uppercase "+ CREATE TASK" footer link), then
 "`<name>` Calendar" panel (upcoming dated entries or "Nothing scheduled"),
 then Dashboard, then a dashed-border "+ ADD TILE" tile (uppercase meta text).
 
+**Movable workspace panels**: every panel on this page (workspace card, feed,
+Tasks, Calendar, Dashboard, tools, Members) can be dragged between and within
+the two columns via a hover-revealed ⋮⋮ grip at the panel's top-right (same
+two-column-dots grip as the template editor). Native HTML5 DnD: teal 2px
+top-border insertion indicator, dashed "Drop panel here" zone at each
+column's bottom while dragging. Order persists per workspace in localStorage
+(`podio.ws-panels.<wsId>`); a small "Reset layout" text link (meta grey,
+hover teal) appears at the bottom of the right rail once a custom layout is
+stored. Default order is always server-rendered; the stored layout is applied
+only after hydration.
+
 ## 8. Wrench admin menu (workspace)
 
 Reference: the wrench-menu screenshot. Clicking 🔧 on the workspace card opens

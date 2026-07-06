@@ -3,17 +3,49 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { PodioIcon } from "@/components/podio-icon";
 
+// One App Market "app entry" (§11): lighter than a card — no border. Line
+// icon + ink semibold name inline, grey truncated description, teal stars,
+// touching teal Get App + grey More info buttons, then a teal category meta
+// link. "More info" expands details: fields/samples, reviews and the rate
+// form, plus the publish/unpublish packaging affordance for org admins.
+// Data logic (install_app_template / review_template /
+// set_template_visibility RPCs) is unchanged.
+
+export type MarketTemplate = {
+  id: string;
+  organization_id: string;
+  name: string;
+  description: string | null;
+  category: string | null;
+  visibility: string;
+  version: number;
+  install_count: number;
+  rating_avg: number | string | null;
+  definition: any;
+};
+
+export type TemplateReview = {
+  id: string;
+  template_id: string;
+  rating: number;
+  review: string | null;
+  created_at: string;
+};
+
+// Teal filled stars, disabled-grey empty (§11: "teal star ratings").
 function Stars({ value, onPick }: { value: number; onPick?: (n: number) => void }) {
   return (
     <span className="inline-flex">
       {[1, 2, 3, 4, 5].map((n) => (
         <button key={n} type="button" disabled={!onPick}
           onClick={() => onPick?.(n)}
+          aria-label={onPick ? `Rate ${n} star${n === 1 ? "" : "s"}` : undefined}
           className={`${onPick ? "cursor-pointer hover:scale-110" : "cursor-default"} px-0.5 text-sm ${
-            n <= value ? "text-amber-400" : "text-slate-300"
+            n <= value ? "text-podio-teal" : "text-podio-disabled"
           }`}>
-          ★
+          {n <= value ? "★" : "☆"}
         </button>
       ))}
     </span>
@@ -21,27 +53,29 @@ function Stars({ value, onPick }: { value: number; onPick?: (n: number) => void 
 }
 
 export function TemplateCard({
-  template, reviews, wsId, orgSlug, wsSlug, isOrgAdmin, isOwnOrg,
+  template, reviews, wsId, orgSlug, wsSlug, isOrgAdmin, isOwnOrg, onPickCategory,
 }: {
-  template: any;
-  reviews: any[];
+  template: MarketTemplate;
+  reviews: TemplateReview[];
   wsId: string;
   orgSlug: string;
   wsSlug: string;
   isOrgAdmin: boolean;
   isOwnOrg: boolean;
+  onPickCategory?: (category: string) => void;
 }) {
   const router = useRouter();
   const supabase = createClient();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [withSamples, setWithSamples] = useState(false);
-  const [showReviews, setShowReviews] = useState(false);
+  const [showDetails, setShowDetails] = useState(false);
   const [myRating, setMyRating] = useState(0);
   const [myReview, setMyReview] = useState("");
   const [reviewMsg, setReviewMsg] = useState<string | null>(null);
 
   const sampleCount = (template.definition?.sample_items ?? []).length;
+  const fieldCount = (template.definition?.fields ?? []).length;
   const reviewCount = reviews.length;
 
   async function install() {
@@ -82,103 +116,124 @@ export function TemplateCard({
   }
 
   return (
-    <li className="rounded-lg border border-slate-200 bg-white p-4">
+    <li className="flex min-w-0 flex-col">
+      {/* Line icon + ink semibold name inline */}
       <div className="flex items-center gap-2">
-        <span className="text-lg">{template.definition?.app?.icon ?? "📋"}</span>
-        <span className="font-medium">{template.name}</span>
+        <PodioIcon
+          icon={typeof template.definition?.app?.icon === "string" ? template.definition.app.icon : null}
+          name={template.name}
+          className="h-6 w-6 shrink-0 text-podio-secondary"
+        />
+        <h3 className="truncate text-[17px] font-semibold text-podio-ink">{template.name}</h3>
         {template.version > 1 && (
-          <span className="rounded bg-slate-100 px-1.5 py-0.5 text-[11px] text-slate-500">
+          <span className="shrink-0 rounded bg-podio-row-alt px-1.5 py-0.5 text-[11px] text-podio-meta">
             v{template.version}
           </span>
         )}
-        {template.category && (
-          <span className="rounded bg-slate-100 px-2 py-0.5 text-xs text-slate-600">
-            {template.category}
-          </span>
+      </div>
+
+      <p className="mt-1 truncate text-sm text-podio-secondary">
+        {template.description || "No description yet."}
+      </p>
+
+      <div className="mt-1.5 flex items-center gap-2 text-xs text-podio-meta">
+        <Stars value={Math.round(Number(template.rating_avg ?? 0))} />
+        {template.rating_avg != null ? (
+          <span>{Number(template.rating_avg).toFixed(1)}</span>
+        ) : (
+          <span>No ratings yet</span>
         )}
-        <span className="rounded bg-slate-100 px-2 py-0.5 text-xs text-slate-500">
-          {template.visibility === "public" ? "Public" : "Organization"}
-        </span>
-        <span className="ml-auto text-xs text-slate-400">
+        <span>·</span>
+        <span>
           {template.install_count} install{template.install_count === 1 ? "" : "s"}
         </span>
       </div>
 
-      <div className="mt-1 flex items-center gap-2 text-xs text-slate-500">
-        {template.rating_avg != null ? (
-          <>
-            <Stars value={Math.round(Number(template.rating_avg))} />
-            <span>{Number(template.rating_avg).toFixed(1)}</span>
-          </>
-        ) : (
-          <span className="text-slate-400">No ratings yet</span>
-        )}
-        <button onClick={() => setShowReviews(!showReviews)}
-          className="text-blue-600 hover:underline">
-          {reviewCount} review{reviewCount === 1 ? "" : "s"} {showReviews ? "▾" : "▸"}
+      {/* Touching buttons: solid teal Get App + grey More info */}
+      <div className="mt-3 flex">
+        <button onClick={install} disabled={busy}
+          className="rounded-l-sm bg-podio-teal px-4 py-1.5 text-sm font-semibold text-white hover:bg-podio-teal-dark disabled:opacity-50">
+          {busy ? "Installing…" : "Get App"}
+        </button>
+        <button onClick={() => setShowDetails(!showDetails)}
+          className="rounded-r-sm bg-podio-row-hover px-4 py-1.5 text-sm font-semibold text-podio-ink hover:bg-[#E0E0E0]">
+          More info
         </button>
       </div>
 
-      {template.description && (
-        <p className="mt-1 text-sm text-slate-500">{template.description}</p>
+      {sampleCount > 0 && (
+        <label className="mt-2 flex items-center gap-1.5 text-xs text-podio-secondary">
+          <input type="checkbox" checked={withSamples}
+            onChange={(e) => setWithSamples(e.target.checked)} />
+          include sample data ({sampleCount} item{sampleCount === 1 ? "" : "s"})
+        </label>
       )}
-      <p className="mt-1 text-xs text-slate-400">
-        {(template.definition?.fields ?? []).length} fields
-        {sampleCount > 0 && ` · ${sampleCount} sample item${sampleCount === 1 ? "" : "s"}`}
+
+      {/* Meta row: category as a teal link (the "Included in <Pack>" slot) */}
+      <p className="mt-2 flex items-center gap-1.5 text-xs text-podio-meta">
+        <PodioIcon icon="book" className="h-4 w-4 shrink-0" />
+        {template.category ? (
+          <button type="button"
+            onClick={() => onPickCategory?.(template.category as string)}
+            className="text-podio-teal hover:underline">
+            {template.category}
+          </button>
+        ) : (
+          <span>Uncategorized</span>
+        )}
+        <span>·</span>
+        <span>{template.visibility === "public" ? "Public" : "Organization"}</span>
       </p>
 
-      <div className="mt-2 flex flex-wrap items-center gap-3">
-        <button onClick={install} disabled={busy}
-          className="rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-blue-700 disabled:opacity-50">
-          {busy ? "Installing…" : "Install"}
-        </button>
-        {sampleCount > 0 && (
-          <label className="flex items-center gap-1.5 text-xs text-slate-600">
-            <input type="checkbox" checked={withSamples}
-              onChange={(e) => setWithSamples(e.target.checked)} />
-            include sample data
-          </label>
-        )}
-        {isOwnOrg && isOrgAdmin && (
-          template.visibility === "public" ? (
-            <button onClick={() => setVisibility("org")}
-              className="text-xs text-slate-500 hover:text-red-600">
-              Unpublish
-            </button>
-          ) : (
-            <button onClick={() => setVisibility("public")}
-              className="rounded border border-green-300 bg-green-50 px-2 py-1 text-xs font-medium text-green-700 hover:bg-green-100">
-              Publish to public market
-            </button>
-          )
-        )}
-        {error && <span className="text-xs text-red-600">{error}</span>}
-      </div>
+      {isOwnOrg && isOrgAdmin && (
+        template.visibility === "public" ? (
+          <button onClick={() => setVisibility("org")}
+            className="mt-1 self-start text-xs text-podio-meta hover:text-red-600 hover:underline">
+            Unpublish from the public market
+          </button>
+        ) : (
+          <button onClick={() => setVisibility("public")}
+            className="mt-1 self-start text-xs font-semibold text-podio-teal hover:underline">
+            Publish to public market
+          </button>
+        )
+      )}
 
-      {showReviews && (
-        <div className="mt-3 space-y-2 rounded-lg border border-slate-100 bg-slate-50 p-3">
+      {error && <p className="mt-1 text-xs text-red-600">{error}</p>}
+
+      {/* More info: details + reviews on a row-alt panel */}
+      {showDetails && (
+        <div className="mt-3 space-y-2 rounded border border-podio-border bg-podio-row-alt p-3">
+          <p className="text-xs text-podio-secondary">
+            {fieldCount} field{fieldCount === 1 ? "" : "s"}
+            {sampleCount > 0 && ` · ${sampleCount} sample item${sampleCount === 1 ? "" : "s"}`}
+            {` · ${reviewCount} review${reviewCount === 1 ? "" : "s"}`}
+          </p>
+          {template.description && (
+            <p className="text-xs text-podio-secondary">{template.description}</p>
+          )}
           {reviews.map((r) => (
             <div key={r.id} className="text-xs">
               <Stars value={r.rating} />
-              {r.review && <span className="ml-1 text-slate-600">{r.review}</span>}
-              <span className="ml-2 text-slate-400">
+              {r.review && <span className="ml-1 text-podio-secondary">{r.review}</span>}
+              <span className="ml-2 text-podio-meta">
                 {new Date(r.created_at).toLocaleDateString()}
               </span>
             </div>
           ))}
           {reviews.length === 0 && (
-            <p className="text-xs text-slate-400">No reviews yet — be the first.</p>
+            <p className="text-xs text-podio-meta">No reviews yet — be the first.</p>
           )}
-          <div className="flex flex-wrap items-center gap-2 border-t border-slate-200 pt-2">
+          <div className="flex flex-wrap items-center gap-2 border-t border-podio-border pt-2">
             <Stars value={myRating} onPick={setMyRating} />
             <input placeholder="Short review (optional)" value={myReview}
               onChange={(e) => setMyReview(e.target.value)}
-              className="flex-1 rounded border border-slate-300 px-2 py-1 text-xs" />
+              className="min-w-0 flex-1 rounded-sm border border-podio-border bg-white px-2 py-1 text-xs text-podio-ink placeholder:text-podio-meta focus:border-podio-teal focus:outline-none" />
             <button onClick={submitReview}
-              className="rounded bg-blue-600 px-2 py-1 text-xs font-medium text-white">
+              className="rounded-sm bg-podio-teal px-2.5 py-1 text-xs font-semibold text-white hover:bg-podio-teal-dark">
               Rate
             </button>
-            {reviewMsg && <span className="text-xs text-slate-500">{reviewMsg}</span>}
+            {reviewMsg && <span className="text-xs text-podio-meta">{reviewMsg}</span>}
           </div>
         </div>
       )}
