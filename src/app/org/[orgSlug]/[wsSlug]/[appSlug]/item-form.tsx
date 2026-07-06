@@ -5,6 +5,9 @@ import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import {
   CURRENCIES,
+  FORM_GRID_COLS,
+  normalizeColumns,
+  splitSections,
   type CategoryOption,
   type FieldType,
 } from "@/lib/fields";
@@ -23,6 +26,7 @@ type Field = {
     multiple?: boolean;
     end_date?: boolean;
     default?: any;
+    column?: number; // layout column (multi-column layouts; absent = 0)
   };
 };
 
@@ -44,6 +48,7 @@ export function ItemForm({
   signedUrls,
   backHref,
   itemName = "Item",
+  columns = 1,
 }: {
   appId: string;
   fields: Field[];
@@ -54,6 +59,8 @@ export function ItemForm({
   signedUrls?: Record<string, string>;
   backHref: string;
   itemName?: string;
+  // Multi-column layout from apps.layout_settings.columns (absent = 1).
+  columns?: number;
 }) {
   const router = useRouter();
   const supabase = createClient();
@@ -414,28 +421,47 @@ export function ItemForm({
           </span>
         </div>
       )}
-      {fields.map((f) =>
-        f.type === "separator" ? (
-          <div key={f.id} className="border-t border-podio-border pt-3">
-            <p className="text-xs font-semibold uppercase tracking-wide text-podio-meta">
-              {f.label}
-            </p>
-          </div>
-        ) : (
-          <div key={f.id} className="flex flex-col gap-1.5 sm:flex-row sm:items-start">
-            <label className="text-[15px] font-semibold text-podio-ink sm:w-44 sm:shrink-0 sm:pt-2.5 sm:text-right">
-              {f.is_required && <span className="text-[#E5484D]">* </span>}
-              {f.label}
-            </label>
-            <div className="min-w-0 flex-1">
-              {renderInput(f)}
-              {f.help_text && (
-                <p className="mt-1 text-sm text-podio-meta">{f.help_text}</p>
+      {/* Sections split at separators; each section renders its own N-column
+          grid (collapsing to one column on small screens). Separators span
+          the full width as a hairline with an optional section label. */}
+      {(() => {
+        const nCols = normalizeColumns(columns);
+        return splitSections(fields, nCols, (f) => f.config?.column ?? 0).map(
+          (sec, si) => (
+            <div key={sec.separator?.id ?? `section-${si}`}>
+              {sec.separator && (
+                <div className="mb-5 border-t border-podio-border pt-3">
+                  {sec.separator.label.trim() !== "" && (
+                    <p className="text-xs font-semibold uppercase tracking-wide text-podio-meta">
+                      {sec.separator.label}
+                    </p>
+                  )}
+                </div>
               )}
+              <div className={`grid grid-cols-1 gap-x-6 ${FORM_GRID_COLS[nCols]}`}>
+                {sec.columns.map((colFields, ci) => (
+                  <div key={ci} className="min-w-0 space-y-5">
+                    {colFields.map((f) => (
+                      <div key={f.id} className="flex flex-col gap-1.5 sm:flex-row sm:items-start">
+                        <label className="text-[15px] font-semibold text-podio-ink sm:w-44 sm:shrink-0 sm:pt-2.5 sm:text-right">
+                          {f.is_required && <span className="text-[#E5484D]">* </span>}
+                          {f.label}
+                        </label>
+                        <div className="min-w-0 flex-1">
+                          {renderInput(f)}
+                          {f.help_text && (
+                            <p className="mt-1 text-sm text-podio-meta">{f.help_text}</p>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ))}
+              </div>
             </div>
-          </div>
-        )
-      )}
+          )
+        );
+      })()}
 
       {error && <p className="text-right text-sm text-[#E5484D]">{error}</p>}
       <div className="flex justify-end pt-2">

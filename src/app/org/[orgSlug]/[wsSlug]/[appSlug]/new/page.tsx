@@ -21,7 +21,7 @@ export default async function NewItemPage({
   if (!ws) notFound();
   const { data: app } = await supabase
     .from("apps")
-    .select("id, name, slug, icon, item_name, description, usage_instructions")
+    .select("id, name, slug, icon, item_name, description, usage_instructions, layout_settings")
     .eq("workspace_id", ws.id).eq("slug", appSlug).single();
   if (!app) notFound();
 
@@ -125,6 +125,7 @@ export default async function NewItemPage({
             initialValues={defaults}
             backHref={appHref}
             itemName={app.item_name}
+            columns={(app.layout_settings as any)?.columns}
           />
         </section>
         <aside className="hidden w-80 shrink-0 lg:block">

@@ -500,6 +500,36 @@ separator→`separator`, link→`globe`, organization→`people`; the rest reuse
 existing glyphs (calendar, contact, phone, mail, pin, clock, image,
 paperclip, link).
 
+### 12c. Beyond-Podio: multi-column form layouts
+
+A **deliberate divergence from real Podio** (which only stacks fields in one
+column): an app template can lay its form out in 1, 2 or 3 columns.
+
+- **Picker**: a "Layout" block at the top of the builder canvas (below App
+  settings) — three segmented buttons (border-podio-border; active =
+  solid-teal bg, white text) with tiny column glyphs + "Single column / Two
+  columns / Three columns". Switching re-renders the canvas immediately;
+  Publish persists `{ columns }` to `apps.layout_settings`.
+- **Per-column drag**: the canvas becomes one grid per section
+  (`grid grid-cols-{n} gap-4`, static class map — never template-string
+  Tailwind classes); every column is a full drop target with its own
+  pointer-midpoint insertion index, teal insertion indicator and dashed
+  bottom drop zone while dragging. Palette drops and reorders both set the
+  field's `config.column` (0-based). One global fields array stays the
+  source of truth; per-column order is derived by filtering.
+- **Separators span all columns**: a separator renders as a full-width
+  hairline with an optional inline section label (meta text, uppercase in
+  forms) and ignores column assignment — it splits the field list into
+  SECTIONS, each rendering its own N-column grid. The shared helper is
+  `splitSections(fields, columns, columnOf)` in `src/lib/fields.ts`, used by
+  all three surfaces: template editor, item creation form and record view.
+  Forms use `grid grid-cols-1 md:grid-cols-{n} gap-x-6` so the layout
+  collapses to one column on small screens; label-left field rows keep their
+  §12 markup unchanged inside their cells.
+- **Safety**: column indexes ≥ the column count clamp into the last column
+  (shrinking the layout never hides a field); absent settings mean 1 column /
+  column 0, so pre-existing apps render exactly as before.
+
 ## 13. Chat panel
 
 Reference: the two chat screenshots. Chat opens from the 💬 icon at the far

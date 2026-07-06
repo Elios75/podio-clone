@@ -7,8 +7,13 @@ import { createClient } from "@/lib/supabase/client";
 import {
   FIELD_TYPES,
   CATEGORY_COLORS,
+  EDITOR_GRID_COLS,
+  normalizeColumns,
+  splitSections,
   type FieldType,
   type CategoryOption,
+  type LayoutColumns,
+  type LayoutSection,
 } from "@/lib/fields";
 import { PodioIcon } from "@/components/podio-icon";
 import { IconPicker } from "@/components/icon-picker";
@@ -33,8 +38,28 @@ type EditField = {
   rollupAgg: string;      // sum | count | avg
   rollupValueField: string;
   defaultValue: string;   // text/number
+  column: number;         // layout column (0-based; separators ignore it)
   origType: FieldType | null;
 };
+
+// Tiny 3-state column glyph for the layout picker buttons.
+function ColumnsGlyph({ n }: { n: LayoutColumns }) {
+  const widths: Record<LayoutColumns, number[]> = {
+    1: [12],
+    2: [5.5, 5.5],
+    3: [3.4, 3.4, 3.4],
+  };
+  let x = 1;
+  return (
+    <svg viewBox="0 0 14 12" className="h-3.5 w-4" aria-hidden="true" fill="currentColor">
+      {widths[n].map((w, i) => {
+        const rect = <rect key={i} x={x} y="1" width={w} height="10" rx="1" />;
+        x += w + 1;
+        return rect;
+      })}
+    </svg>
+  );
+}
 
 const NUMERIC_TYPES = ["number", "money", "progress", "duration", "calculation"];
 
@@ -215,6 +240,7 @@ export function AppEditor({
         f.config?.default !== undefined && f.config?.default !== null
           ? String(f.config.default)
           : "",
+      column: typeof f.config?.column === "number" ? f.config.column : 0,
       origType: f.type,
     }))
   );
@@ -222,8 +248,15 @@ export function AppEditor({
   const [saved, setSaved] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [dragIndex, setDragIndex] = useState<number | null>(null);
-  const [overIndex, setOverIndex] = useState<number | null>(null);
+  // Insertion indicator while dragging: section + column + position within
+  // that column (pos === column length ⇒ the column's bottom drop zone).
+  const [overSlot, setOverSlot] = useState<{ sec: number; col: number; pos: number } | null>(null);
   const [dragging, setDragging] = useState(false);
+  // Layout: how many columns the form renders in (persisted on publish).
+  const [columns, setColumns] = useState<LayoutColumns>(
+    normalizeColumns(app.layout_settings?.columns)
+  );
+  const [layoutDirty, setLayoutDirty] = useState(false);
   const [justAdded, setJustAdded] = useState<string | null>(null);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState("");
@@ -241,21 +274,41 @@ export function AppEditor({
     setFields(fields.map((f) => (f.key === key ? { ...f, ...patch } : f)));
   }
 
-  function move(i: number, dir: -1 | 1) {
+  // --- Section/column model ----------------------------------------------
+  // The single global `fields` array stays the source of truth. Sections and
+  // per-column buckets are DERIVED views (same splitSections helper as the
+  // item form and record view); drops splice back into the global array.
+  const sections = splitSections(fields, columns, (f) => f.column);
+  const globalIndex = new Map(fields.map((f, i) => [f.key, i]));
+
+  // Move a field one step within ITS OWN column (▲▼ buttons). Swapping two
+  // same-column fields in the global array leaves every other column's
+  // relative order untouched.
+  function moveInColumn(colFields: EditField[], p: number, dir: -1 | 1) {
+    const t = p + dir;
+    if (t < 0 || t >= colFields.length) return;
+    const a = globalIndex.get(colFields[p].key)!;
+    const b = globalIndex.get(colFields[t].key)!;
     const next = [...fields];
-    const t = i + dir;
-    if (t < 0 || t >= next.length) return;
-    [next[i], next[t]] = [next[t], next[i]];
+    [next[a], next[b]] = [next[b], next[a]];
     setSchemaDirty(true);
     setFields(next);
   }
 
-  // Move a field from one index to an arbitrary drop index (drag-and-drop).
-  function moveTo(from: number, to: number) {
-    if (from === to || from < 0 || from >= fields.length) return;
+  // Move fields[from] to global index `to` (computed with the field still in
+  // place) and assign it to layout column `col`. Removing the field first
+  // shifts the target left by one whenever it sat before the insertion point.
+  function moveToColumn(from: number, to: number, col: number) {
+    if (from < 0 || from >= fields.length) return;
     const next = [...fields];
     const [moved] = next.splice(from, 1);
-    next.splice(Math.min(to, next.length), 0, moved);
+    const target = Math.max(0, Math.min(from < to ? to - 1 : to, next.length));
+    const patched =
+      moved.type === "separator" || moved.column === col
+        ? moved
+        : { ...moved, column: col };
+    if (target === from && patched === moved) return; // true no-op
+    next.splice(target, 0, patched);
     setSchemaDirty(true);
     setFields(next);
   }
@@ -287,7 +340,7 @@ export function AppEditor({
     window.setTimeout(() => setJustAdded((k) => (k === key ? null : k)), 1500);
   }
 
-  function addField(type: FieldType, at?: number) {
+  function addField(type: FieldType, at?: number, col = 0) {
     const key = crypto.randomUUID();
     const next = [...fields];
     next.splice(at ?? next.length, 0, {
@@ -297,6 +350,7 @@ export function AppEditor({
       is_primary: false, options: [], multiple: false, endDate: false,
       formula: "", calcMode: "formula", rollupSource: "",
       rollupAgg: "sum", rollupValueField: "", defaultValue: "",
+      column: type === "separator" ? 0 : col,
       origType: null,
     });
     setSchemaDirty(true);
@@ -316,37 +370,169 @@ export function AppEditor({
     );
   }
 
-  // Insertion index from the pointer's Y position: before the first block
-  // whose vertical midpoint the cursor is above, else at the end. This lets
-  // the WHOLE canvas column accept drops (gaps between blocks included) —
-  // dropping only on exact block rectangles feels broken.
-  function indexFromPointer(clientY: number): number {
-    for (let i = 0; i < fields.length; i++) {
-      const el = document.getElementById(`field-block-${fields[i].key}`);
+  // Insertion position inside ONE column from the pointer's Y: before the
+  // first block whose vertical midpoint the cursor is above, else at the end
+  // (the midpoint technique from the old single-column canvas, per column).
+  function posFromPointer(colFields: EditField[], clientY: number): number {
+    for (let p = 0; p < colFields.length; p++) {
+      const el = document.getElementById(`field-block-${colFields[p].key}`);
       if (!el) continue;
       const r = el.getBoundingClientRect();
-      if (clientY < r.top + r.height / 2) return i;
+      if (clientY < r.top + r.height / 2) return p;
     }
-    return fields.length;
+    return colFields.length;
   }
 
-  function handleCanvasDrop(e: DragEvent, index: number) {
+  // Map a (section, column, position) slot back to an insertion index in the
+  // GLOBAL fields array. Inserting there preserves every column's order:
+  //  - before an existing column member ⇒ directly before it globally;
+  //  - at the end of a non-empty column ⇒ directly after its last member
+  //    (still inside the section, last within that column);
+  //  - into an empty column ⇒ right after the section's separator (or at 0
+  //    for the leading section) — it becomes the column's sole member and no
+  //    other column's relative order changes.
+  function globalInsertIndex(
+    section: LayoutSection<EditField>,
+    colFields: EditField[],
+    pos: number
+  ): number {
+    if (pos < colFields.length) return globalIndex.get(colFields[pos].key)!;
+    if (colFields.length > 0)
+      return globalIndex.get(colFields[colFields.length - 1].key)! + 1;
+    return section.separator ? globalIndex.get(section.separator.key)! + 1 : 0;
+  }
+
+  function clearDragState() {
+    setDragIndex(null);
+    setOverSlot(null);
+    setDragging(false);
+  }
+
+  function handleColumnDrop(
+    e: DragEvent,
+    section: LayoutSection<EditField>,
+    colFields: EditField[],
+    col: number,
+    pos: number
+  ) {
     if (!isFieldDrag(e) || e.defaultPrevented) return;
     e.preventDefault();
     const reorder = e.dataTransfer.getData("application/x-field-reorder");
     const droppedType = e.dataTransfer.getData("application/x-field-type");
-    setDragIndex(null);
-    setOverIndex(null);
-    setDragging(false);
+    const index = globalInsertIndex(section, colFields, pos);
+    clearDragState();
     if (reorder !== "") {
-      moveTo(Number(reorder), index);
+      moveToColumn(Number(reorder), index, col);
     } else if (FIELD_TYPES.some((t) => t.value === droppedType)) {
-      addField(droppedType as FieldType, index);
+      addField(droppedType as FieldType, index, col);
     }
   }
 
+  // Drops ON a separator row insert just before it in the flow (a dragged
+  // field keeps its own column; palette drops land in column 0).
+  function handleSeparatorDrop(e: DragEvent, sep: EditField) {
+    if (!isFieldDrag(e) || e.defaultPrevented) return;
+    e.preventDefault();
+    const reorder = e.dataTransfer.getData("application/x-field-reorder");
+    const droppedType = e.dataTransfer.getData("application/x-field-type");
+    const index = globalIndex.get(sep.key)!;
+    clearDragState();
+    if (reorder !== "") {
+      const from = Number(reorder);
+      moveToColumn(from, index, fields[from]?.column ?? 0);
+    } else if (FIELD_TYPES.some((t) => t.value === droppedType)) {
+      addField(droppedType as FieldType, index, 0);
+    }
+  }
+
+  // Grip handle — the only draggable element on a block, so text selection
+  // in the inputs keeps working. Shared by field blocks and separator rows.
+  function renderGrip(f: EditField) {
+    const i = globalIndex.get(f.key)!;
+    return (
+      <div
+        draggable
+        onDragStart={(e) => {
+          e.dataTransfer.setData("application/x-field-reorder", String(i));
+          e.dataTransfer.effectAllowed = "move";
+          const block = document.getElementById(`field-block-${f.key}`);
+          if (block) e.dataTransfer.setDragImage(block, 24, 24);
+          setDragIndex(i);
+          setDragging(true);
+        }}
+        onDragEnd={clearDragState}
+        title="Drag to reorder"
+        aria-label="Drag to reorder"
+        className="-ml-1.5 flex shrink-0 cursor-grab items-center self-stretch rounded-sm px-1 text-podio-disabled hover:bg-podio-row-hover hover:text-podio-secondary active:cursor-grabbing"
+      >
+        <svg viewBox="0 0 10 16" className="h-4 w-2.5" fill="currentColor" aria-hidden="true">
+          <circle cx="2.5" cy="2.5" r="1.5" />
+          <circle cx="2.5" cy="8" r="1.5" />
+          <circle cx="2.5" cy="13.5" r="1.5" />
+          <circle cx="7.5" cy="2.5" r="1.5" />
+          <circle cx="7.5" cy="8" r="1.5" />
+          <circle cx="7.5" cy="13.5" r="1.5" />
+        </svg>
+      </div>
+    );
+  }
+
+  // A separator on the canvas: full-width hairline with an inline, optional
+  // section-label input. It ignores column assignment and splits the form
+  // into sections. Dropping onto the line inserts just before it.
+  function renderSeparatorRow(f: EditField, si: number) {
+    const i = globalIndex.get(f.key)!;
+    const over = overSlot !== null && overSlot.sec === si && overSlot.col === -1;
+    return (
+      <div
+        id={`field-block-${f.key}`}
+        onDragOver={(e) => {
+          if (!isFieldDrag(e)) return;
+          e.preventDefault();
+          e.dataTransfer.dropEffect = e.dataTransfer.types.includes(
+            "application/x-field-reorder"
+          )
+            ? "move"
+            : "copy";
+          if (overSlot?.sec !== si || overSlot?.col !== -1)
+            setOverSlot({ sec: si, col: -1, pos: 0 });
+        }}
+        onDragLeave={(e) => {
+          if (!e.currentTarget.contains(e.relatedTarget as Node | null))
+            setOverSlot((v) => (v && v.sec === si && v.col === -1 ? null : v));
+        }}
+        onDrop={(e) => handleSeparatorDrop(e, f)}
+        className={`flex items-center gap-2 rounded border-t-2 px-1 py-1 ${
+          over && dragIndex !== i ? "border-t-podio-teal" : "border-t-transparent"
+        } ${dragIndex === i ? "opacity-60" : ""} ${
+          justAdded === f.key ? "ring-2 ring-podio-teal" : ""
+        }`}
+      >
+        {renderGrip(f)}
+        <PodioIcon icon="separator" className="h-5 w-5 shrink-0 text-podio-secondary" />
+        <span className="h-px min-w-6 flex-1 bg-podio-border" aria-hidden />
+        <input
+          id={`field-label-${f.key}`}
+          value={f.label}
+          placeholder="Section label (optional)"
+          aria-label="Section label"
+          onChange={(e) => upd(f.key, { label: e.target.value })}
+          className="w-52 shrink-0 bg-transparent text-center text-xs font-semibold uppercase tracking-wide text-podio-meta placeholder:font-normal placeholder:normal-case placeholder:tracking-normal focus:outline-none"
+        />
+        <span className="h-px min-w-6 flex-1 bg-podio-border" aria-hidden />
+        <button
+          onClick={() => remove(f)}
+          title="Remove separator"
+          className="text-sm text-podio-meta hover:text-red-600"
+        >
+          ✕
+        </button>
+      </div>
+    );
+  }
+
   function done() {
-    if (schemaDirty || settingsDirty) {
+    if (schemaDirty || settingsDirty || layoutDirty) {
       const ok = window.confirm(
         "You have unpublished changes. Leave the template editor anyway?"
       );
@@ -371,7 +557,7 @@ export function AppEditor({
   async function saveSchema() {
     setError(null);
     setSaved(null);
-    if (fields.some((f) => !f.label.trim()))
+    if (fields.some((f) => f.type !== "separator" && !f.label.trim()))
       return setError("Every field needs a label.");
 
     // Warn on type changes for fields with data
@@ -407,6 +593,9 @@ export function AppEditor({
       if (["text", "number"].includes(f.type) && f.defaultValue !== "") {
         config.default = f.type === "number" ? Number(f.defaultValue) : f.defaultValue;
       }
+      // Layout column rides inside config (absent = column 0; separators span
+      // all columns, so they never store one).
+      if (f.type !== "separator" && f.column > 0) config.column = f.column;
       return {
         id: f.id,
         label: f.label,
@@ -418,6 +607,21 @@ export function AppEditor({
         config,
       };
     });
+    // Layout (column count) lives on the app row, not in the field schema —
+    // persist it with the same publish action, via a plain apps update like
+    // the settings save.
+    if (layoutDirty) {
+      const { error: layoutError } = await supabase
+        .from("apps")
+        .update({ layout_settings: { ...(app.layout_settings ?? {}), columns } })
+        .eq("id", app.id);
+      if (layoutError) {
+        setSaving(false);
+        return setError(layoutError.message);
+      }
+      setLayoutDirty(false);
+    }
+
     const { data, error: rpcError } = await supabase.rpc("update_app_schema", {
       p_app: app.id,
       p_fields: payload,
@@ -499,25 +703,16 @@ export function AppEditor({
 
       {/* Two-column body: fields palette + canvas */}
       <div className="flex items-start gap-4 p-4 lg:gap-6 lg:p-6">
-        <FieldsPalette onAdd={addField} onDone={done} onDragStateChange={setDragging} />
-
-        <section
-          className="min-w-0 flex-1 space-y-3"
-          // The full column is a drop target: pointer position decides the
-          // insertion index, so drops in the gaps between blocks work too.
-          onDragOver={(e) => {
-            if (!isFieldDrag(e)) return;
-            e.preventDefault();
-            e.dataTransfer.dropEffect = e.dataTransfer.types.includes(
-              "application/x-field-reorder"
-            )
-              ? "move"
-              : "copy";
-            const idx = indexFromPointer(e.clientY);
-            if (overIndex !== idx) setOverIndex(idx);
+        <FieldsPalette
+          onAdd={addField}
+          onDone={done}
+          onDragStateChange={(d) => {
+            setDragging(d);
+            if (!d) setOverSlot(null);
           }}
-          onDrop={(e) => handleCanvasDrop(e, indexFromPointer(e.clientY))}
-        >
+        />
+
+        <section className="min-w-0 flex-1 space-y-3">
           {error && (
             <p className="rounded border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
               {error}
@@ -632,71 +827,125 @@ export function AppEditor({
             )}
           </div>
 
+          {/* Layout picker (beyond-Podio): single / dual / three columns */}
+          <div className="rounded border border-podio-border bg-white px-4 py-3 shadow-sm">
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+              <span className="text-sm font-semibold text-podio-ink">Layout</span>
+              <div className="inline-flex overflow-hidden rounded border border-podio-border">
+                {(
+                  [
+                    [1, "Single column"],
+                    [2, "Two columns"],
+                    [3, "Three columns"],
+                  ] as [LayoutColumns, string][]
+                ).map(([n, label], bi) => (
+                  <button
+                    key={n}
+                    type="button"
+                    aria-pressed={columns === n}
+                    onClick={() => {
+                      if (columns === n) return;
+                      setColumns(n);
+                      setLayoutDirty(true);
+                    }}
+                    className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold ${
+                      bi > 0 ? "border-l border-podio-border" : ""
+                    } ${
+                      columns === n
+                        ? "bg-podio-teal text-white"
+                        : "bg-white text-podio-secondary hover:bg-podio-row-hover"
+                    }`}
+                  >
+                    <ColumnsGlyph n={n} />
+                    {label}
+                  </button>
+                ))}
+              </div>
+              <span className="text-xs text-podio-meta">
+                Drag fields into any column. Separators always span the full width.
+              </span>
+            </div>
+          </div>
+
           <p className="px-1 text-xs text-podio-meta">
             Schema v{app.schema_version} — changes apply when you publish. Removed
             fields keep their data and can be restored by support.
           </p>
 
-          {/* Canvas field blocks */}
-          {fields.map((f, i) => {
+          {/* Canvas: sections split at every separator; each section renders
+              its own N-column grid and every column is a full-height drop
+              target with pointer-midpoint insertion. While dragging over an
+              empty canvas, a single empty section still offers drop zones. */}
+          {(fields.length === 0 && dragging
+            ? ([
+                {
+                  separator: null,
+                  columns: Array.from({ length: columns }, () => []),
+                },
+              ] as LayoutSection<EditField>[])
+            : sections
+          ).map((sec, si) => (
+            <div key={si} className="space-y-3">
+              {sec.separator && renderSeparatorRow(sec.separator, si)}
+              <div className={`grid gap-4 ${EDITOR_GRID_COLS[columns]}`}>
+                {sec.columns.map((colFields, ci) => (
+                  <div
+                    key={ci}
+                    className="min-w-0 space-y-3"
+                    onDragOver={(e) => {
+                      if (!isFieldDrag(e)) return;
+                      e.preventDefault();
+                      e.dataTransfer.dropEffect = e.dataTransfer.types.includes(
+                        "application/x-field-reorder"
+                      )
+                        ? "move"
+                        : "copy";
+                      const pos = posFromPointer(colFields, e.clientY);
+                      if (
+                        overSlot?.sec !== si ||
+                        overSlot?.col !== ci ||
+                        overSlot?.pos !== pos
+                      )
+                        setOverSlot({ sec: si, col: ci, pos });
+                    }}
+                    onDragLeave={(e) => {
+                      if (!e.currentTarget.contains(e.relatedTarget as Node | null))
+                        setOverSlot((v) =>
+                          v && v.sec === si && v.col === ci ? null : v
+                        );
+                    }}
+                    onDrop={(e) =>
+                      handleColumnDrop(
+                        e,
+                        sec,
+                        colFields,
+                        ci,
+                        posFromPointer(colFields, e.clientY)
+                      )
+                    }
+                  >
+          {colFields.map((f, p) => {
+            const i = globalIndex.get(f.key)!;
             const cnt = f.id ? countByField[f.id] ?? 0 : 0;
+            const over =
+              overSlot !== null &&
+              overSlot.sec === si &&
+              overSlot.col === ci &&
+              overSlot.pos === p;
             return (
               <div
                 key={f.key}
                 id={`field-block-${f.key}`}
-                onDragOver={(e) => {
-                  if (!isFieldDrag(e)) return;
-                  e.preventDefault();
-                  e.dataTransfer.dropEffect =
-                    e.dataTransfer.types.includes("application/x-field-reorder")
-                      ? "move"
-                      : "copy";
-                  if (overIndex !== i) setOverIndex(i);
-                }}
-                onDragLeave={(e) => {
-                  if (!e.currentTarget.contains(e.relatedTarget as Node | null))
-                    setOverIndex((v) => (v === i ? null : v));
-                }}
-                onDrop={(e) => handleCanvasDrop(e, indexFromPointer(e.clientY))}
                 className={`rounded border bg-white shadow-sm ${
                   dragIndex === i ? "border-podio-teal opacity-60" : "border-podio-border"
                 } ${
-                  overIndex === i && dragIndex !== i
+                  over && dragIndex !== i
                     ? "border-t-2 border-t-podio-teal"
                     : ""
                 } ${justAdded === f.key ? "ring-2 ring-podio-teal" : ""}`}
               >
                 <div className="flex items-start gap-3 p-4">
-                  {/* Grip handle — the only draggable element, so text
-                      selection in the inputs keeps working. */}
-                  <div
-                    draggable
-                    onDragStart={(e) => {
-                      e.dataTransfer.setData("application/x-field-reorder", String(i));
-                      e.dataTransfer.effectAllowed = "move";
-                      const block = document.getElementById(`field-block-${f.key}`);
-                      if (block) e.dataTransfer.setDragImage(block, 24, 24);
-                      setDragIndex(i);
-                      setDragging(true);
-                    }}
-                    onDragEnd={() => {
-                      setDragIndex(null);
-                      setOverIndex(null);
-                      setDragging(false);
-                    }}
-                    title="Drag to reorder"
-                    aria-label="Drag to reorder"
-                    className="-ml-1.5 flex shrink-0 cursor-grab items-center self-stretch rounded-sm px-1 text-podio-disabled hover:bg-podio-row-hover hover:text-podio-secondary active:cursor-grabbing"
-                  >
-                    <svg viewBox="0 0 10 16" className="h-4 w-2.5" fill="currentColor" aria-hidden="true">
-                      <circle cx="2.5" cy="2.5" r="1.5" />
-                      <circle cx="2.5" cy="8" r="1.5" />
-                      <circle cx="2.5" cy="13.5" r="1.5" />
-                      <circle cx="7.5" cy="2.5" r="1.5" />
-                      <circle cx="7.5" cy="8" r="1.5" />
-                      <circle cx="7.5" cy="13.5" r="1.5" />
-                    </svg>
-                  </div>
+                  {renderGrip(f)}
                   {/* Type indicator: icon + ⌄ with an invisible select on top
                       so changing the type keeps working. */}
                   <div
@@ -921,9 +1170,9 @@ export function AppEditor({
                       </span>
                     )}
                     <div className="flex flex-col leading-none">
-                      <button onClick={() => move(i, -1)} title="Move up"
+                      <button onClick={() => moveInColumn(colFields, p, -1)} title="Move up"
                         className="text-xs text-podio-meta hover:text-podio-ink">▲</button>
-                      <button onClick={() => move(i, 1)} title="Move down"
+                      <button onClick={() => moveInColumn(colFields, p, 1)} title="Move down"
                         className="text-xs text-podio-meta hover:text-podio-ink">▼</button>
                     </div>
                     <button onClick={() => remove(f)} title="Remove field"
@@ -934,28 +1183,33 @@ export function AppEditor({
             );
           })}
 
-          {/* Append zone — only visible mid-drag, catches drops below the
-              last block (or on an empty canvas). */}
-          {dragging && (
-            <div
-              onDragOver={(e) => {
-                if (!isFieldDrag(e)) return;
-                e.preventDefault();
-                if (overIndex !== fields.length) setOverIndex(fields.length);
-              }}
-              onDragLeave={() =>
-                setOverIndex((v) => (v === fields.length ? null : v))
-              }
-              onDrop={(e) => handleCanvasDrop(e, fields.length)}
-              className={`rounded border-2 border-dashed px-4 py-6 text-center text-sm ${
-                overIndex === fields.length
-                  ? "border-podio-teal bg-podio-row-alt text-podio-teal"
-                  : "border-podio-border text-podio-meta"
-              }`}
-            >
-              Drop a field here
+                    {/* Per-column drop zone — only visible mid-drag, catches
+                        drops below the column's last block (and drops into an
+                        empty column). */}
+                    {dragging && (
+                      <div
+                        className={`rounded border-2 border-dashed px-4 py-6 text-center text-sm ${
+                          overSlot !== null &&
+                          overSlot.sec === si &&
+                          overSlot.col === ci &&
+                          overSlot.pos === colFields.length
+                            ? "border-podio-teal bg-podio-row-alt text-podio-teal"
+                            : "border-podio-border text-podio-meta"
+                        }`}
+                      >
+                        Drop a field here
+                      </div>
+                    )}
+                    {!dragging && colFields.length === 0 && columns > 1 && (
+                      <div className="rounded border border-dashed border-podio-border px-4 py-6 text-center text-xs text-podio-meta">
+                        Empty column — drag fields here
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
             </div>
-          )}
+          ))}
 
           {fields.length === 0 && !dragging && (
             <div className="rounded border border-dashed border-podio-border bg-white p-8 text-center text-sm text-podio-meta">

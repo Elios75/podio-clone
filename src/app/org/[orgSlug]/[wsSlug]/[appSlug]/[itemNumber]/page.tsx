@@ -37,7 +37,7 @@ export default async function ItemDetailPage({
     .eq("organization_id", org.id).eq("slug", wsSlug).single();
   if (!ws) notFound();
   const { data: app } = await supabase
-    .from("apps").select("id, name, slug, icon, item_name")
+    .from("apps").select("id, name, slug, icon, item_name, layout_settings")
     .eq("workspace_id", ws.id).eq("slug", appSlug).single();
   if (!app) notFound();
 
@@ -314,6 +314,7 @@ export default async function ItemDetailPage({
                 signedUrls={signedUrls}
                 backHref={backHref}
                 itemName={app.item_name}
+                columns={(app.layout_settings as any)?.columns}
               />
             </div>
           </section>

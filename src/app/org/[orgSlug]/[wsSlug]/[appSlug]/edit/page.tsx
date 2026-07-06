@@ -19,7 +19,7 @@ export default async function EditAppPage({
   if (!ws) notFound();
   const { data: app } = await supabase
     .from("apps")
-    .select("id, name, slug, icon, item_name, description, usage_instructions, schema_version")
+    .select("id, name, slug, icon, item_name, description, usage_instructions, schema_version, layout_settings")
     .eq("workspace_id", ws.id).eq("slug", appSlug).single();
   if (!app) notFound();
 
