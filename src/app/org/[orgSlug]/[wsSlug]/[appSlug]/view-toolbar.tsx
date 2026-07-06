@@ -97,7 +97,10 @@ export function ViewToolbar({
   const router = useRouter();
   const supabase = createClient();
   const filterable = fields.filter(
-    (f) => !["separator", "calculation", "image", "file", "relationship"].includes(f.type)
+    (f) =>
+      !["separator", "calculation", "image", "file", "relationship", "table"].includes(
+        f.type
+      )
   );
   const [filters, setFilters] = useState<Filter[]>(initialFilters);
   const [sortField, setSortField] = useState(initialSort[0]?.field_id ?? "");

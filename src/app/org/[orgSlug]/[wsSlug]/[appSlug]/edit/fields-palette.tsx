@@ -24,13 +24,14 @@ export const FIELD_TYPE_ICONS: Record<FieldType, string> = {
   file: "paperclip",
   link: "globe",
   separator: "separator",
+  table: "table-grid",
 };
 
 // Podio lists the everyday types first (Text, Category, Date, Relationship,
 // Contact, Phone, Email, Number, Link, Money, …). Order the existing
 // FIELD_TYPES list accordingly; anything unlisted sinks to the bottom.
 const PALETTE_ORDER: FieldType[] = [
-  "text", "category", "date", "relationship", "contact", "phone",
+  "text", "category", "date", "relationship", "contact", "table", "phone",
   "email", "number", "link", "money", "progress", "duration",
   "location", "organization", "image", "file", "calculation", "separator",
 ];

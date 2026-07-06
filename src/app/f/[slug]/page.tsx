@@ -46,6 +46,9 @@ export default async function PublicFormPage({
         if (opt) prefill[f.id] = opt.id;
         break;
       }
+      case "table":
+        // Embedded sub-tables are not prefillable (and not rendered publicly).
+        break;
       default:
         prefill[f.id] = v;
     }

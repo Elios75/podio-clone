@@ -173,7 +173,11 @@ export function PublicForm({
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
-      {(form.fields ?? []).map((f: any) =>
+      {/* Table fields (embedded sub-tables) are app-internal — the public
+          form skips them rather than rendering an unknown input. */}
+      {(form.fields ?? [])
+        .filter((f: any) => f.type !== "table")
+        .map((f: any) =>
         f.type === "separator" ? (
           <div key={f.id} className="border-t border-slate-200 pt-3">
             <p className="text-xs font-medium uppercase tracking-wide text-slate-400">{f.label}</p>

@@ -530,6 +530,44 @@ column): an app template can lay its form out in 1, 2 or 3 columns.
   (shrinking the layout never hides a field); absent settings mean 1 column /
   column 0, so pre-existing apps render exactly as before.
 
+### 12d. Beyond-Podio: table field (embedded rows)
+
+A second deliberate divergence: a **table field** embeds a one-to-many
+sub-table inside a record (a Customer holding invoice lines: Date, Product,
+Amount). Column types: Text, Number, Money, Date, Checkbox, Category
+(colored options). Palette icon: `table-grid` (header band over a 3x2 cell
+grid); palette position right after Contact.
+
+- **Data model**: `app_fields.config` holds
+  `{ columns: [{id, label, type, options?}], currency? }` (currency once per
+  field, default USD); `item_field_values.value` holds
+  `{ rows: [{ "<columnId>": string|number|boolean|null }] }` with dates as
+  ISO strings and money cells as plain numbers. `value_text` mirrors a human
+  summary ("3 rows"). Types + `tableSummary` / `tableColumnTotals` helpers
+  live in `src/lib/fields.ts`.
+- **Full width**: like separators, a table field spans ALL layout columns.
+  `splitSections` treats it as a segment opener (`section.fullWidth`): it
+  renders across the section, and following fields continue in a fresh
+  column grid. Same behavior on all three surfaces (builder canvas, item
+  form, record view).
+- **Builder block**: the canvas block shows a **columns builder** (no fake
+  rows): one bordered list — borderless column-label input + a small type
+  `<select>` + ▲▼ + ✕ per column, closed by a `bg-podio-row-alt` "Enter a
+  column label (Enter to add)" row (the category-options grammar). Category
+  columns nest their own option list (label + CATEGORY_COLORS swatch + ✕);
+  a compact Currency select appears when a money column exists. Publishing
+  requires ≥ 1 column.
+- **Form/record grid**: bordered table — uppercase meta header row on
+  `bg-podio-row-alt`, typed cell inputs (money cells get a meta currency
+  prefix, category cells a colored dot + select), per-row ✕, a semibold
+  totals footer (2px top hairline) summing number/money columns, and a
+  full-width teal "+ Add row" text button under the grid.
+- **Everywhere else it degrades**: the sheet, Dig, stream, exports and the
+  item PDF render the compact summary "3 rows · $1,250" (count + sum of the
+  first money column, else first number column, else count only) via
+  `tableSummary`; webforms, filters and the quick app builder skip table
+  fields entirely.
+
 ## 13. Chat panel
 
 Reference: the two chat screenshots. Chat opens from the 💬 icon at the far

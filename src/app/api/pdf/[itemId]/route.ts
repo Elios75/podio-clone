@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
+import { tableSummary } from "@/lib/fields";
 import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
 
 // GET /api/pdf/:itemId — renders the item as a simple PDF document.
@@ -47,6 +48,8 @@ export async function GET(
       case "number":
       case "progress":
         return v.value_number != null ? String(v.value_number) : "—";
+      case "table":
+        return tableSummary(v.value, f.config);
       default:
         return v.value_text ?? "—";
     }

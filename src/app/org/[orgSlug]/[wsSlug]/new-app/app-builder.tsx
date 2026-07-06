@@ -283,7 +283,9 @@ export function AppBuilder({
                 onChange={(e) => updateField(f.key, { type: e.target.value as FieldType })}
                 className="rounded-lg border border-slate-300 px-2 py-2 text-sm"
               >
-                {FIELD_TYPES.map((t) => (
+                {/* Table fields need the template editor's columns builder,
+                    so this quick builder doesn't offer them. */}
+                {FIELD_TYPES.filter((t) => t.value !== "table").map((t) => (
                   <option key={t.value} value={t.value}>{t.label}</option>
                 ))}
               </select>

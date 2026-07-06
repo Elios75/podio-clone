@@ -1,7 +1,12 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { formatDuration, CATEGORY_COLORS, type CategoryOption } from "@/lib/fields";
+import {
+  formatDuration,
+  tableSummary,
+  CATEGORY_COLORS,
+  type CategoryOption,
+} from "@/lib/fields";
 import { PodioIcon } from "@/components/podio-icon";
 import { AppTabBar } from "../app-tab-bar";
 import { BoardView } from "./board-view";
@@ -235,6 +240,14 @@ export default async function AppPage({
           <span className="font-medium">{Number(v.value_number).toLocaleString()}</span>
         ) : (
           <span className="text-podio-disabled">ƒ</span>
+        );
+      case "table":
+        // Compact summary: row count + sum of the first money (else number)
+        // column, e.g. "3 rows · $1,250".
+        return (
+          <span className="whitespace-nowrap text-podio-secondary">
+            {tableSummary(v.value, field.config)}
+          </span>
         );
       default:
         return <span className="line-clamp-1">{v.value_text}</span>;

@@ -4,9 +4,19 @@ import { useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { toCsv, downloadCsv } from "@/lib/csv";
 import { downloadXlsx } from "@/lib/spreadsheet";
-import { formatDuration, type CategoryOption } from "@/lib/fields";
+import {
+  formatDuration,
+  tableSummary,
+  type CategoryOption,
+  type TableColumn,
+} from "@/lib/fields";
 
-type Field = { id: string; label: string; type: string; config: { options?: CategoryOption[] } };
+type Field = {
+  id: string;
+  label: string;
+  type: string;
+  config: { options?: CategoryOption[]; columns?: TableColumn[]; currency?: string };
+};
 
 export function ExportButton({
   appId,
@@ -64,6 +74,8 @@ export function ExportButton({
         case "number":
         case "progress":
           return v.value_number != null ? String(v.value_number) : "";
+        case "table":
+          return tableSummary(v.value, field.config);
         default:
           return v.value_text ?? "";
       }

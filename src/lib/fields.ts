@@ -4,7 +4,7 @@ export type FieldType =
   | "text" | "category" | "date" | "relationship" | "contact"
   | "phone" | "email" | "organization" | "number" | "money"
   | "progress" | "calculation" | "location" | "duration"
-  | "image" | "file" | "link" | "separator";
+  | "image" | "file" | "link" | "separator" | "table";
 
 export const FIELD_TYPES: { value: FieldType; label: string }[] = [
   { value: "text", label: "Text" },
@@ -13,6 +13,7 @@ export const FIELD_TYPES: { value: FieldType; label: string }[] = [
   { value: "category", label: "Category" },
   { value: "contact", label: "Contact (member)" },
   { value: "relationship", label: "Relationship (link items)" },
+  { value: "table", label: "Table (rows)" },
   { value: "money", label: "Money" },
   { value: "progress", label: "Progress (0–100%)" },
   { value: "duration", label: "Duration" },
@@ -28,6 +29,95 @@ export const FIELD_TYPES: { value: FieldType; label: string }[] = [
 ];
 
 export type CategoryOption = { id: string; label: string; color: string };
+
+// ---------------------------------------------------------------------------
+// Table field (beyond-Podio feature): an embedded one-to-many sub-table
+// inside a record (e.g. a Customer with invoice lines: Date, Product,
+// Amount).
+//
+// app_fields.config for a table field:
+//   { columns: TableColumn[], currency?: "USD" }
+// item_field_values.value for a table field:
+//   { rows: [ { "<columnId>": string | number | boolean | null, ... } ] }
+// (dates as ISO "YYYY-MM-DD" strings; money cells as plain numbers — the
+// currency lives once on the field config). value_text mirrors a human
+// summary ("3 rows") so search and generic renderers degrade gracefully.
+
+export type TableColumnType =
+  | "text" | "number" | "money" | "date" | "checkbox" | "category";
+
+export type TableColumn = {
+  id: string;
+  label: string;
+  type: TableColumnType;
+  options?: CategoryOption[]; // category columns only
+};
+
+export type TableRow = Record<string, string | number | boolean | null>;
+
+export const TABLE_COLUMN_TYPES: { value: TableColumnType; label: string }[] = [
+  { value: "text", label: "Text" },
+  { value: "number", label: "Number" },
+  { value: "money", label: "Money" },
+  { value: "date", label: "Date" },
+  { value: "checkbox", label: "Checkbox" },
+  { value: "category", label: "Category" },
+];
+
+// Currency prefix for money cells and summaries (default USD).
+export function currencySymbol(code: string | undefined): string {
+  const map: Record<string, string> = {
+    USD: "$", EUR: "€", GBP: "£", MXN: "MX$", CAD: "CA$",
+  };
+  return map[code ?? "USD"] ?? `${code} `;
+}
+
+// Fixed locale so server and client render identical strings (hydration).
+function formatCellNumber(n: number): string {
+  return n.toLocaleString("en-US", { maximumFractionDigits: 2 });
+}
+
+// Per-column sums for the totals footer: only number + money columns total.
+export function tableColumnTotals(
+  rows: TableRow[],
+  columns: TableColumn[]
+): Record<string, number> {
+  const totals: Record<string, number> = {};
+  for (const c of columns) {
+    if (c.type !== "number" && c.type !== "money") continue;
+    let sum = 0;
+    for (const r of rows) {
+      const v = r?.[c.id];
+      if (typeof v === "number" && Number.isFinite(v)) sum += v;
+    }
+    totals[c.id] = sum;
+  }
+  return totals;
+}
+
+// Compact summary for sheet cells / exports: "3 rows · $1,250" (count + sum
+// of the FIRST money column, else first number column, else count only).
+// Tolerates any malformed value/config — never throws.
+export function tableSummary(
+  value: unknown,
+  config?: { columns?: TableColumn[]; currency?: string } | null
+): string {
+  const rows: TableRow[] = Array.isArray((value as any)?.rows)
+    ? (value as any).rows
+    : [];
+  const count = `${rows.length} row${rows.length === 1 ? "" : "s"}`;
+  const columns = Array.isArray(config?.columns) ? config!.columns! : [];
+  const sumCol =
+    columns.find((c) => c?.type === "money") ??
+    columns.find((c) => c?.type === "number");
+  if (!sumCol || rows.length === 0) return count;
+  const sum = tableColumnTotals(rows, [sumCol])[sumCol.id] ?? 0;
+  const formatted =
+    sumCol.type === "money"
+      ? `${currencySymbol(config?.currency)}${formatCellNumber(sum)}`
+      : formatCellNumber(sum);
+  return `${count} · ${formatted}`;
+}
 
 // ---------------------------------------------------------------------------
 // Multi-column form layout (beyond-Podio feature).
@@ -61,24 +151,32 @@ export const EDITOR_GRID_COLS: Record<LayoutColumns, string> = {
 export type LayoutSection<F> = {
   // The separator that opens this section (null for the leading section).
   separator: F | null;
+  // A full-width field (e.g. a table field) that opens this segment: it
+  // renders across every layout column, like separators do, but keeps its
+  // form-field chrome (label, help text). Null for ordinary sections.
+  fullWidth: F | null;
   // One bucket per layout column; `columns.length` always equals the layout's
   // column count. Fields keep their relative (global) order inside a bucket.
   columns: F[][];
 };
 
 // Split a flat, ordered field list into sections at every separator field,
-// bucketing each section's fields by column. Column indexes ≥ the column
-// count clamp into the LAST column so shrinking the layout never hides a
-// field. Returns [] for an empty list.
+// bucketing each section's fields by column. Fields matched by `isFullWidth`
+// (table fields) also open a new segment — they span all columns, and the
+// fields after them continue in a fresh column grid. Column indexes ≥ the
+// column count clamp into the LAST column so shrinking the layout never
+// hides a field. Returns [] for an empty list.
 export function splitSections<F extends { type: string }>(
   fields: F[],
   columns: LayoutColumns,
-  columnOf: (f: F) => number
+  columnOf: (f: F) => number,
+  isFullWidth: (f: F) => boolean = (f) => f.type === "table"
 ): LayoutSection<F>[] {
   const sections: LayoutSection<F>[] = [];
-  const open = (separator: F | null): LayoutSection<F> => {
+  const open = (separator: F | null, fullWidth: F | null = null): LayoutSection<F> => {
     const s: LayoutSection<F> = {
       separator,
+      fullWidth,
       columns: Array.from({ length: columns }, () => [] as F[]),
     };
     sections.push(s);
@@ -88,6 +186,10 @@ export function splitSections<F extends { type: string }>(
   for (const f of fields) {
     if (f.type === "separator") {
       current = open(f);
+      continue;
+    }
+    if (isFullWidth(f)) {
+      current = open(null, f);
       continue;
     }
     if (!current) current = open(null);

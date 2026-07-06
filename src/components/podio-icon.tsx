@@ -632,6 +632,14 @@ const PATHS: Record<string, ReactNode> = {
       <path d="M7 6.5h10M7 17.5h10" />
     </>
   ),
+  // Mini spreadsheet: header band over a 3x2 cell grid (table field).
+  "table-grid": (
+    <>
+      <rect x="3.5" y="4.5" width="17" height="15" rx="1.5" />
+      <path d="M3.5 9.5h17M3.5 14.5h17" />
+      <path d="M9.5 9.5v10M15 9.5v10" />
+    </>
+  ),
 };
 
 // `chain` is an alias for the existing chain-link glyph.

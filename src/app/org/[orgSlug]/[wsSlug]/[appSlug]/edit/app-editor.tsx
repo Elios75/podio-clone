@@ -7,13 +7,16 @@ import { createClient } from "@/lib/supabase/client";
 import {
   FIELD_TYPES,
   CATEGORY_COLORS,
+  CURRENCIES,
   EDITOR_GRID_COLS,
+  TABLE_COLUMN_TYPES,
   normalizeColumns,
   splitSections,
   type FieldType,
   type CategoryOption,
   type LayoutColumns,
   type LayoutSection,
+  type TableColumn,
 } from "@/lib/fields";
 import { PodioIcon } from "@/components/podio-icon";
 import { IconPicker } from "@/components/icon-picker";
@@ -38,6 +41,8 @@ type EditField = {
   rollupAgg: string;      // sum | count | avg
   rollupValueField: string;
   defaultValue: string;   // text/number
+  tableColumns: TableColumn[]; // table (sub-table column schema)
+  tableCurrency: string;  // table (currency for money columns)
   column: number;         // layout column (0-based; separators ignore it)
   origType: FieldType | null;
 };
@@ -167,8 +172,15 @@ function ColorSwatch({
   );
 }
 
-// "Enter a category option" — adds an option on Enter, Podio-style.
-function AddOptionInput({ onAdd }: { onAdd: (label: string) => void }) {
+// "Enter a category option" — adds an option on Enter, Podio-style. Also
+// reused (with another placeholder) by the table field's columns builder.
+function AddOptionInput({
+  onAdd,
+  placeholder = "Enter a category option",
+}: {
+  onAdd: (label: string) => void;
+  placeholder?: string;
+}) {
   const [value, setValue] = useState("");
   return (
     <input
@@ -181,7 +193,7 @@ function AddOptionInput({ onAdd }: { onAdd: (label: string) => void }) {
           setValue("");
         }
       }}
-      placeholder="Enter a category option"
+      placeholder={placeholder}
       className="w-full bg-transparent text-sm text-podio-ink placeholder:text-podio-meta focus:outline-none"
     />
   );
@@ -240,6 +252,8 @@ export function AppEditor({
         f.config?.default !== undefined && f.config?.default !== null
           ? String(f.config.default)
           : "",
+      tableColumns: f.config?.columns ?? [],
+      tableCurrency: f.config?.currency ?? "USD",
       column: typeof f.config?.column === "number" ? f.config.column : 0,
       origType: f.type,
     }))
@@ -304,7 +318,8 @@ export function AppEditor({
     const [moved] = next.splice(from, 1);
     const target = Math.max(0, Math.min(from < to ? to - 1 : to, next.length));
     const patched =
-      moved.type === "separator" || moved.column === col
+      // Separators and table fields span all columns — never store one.
+      moved.type === "separator" || moved.type === "table" || moved.column === col
         ? moved
         : { ...moved, column: col };
     if (target === from && patched === moved) return; // true no-op
@@ -350,7 +365,8 @@ export function AppEditor({
       is_primary: false, options: [], multiple: false, endDate: false,
       formula: "", calcMode: "formula", rollupSource: "",
       rollupAgg: "sum", rollupValueField: "", defaultValue: "",
-      column: type === "separator" ? 0 : col,
+      tableColumns: [], tableCurrency: "USD",
+      column: type === "separator" || type === "table" ? 0 : col,
       origType: null,
     });
     setSchemaDirty(true);
@@ -399,7 +415,8 @@ export function AppEditor({
     if (pos < colFields.length) return globalIndex.get(colFields[pos].key)!;
     if (colFields.length > 0)
       return globalIndex.get(colFields[colFields.length - 1].key)! + 1;
-    return section.separator ? globalIndex.get(section.separator.key)! + 1 : 0;
+    const lead = section.separator ?? section.fullWidth;
+    return lead ? globalIndex.get(lead.key)! + 1 : 0;
   }
 
   function clearDragState() {
@@ -428,14 +445,27 @@ export function AppEditor({
     }
   }
 
-  // Drops ON a separator row insert just before it in the flow (a dragged
-  // field keeps its own column; palette drops land in column 0).
+  // Whether the pointer sits in the BOTTOM half of a separator row — if so,
+  // the drop belongs to the section BELOW the line, not above it. Without
+  // this, dropping "just under the line" silently filed the field into the
+  // section above (the separator row is the biggest target near the line).
+  function separatorDropAfter(e: DragEvent, sep: EditField): boolean {
+    const el = document.getElementById(`field-block-${sep.key}`);
+    if (!el) return true;
+    const r = el.getBoundingClientRect();
+    return e.clientY >= r.top + r.height / 2;
+  }
+
+  // Drops ON a separator row are direction-aware: top half inserts just
+  // before the line (end of the section above), bottom half just after it
+  // (start of its own section). A dragged field keeps its own column;
+  // palette drops land in column 0.
   function handleSeparatorDrop(e: DragEvent, sep: EditField) {
     if (!isFieldDrag(e) || e.defaultPrevented) return;
     e.preventDefault();
     const reorder = e.dataTransfer.getData("application/x-field-reorder");
     const droppedType = e.dataTransfer.getData("application/x-field-type");
-    const index = globalIndex.get(sep.key)!;
+    const index = globalIndex.get(sep.key)! + (separatorDropAfter(e, sep) ? 1 : 0);
     clearDragState();
     if (reorder !== "") {
       const from = Number(reorder);
@@ -482,7 +512,10 @@ export function AppEditor({
   // into sections. Dropping onto the line inserts just before it.
   function renderSeparatorRow(f: EditField, si: number) {
     const i = globalIndex.get(f.key)!;
-    const over = overSlot !== null && overSlot.sec === si && overSlot.col === -1;
+    const overBefore =
+      overSlot !== null && overSlot.sec === si && overSlot.col === -1 && overSlot.pos === 0;
+    const overAfter =
+      overSlot !== null && overSlot.sec === si && overSlot.col === -1 && overSlot.pos === 1;
     return (
       <div
         id={`field-block-${f.key}`}
@@ -494,16 +527,19 @@ export function AppEditor({
           )
             ? "move"
             : "copy";
-          if (overSlot?.sec !== si || overSlot?.col !== -1)
-            setOverSlot({ sec: si, col: -1, pos: 0 });
+          const pos = separatorDropAfter(e, f) ? 1 : 0;
+          if (overSlot?.sec !== si || overSlot?.col !== -1 || overSlot?.pos !== pos)
+            setOverSlot({ sec: si, col: -1, pos });
         }}
         onDragLeave={(e) => {
           if (!e.currentTarget.contains(e.relatedTarget as Node | null))
             setOverSlot((v) => (v && v.sec === si && v.col === -1 ? null : v));
         }}
         onDrop={(e) => handleSeparatorDrop(e, f)}
-        className={`flex items-center gap-2 rounded border-t-2 px-1 py-1 ${
-          over && dragIndex !== i ? "border-t-podio-teal" : "border-t-transparent"
+        className={`flex items-center gap-2 rounded border-b-2 border-t-2 px-1 py-1 ${
+          overBefore && dragIndex !== i ? "border-t-podio-teal" : "border-t-transparent"
+        } ${
+          overAfter && dragIndex !== i ? "border-b-podio-teal" : "border-b-transparent"
         } ${dragIndex === i ? "opacity-60" : ""} ${
           justAdded === f.key ? "ring-2 ring-podio-teal" : ""
         }`}
@@ -527,6 +563,273 @@ export function AppEditor({
         >
           ✕
         </button>
+      </div>
+    );
+  }
+
+  // Columns builder for a table field (beyond-Podio): label + type per
+  // column, ▲▼ reorder, ✕ remove, "+ column" input that adds on Enter, and
+  // nested category options (label + chip-color swatch) for category columns.
+  function renderColumnsBuilder(f: EditField) {
+    const cols = f.tableColumns;
+    const setCols = (tableColumns: TableColumn[]) => upd(f.key, { tableColumns });
+    const setCol = (colId: string, patch: Partial<TableColumn>) =>
+      setCols(cols.map((c) => (c.id === colId ? { ...c, ...patch } : c)));
+    const moveCol = (ci: number, dir: -1 | 1) => {
+      const t = ci + dir;
+      if (t < 0 || t >= cols.length) return;
+      const next = [...cols];
+      [next[ci], next[t]] = [next[t], next[ci]];
+      setCols(next);
+    };
+    return (
+      <div className="mt-3 space-y-2">
+        <div className="flex flex-wrap items-center gap-2 text-xs text-podio-secondary">
+          <span>Columns — every row of the table fills these in.</span>
+          {cols.some((c) => c.type === "money") && (
+            <label className="ml-auto flex items-center gap-1.5">
+              Currency
+              <select
+                value={f.tableCurrency}
+                onChange={(e) => upd(f.key, { tableCurrency: e.target.value })}
+                className="rounded-sm border border-podio-border px-1.5 py-1 text-xs"
+              >
+                {CURRENCIES.map((c) => (
+                  <option key={c} value={c}>{c}</option>
+                ))}
+              </select>
+            </label>
+          )}
+        </div>
+        <div className="overflow-hidden rounded border border-podio-border">
+          {cols.map((c, ci) => (
+            <div key={c.id} className={ci > 0 ? "border-t border-podio-border" : ""}>
+              <div className="flex items-center gap-2 px-3 py-2">
+                <input
+                  value={c.label}
+                  aria-label="Column label"
+                  onChange={(e) => setCol(c.id, { label: e.target.value })}
+                  className="min-w-0 flex-1 bg-transparent text-sm text-podio-ink focus:outline-none"
+                />
+                <select
+                  value={c.type}
+                  aria-label="Column type"
+                  onChange={(e) =>
+                    setCol(c.id, { type: e.target.value as TableColumn["type"] })
+                  }
+                  className="rounded-sm border border-podio-border px-1.5 py-1 text-xs text-podio-secondary"
+                >
+                  {TABLE_COLUMN_TYPES.map((t) => (
+                    <option key={t.value} value={t.value}>{t.label}</option>
+                  ))}
+                </select>
+                <div className="flex flex-col leading-none">
+                  <button type="button" onClick={() => moveCol(ci, -1)} title="Move column up"
+                    className="text-xs text-podio-meta hover:text-podio-ink">▲</button>
+                  <button type="button" onClick={() => moveCol(ci, 1)} title="Move column down"
+                    className="text-xs text-podio-meta hover:text-podio-ink">▼</button>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setCols(cols.filter((x) => x.id !== c.id))}
+                  title="Remove column"
+                  className="text-xs text-podio-meta hover:text-red-600"
+                >
+                  ✕
+                </button>
+              </div>
+              {c.type === "category" && (
+                <div className="mx-3 mb-2 overflow-hidden rounded border border-podio-border">
+                  {(c.options ?? []).map((o, oi) => (
+                    <div
+                      key={o.id}
+                      className={`flex items-center gap-2 px-2 py-1.5 ${
+                        oi > 0 ? "border-t border-podio-border" : ""
+                      }`}
+                    >
+                      <input
+                        value={o.label}
+                        aria-label="Option label"
+                        onChange={(e) =>
+                          setCol(c.id, {
+                            options: (c.options ?? []).map((x) =>
+                              x.id === o.id ? { ...x, label: e.target.value } : x
+                            ),
+                          })
+                        }
+                        className="min-w-0 flex-1 bg-transparent text-xs text-podio-ink focus:outline-none"
+                      />
+                      <ColorSwatch
+                        value={o.color}
+                        onChange={(color) =>
+                          setCol(c.id, {
+                            options: (c.options ?? []).map((x) =>
+                              x.id === o.id ? { ...x, color } : x
+                            ),
+                          })
+                        }
+                      />
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setCol(c.id, {
+                            options: (c.options ?? []).filter((x) => x.id !== o.id),
+                          })
+                        }
+                        title="Remove option"
+                        className="text-xs text-podio-meta hover:text-red-600"
+                      >
+                        ✕
+                      </button>
+                    </div>
+                  ))}
+                  <div
+                    className={`bg-podio-row-alt px-2 py-1.5 ${
+                      (c.options ?? []).length > 0 ? "border-t border-podio-border" : ""
+                    }`}
+                  >
+                    <AddOptionInput
+                      placeholder="Enter an option"
+                      onAdd={(label) =>
+                        setCol(c.id, {
+                          options: [
+                            ...(c.options ?? []),
+                            {
+                              id: crypto.randomUUID(),
+                              label,
+                              color:
+                                CATEGORY_COLORS[
+                                  (c.options ?? []).length % CATEGORY_COLORS.length
+                                ],
+                            },
+                          ],
+                        })
+                      }
+                    />
+                  </div>
+                </div>
+              )}
+            </div>
+          ))}
+          <div
+            className={`bg-podio-row-alt px-3 py-2 ${
+              cols.length > 0 ? "border-t border-podio-border" : ""
+            }`}
+          >
+            <AddOptionInput
+              placeholder="Enter a column label (Enter to add)"
+              onAdd={(label) =>
+                setCols([
+                  ...cols,
+                  { id: crypto.randomUUID(), label, type: "text" },
+                ])
+              }
+            />
+          </div>
+        </div>
+        {cols.length === 0 && (
+          <p className="text-[11px] text-amber-600">
+            A table field needs at least one column before you can publish.
+          </p>
+        )}
+      </div>
+    );
+  }
+
+  // A table field on the canvas: spans the FULL width of its section (like a
+  // separator) and shows the columns builder. Drops on it are direction-
+  // aware, reusing the separator's before/after plumbing.
+  function renderTableBlock(f: EditField, si: number) {
+    const i = globalIndex.get(f.key)!;
+    const cnt = f.id ? countByField[f.id] ?? 0 : 0;
+    const overBefore =
+      overSlot !== null && overSlot.sec === si && overSlot.col === -1 && overSlot.pos === 0;
+    const overAfter =
+      overSlot !== null && overSlot.sec === si && overSlot.col === -1 && overSlot.pos === 1;
+    return (
+      <div
+        id={`field-block-${f.key}`}
+        onDragOver={(e) => {
+          if (!isFieldDrag(e)) return;
+          e.preventDefault();
+          e.dataTransfer.dropEffect = e.dataTransfer.types.includes(
+            "application/x-field-reorder"
+          )
+            ? "move"
+            : "copy";
+          const pos = separatorDropAfter(e, f) ? 1 : 0;
+          if (overSlot?.sec !== si || overSlot?.col !== -1 || overSlot?.pos !== pos)
+            setOverSlot({ sec: si, col: -1, pos });
+        }}
+        onDragLeave={(e) => {
+          if (!e.currentTarget.contains(e.relatedTarget as Node | null))
+            setOverSlot((v) => (v && v.sec === si && v.col === -1 ? null : v));
+        }}
+        onDrop={(e) => handleSeparatorDrop(e, f)}
+        className={`rounded border bg-white shadow-sm ${
+          dragIndex === i ? "border-podio-teal opacity-60" : "border-podio-border"
+        } ${overBefore && dragIndex !== i ? "border-t-2 border-t-podio-teal" : ""} ${
+          overAfter && dragIndex !== i ? "border-b-2 border-b-podio-teal" : ""
+        } ${justAdded === f.key ? "ring-2 ring-podio-teal" : ""}`}
+      >
+        <div className="flex items-start gap-3 p-4">
+          {renderGrip(f)}
+          <div
+            className="relative flex shrink-0 items-center gap-1 rounded-sm border border-transparent px-1.5 py-1.5 text-podio-secondary hover:border-podio-border"
+            title="Table"
+          >
+            <PodioIcon icon={FIELD_TYPE_ICONS.table} className="h-6 w-6" />
+            <span className="text-xs leading-none text-podio-meta">⌄</span>
+            <select
+              value={f.type}
+              aria-label="Field type"
+              onChange={(e) => upd(f.key, { type: e.target.value as FieldType })}
+              className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
+            >
+              {FIELD_TYPES.map((t) => (
+                <option key={t.value} value={t.value}>{t.label}</option>
+              ))}
+            </select>
+          </div>
+
+          <div className="min-w-0 flex-1">
+            <input
+              id={`field-label-${f.key}`}
+              value={f.label}
+              placeholder="Field label"
+              onChange={(e) => upd(f.key, { label: e.target.value })}
+              className="w-full border-b border-podio-border bg-transparent pb-1 text-xl font-semibold text-podio-ink placeholder:font-normal placeholder:text-podio-meta focus:border-podio-teal focus:outline-none"
+            />
+            <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1.5 text-xs text-podio-secondary">
+              <input placeholder="Help text shown under the field"
+                value={f.help_text}
+                onChange={(e) => upd(f.key, { help_text: e.target.value })}
+                className="min-w-40 flex-1 rounded-sm border border-podio-border px-2 py-1 text-xs placeholder:text-podio-meta focus:border-podio-teal focus:outline-none" />
+              <label className="flex items-center gap-1">
+                <input type="checkbox" checked={f.is_hidden}
+                  onChange={(e) => upd(f.key, { is_hidden: e.target.checked })} />
+                hidden
+              </label>
+              <span className="text-podio-meta">spans all columns</span>
+            </div>
+            {renderColumnsBuilder(f)}
+          </div>
+
+          <div className="flex shrink-0 items-center gap-2 pt-1">
+            {f.id ? (
+              <span className="rounded bg-podio-row-alt px-2 py-0.5 text-[11px] text-podio-meta"
+                title="Items holding a value for this field">
+                {cnt} value{cnt === 1 ? "" : "s"}
+              </span>
+            ) : (
+              <span className="rounded bg-podio-row-hover px-2 py-0.5 text-[11px] font-semibold text-podio-teal">
+                new
+              </span>
+            )}
+            <button onClick={() => remove(f)} title="Remove field"
+              className="text-sm text-podio-meta hover:text-red-600">✕</button>
+          </div>
+        </div>
       </div>
     );
   }
@@ -579,6 +882,10 @@ export function AppEditor({
       setError("Every field needs a label.");
       return false;
     }
+    if (fields.some((f) => f.type === "table" && f.tableColumns.length === 0)) {
+      setError("Every table field needs at least one column.");
+      return false;
+    }
 
     // Warn on type changes for fields with data
     for (const f of fields) {
@@ -613,9 +920,14 @@ export function AppEditor({
       if (["text", "number"].includes(f.type) && f.defaultValue !== "") {
         config.default = f.type === "number" ? Number(f.defaultValue) : f.defaultValue;
       }
-      // Layout column rides inside config (absent = column 0; separators span
-      // all columns, so they never store one).
-      if (f.type !== "separator" && f.column > 0) config.column = f.column;
+      if (f.type === "table") {
+        config.columns = f.tableColumns;
+        config.currency = f.tableCurrency || "USD";
+      }
+      // Layout column rides inside config (absent = column 0; separators and
+      // table fields span all columns, so they never store one).
+      if (f.type !== "separator" && f.type !== "table" && f.column > 0)
+        config.column = f.column;
       return {
         id: f.id,
         label: f.label,
@@ -905,7 +1217,7 @@ export function AppEditor({
                 ))}
               </div>
               <span className="text-xs text-podio-meta">
-                Drag fields into any column. Separators always span the full width.
+                Drag fields into any column. Separators and table fields always span the full width.
               </span>
             </div>
           </div>
@@ -923,6 +1235,7 @@ export function AppEditor({
             ? ([
                 {
                   separator: null,
+                  fullWidth: null,
                   columns: Array.from({ length: columns }, () => []),
                 },
               ] as LayoutSection<EditField>[])
@@ -930,6 +1243,7 @@ export function AppEditor({
           ).map((sec, si) => (
             <div key={si} className="space-y-3">
               {sec.separator && renderSeparatorRow(sec.separator, si)}
+              {sec.fullWidth && renderTableBlock(sec.fullWidth, si)}
               <div className={`grid gap-4 ${EDITOR_GRID_COLS[columns]}`}>
                 {sec.columns.map((colFields, ci) => (
                   <div
@@ -1243,9 +1557,11 @@ export function AppEditor({
                         Drop a field here
                       </div>
                     )}
-                    {!dragging && colFields.length === 0 && columns > 1 && (
+                    {!dragging && colFields.length === 0 && (columns > 1 || sec.separator) && (
                       <div className="rounded border border-dashed border-podio-border px-4 py-6 text-center text-xs text-podio-meta">
-                        Empty column — drag fields here
+                        {sec.separator && columns === 1
+                          ? "Empty section — drag fields here"
+                          : "Empty column — drag fields here"}
                       </div>
                     )}
                   </div>
