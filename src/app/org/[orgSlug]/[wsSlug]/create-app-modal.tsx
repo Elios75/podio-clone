@@ -1,7 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import { createClient } from "@/lib/supabase/client";
+import { slugify } from "@/lib/slug";
 import { PodioIcon } from "@/components/podio-icon";
 import { IconPicker } from "@/components/icon-picker";
 
@@ -48,6 +50,17 @@ export function CreateAppModal({
   const [type, setType] = useState<AppType>("standard");
   const [icon, setIcon] = useState("brick");
   const [iconOpen, setIconOpen] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const iconPanelRef = useRef<HTMLDivElement>(null);
+
+  // The App Icon button sits at the bottom of the scrollable body, so the
+  // picker can open below the fold — scroll it into view when it appears.
+  useEffect(() => {
+    if (iconOpen) {
+      iconPanelRef.current?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+    }
+  }, [iconOpen]);
 
   // Fresh form every time the modal opens.
   useEffect(() => {
@@ -57,6 +70,8 @@ export function CreateAppModal({
       setType("standard");
       setIcon("brick");
       setIconOpen(false);
+      setSaving(false);
+      setError(null);
     }
   }, [open]);
 
@@ -64,16 +79,67 @@ export function CreateAppModal({
 
   const canCreate = name.trim().length > 0 && itemName.trim().length > 0;
 
-  function create() {
-    if (!canCreate) return;
-    const params = new URLSearchParams({
-      name: name.trim(),
-      item: itemName.trim(),
-      type,
-      icon,
+  // Create the app immediately (one required Title field, like real Podio)
+  // and drop the user into the Modify Template editor to build the rest with
+  // the fields palette — no intermediate builder page, no surprise fields.
+  async function create() {
+    if (!canCreate || saving) return;
+    setSaving(true);
+    setError(null);
+    const supabase = createClient();
+
+    const { data: ws, error: wsError } = await supabase
+      .from("workspaces")
+      .select("id, organizations!inner(slug)")
+      .eq("slug", wsSlug)
+      .eq("organizations.slug", orgSlug)
+      .single();
+    if (wsError || !ws) {
+      setSaving(false);
+      setError(wsError?.message ?? "Workspace not found.");
+      return;
+    }
+
+    const { data: app, error: appError } = await supabase
+      .from("apps")
+      .insert({
+        workspace_id: ws.id,
+        name: name.trim(),
+        slug: slugify(name.trim()),
+        icon,
+        item_name: itemName.trim() || "Item",
+      })
+      .select()
+      .single();
+    if (appError) {
+      setSaving(false);
+      setError(
+        appError.message.includes("duplicate key")
+          ? "An app with that name already exists in this workspace."
+          : appError.message
+      );
+      return;
+    }
+
+    const { error: fieldError } = await supabase.from("app_fields").insert({
+      app_id: app.id,
+      external_id: "title-0",
+      label: "Title",
+      type: "text",
+      is_required: true,
+      is_primary: true,
+      position: 0,
+      config: {},
     });
+    setSaving(false);
+    if (fieldError) {
+      setError(fieldError.message);
+      return;
+    }
+
     onClose();
-    router.push(`/org/${orgSlug}/${wsSlug}/new-app?${params.toString()}`);
+    router.push(`/org/${orgSlug}/${wsSlug}/${app.slug}/edit`);
+    router.refresh();
   }
 
   return (
@@ -198,7 +264,7 @@ export function CreateAppModal({
                   always reachable. Picking keeps it open for browsing; the
                   button above toggles it closed. */}
               {iconOpen && (
-                <div className="mt-2">
+                <div ref={iconPanelRef} className="mt-2">
                   <IconPicker value={icon} onChange={setIcon} />
                 </div>
               )}
@@ -207,7 +273,8 @@ export function CreateAppModal({
         </div>
 
         {/* Footer: grey Cancel + teal Create App, touching */}
-        <div className="flex shrink-0 justify-end border-t border-podio-border px-6 py-4">
+        <div className="flex shrink-0 items-center justify-end gap-4 border-t border-podio-border px-6 py-4">
+          {error && <span className="mr-auto text-sm text-red-600">{error}</span>}
           <button
             onClick={onClose}
             className="rounded-sm bg-podio-row-hover px-6 py-2.5 font-semibold text-podio-ink hover:bg-[#E0E0E0]"
@@ -216,10 +283,10 @@ export function CreateAppModal({
           </button>
           <button
             onClick={create}
-            disabled={!canCreate}
+            disabled={!canCreate || saving}
             className="rounded-sm bg-podio-teal px-6 py-2.5 font-semibold text-white hover:bg-podio-teal-dark disabled:opacity-50"
           >
-            Create App
+            {saving ? "Creating…" : "Create App"}
           </button>
         </div>
       </div>

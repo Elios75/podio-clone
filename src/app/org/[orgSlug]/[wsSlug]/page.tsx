@@ -545,6 +545,7 @@ export default async function WorkspacePage({
         rightFooter={
           /* Add-tile affordance — jumps up to the Dashboard panel */
           <a
+            key="add-tile"
             href="#dashboard"
             className="flex h-28 w-full items-center justify-center rounded border-2 border-dashed border-podio-border text-sm font-semibold uppercase tracking-wide text-podio-meta hover:border-podio-meta hover:text-podio-secondary"
           >
