@@ -531,34 +531,54 @@ export function AppEditor({
     );
   }
 
-  function done() {
-    if (schemaDirty || settingsDirty || layoutDirty) {
-      const ok = window.confirm(
-        "You have unpublished changes. Leave the template editor anyway?"
-      );
-      if (!ok) return;
+  // Done = publish-and-leave: everything dirty is saved (settings, layout,
+  // schema) before navigating back. If any save fails — including schema
+  // validation like a missing label — we stay on the page with the error
+  // visible instead of discarding work.
+  async function done() {
+    if (saving) return; // a publish is already in flight
+    if (settingsDirty && !(await saveSettings())) return;
+    if (layoutDirty) {
+      const { error: layoutError } = await supabase
+        .from("apps")
+        .update({
+          layout_settings: { ...(app.layout_settings ?? {}), columns },
+        })
+        .eq("id", app.id);
+      if (layoutError) {
+        setError(layoutError.message);
+        return;
+      }
+      setLayoutDirty(false);
     }
+    if (schemaDirty && !(await saveSchema())) return;
     router.push(backHref);
   }
 
-  async function saveSettings() {
+  async function saveSettings(): Promise<boolean> {
     setError(null);
     setSaved(null);
     const { error: upError } = await supabase
       .from("apps")
       .update({ name, icon, item_name: itemName || "Item", description: description || null })
       .eq("id", app.id);
-    if (upError) return setError(upError.message);
+    if (upError) {
+      setError(upError.message);
+      return false;
+    }
     setSettingsDirty(false);
     setSaved("Settings saved.");
     router.refresh();
+    return true;
   }
 
-  async function saveSchema() {
+  async function saveSchema(): Promise<boolean> {
     setError(null);
     setSaved(null);
-    if (fields.some((f) => f.type !== "separator" && !f.label.trim()))
-      return setError("Every field needs a label.");
+    if (fields.some((f) => f.type !== "separator" && !f.label.trim())) {
+      setError("Every field needs a label.");
+      return false;
+    }
 
     // Warn on type changes for fields with data
     for (const f of fields) {
@@ -567,7 +587,7 @@ export function AppEditor({
           `"${f.label}" changes type ${f.origType} → ${f.type} and holds data on ` +
           `${countByField[f.id]} item(s). Existing values may display incorrectly. Continue?`
         );
-        if (!ok) return;
+        if (!ok) return false;
       }
     }
 
@@ -617,7 +637,8 @@ export function AppEditor({
         .eq("id", app.id);
       if (layoutError) {
         setSaving(false);
-        return setError(layoutError.message);
+        setError(layoutError.message);
+        return false;
       }
       setLayoutDirty(false);
     }
@@ -627,10 +648,14 @@ export function AppEditor({
       p_fields: payload,
     });
     setSaving(false);
-    if (rpcError) return setError(rpcError.message);
+    if (rpcError) {
+      setError(rpcError.message);
+      return false;
+    }
     setSchemaDirty(false);
     setSaved(`Published schema v${data.version}.`);
     router.refresh();
+    return true;
   }
 
   async function archiveApp() {
@@ -843,10 +868,28 @@ export function AppEditor({
                     key={n}
                     type="button"
                     aria-pressed={columns === n}
-                    onClick={() => {
+                    onClick={async () => {
                       if (columns === n) return;
                       setColumns(n);
-                      setLayoutDirty(true);
+                      // Persist immediately — the column count is app chrome,
+                      // not field schema, so it must not be lost when the user
+                      // leaves without publishing.
+                      const { error: layoutError } = await supabase
+                        .from("apps")
+                        .update({
+                          layout_settings: {
+                            ...(app.layout_settings ?? {}),
+                            columns: n,
+                          },
+                        })
+                        .eq("id", app.id);
+                      if (layoutError) {
+                        // Fall back to publish-time persistence.
+                        setLayoutDirty(true);
+                        setError(layoutError.message);
+                      } else {
+                        setLayoutDirty(false);
+                      }
                     }}
                     className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold ${
                       bi > 0 ? "border-l border-podio-border" : ""

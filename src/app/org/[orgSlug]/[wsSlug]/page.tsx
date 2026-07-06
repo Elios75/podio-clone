@@ -264,6 +264,7 @@ export default async function WorkspacePage({
             column: "left",
             node: (
           <WorkspaceHeader
+            key="header"
             orgSlug={orgSlug}
             wsSlug={ws.slug}
             wsId={ws.id}
@@ -285,7 +286,7 @@ export default async function WorkspacePage({
             title: "Activity feed",
             column: "left",
             node: (
-          <section className="rounded border border-podio-border bg-white p-4 shadow-sm">
+          <section key="feed" className="rounded border border-podio-border bg-white p-4 shadow-sm">
             <StatusComposer wsId={ws.id} orgId={org.id} />
             {(statusRows ?? []).length > 0 && (
               <ul className="mt-4 space-y-1.5">
@@ -385,7 +386,7 @@ export default async function WorkspacePage({
             title: `${ws.name} Tasks`,
             column: "right",
             node: (
-          <section className="rounded border border-podio-border bg-white shadow-sm">
+          <section key="tasks" className="rounded border border-podio-border bg-white shadow-sm">
             <div className="p-4">
               <h2 className="font-semibold text-podio-teal">
                 {ws.name} Tasks{" "}
@@ -429,7 +430,7 @@ export default async function WorkspacePage({
             title: `${ws.name} Calendar`,
             column: "right",
             node: (
-          <section className="rounded border border-podio-border bg-white p-4 shadow-sm">
+          <section key="calendar" className="rounded border border-podio-border bg-white p-4 shadow-sm">
             <h2 className="font-semibold text-podio-teal">
               {ws.name} Calendar
             </h2>
@@ -462,6 +463,7 @@ export default async function WorkspacePage({
             column: "right",
             node: (
           <section
+            key="dashboard"
             id="dashboard"
             className="rounded border border-podio-border bg-white p-4 shadow-sm"
           >
@@ -477,7 +479,7 @@ export default async function WorkspacePage({
             title: "Workspace tools",
             column: "right",
             node: (
-          <section className="rounded border border-podio-border bg-white p-4 shadow-sm">
+          <section key="tools" className="rounded border border-podio-border bg-white p-4 shadow-sm">
             <h2 className="font-semibold text-podio-teal">Workspace tools</h2>
             <ul className="mt-2 space-y-0.5 text-sm">
               <li>
@@ -519,7 +521,7 @@ export default async function WorkspacePage({
             title: "Members",
             column: "right",
             node: (
-          <section className="rounded border border-podio-border bg-white p-4 shadow-sm">
+          <section key="members" className="rounded border border-podio-border bg-white p-4 shadow-sm">
             <h2 className="font-semibold text-podio-teal">Members</h2>
             <ul className="mt-2 space-y-2">
               {(members ?? []).map((m: any) => (
