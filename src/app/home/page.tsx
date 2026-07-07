@@ -62,9 +62,29 @@ export default async function HomePage() {
         })),
     }));
 
+  // Global-bar right cluster: profile (avatar) + unread notification count
+  const { data: myProfile } = await supabase
+    .from("user_profiles")
+    .select("full_name, avatar_url")
+    .eq("user_id", user.id)
+    .maybeSingle();
+  const { count: unread } = await supabase
+    .from("notifications")
+    .select("id", { count: "exact", head: true })
+    .eq("user_id", user.id)
+    .is("read_at", null);
+
   return (
     <div className="flex min-h-screen flex-col bg-podio-page">
-      <GlobalBar left={<OrgPickerDrawer orgs={pickerOrgs} />} />
+      <GlobalBar
+        left={<OrgPickerDrawer orgs={pickerOrgs} />}
+        user={{
+          id: user.id,
+          name: myProfile?.full_name ?? user.email ?? null,
+          avatarUrl: myProfile?.avatar_url ?? null,
+        }}
+        initialUnread={unread ?? 0}
+      />
 
       <main className="mx-auto w-full max-w-2xl flex-1 px-4 py-8">
         <div className="flex flex-wrap items-center justify-between gap-3">

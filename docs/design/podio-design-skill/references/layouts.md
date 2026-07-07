@@ -21,6 +21,20 @@ no exception. The bar lives in the shared `GlobalBar` component
 (`src/components/global-bar.tsx`) with a `left` slot and an `activeTool`
 prop that puts the current page's tool icon on a small white rounded card.
 
+**Right cluster** (implemented; Podio order, left to right): help `?`
+circle icon · search icon · the user's round avatar (photo, or initials on
+a `bg-podio-secondary` circle) · **NotificationsBell** · **ChatLauncher**
+(💬 → the §13 presence slide-over). Call sites pass
+`user={{ id, name, avatarUrl }}` and `initialUnread` (server-counted
+unread notifications); all three GlobalBar call sites (org layout, /tasks,
+/home) fetch both. The bell shows, when unread > 0, a small red dot ON the
+bell AND a yellow count pill (`bg-podio-yellow`, ink text, `text-xs
+font-semibold rounded`) to its right; clicking opens a right-aligned `w-96`
+white dropdown with the 15 newest notifications (unread rows
+`bg-podio-row-alt`, click marks read + navigates, quiet "Mark all read",
+footer "All notifications →"). Live count via a postgres_changes INSERT
+subscription, degrading to refetch-on-open when realtime is off.
+
 Two drawers fill the left slot, one per context:
 
 - **Inside an org** (`/org/[orgSlug]/…`): `WorkspaceDrawer` — ☰ + org
@@ -630,7 +644,8 @@ Structure, right-docked and full height:
   overflow and a tray icon at the bottom.
 - The **panel column** (white): top row = 🔍 "Search connections" input with
   a ✕ close at the right; below, connection rows — avatar + ink name +
-  right-aligned presence dot (solid green = online, grey outline = offline),
+  right-aligned presence dot (filled orange #F7A11C = online, grey outline =
+  offline),
   hairline dividers, ~72px rows.
 - **Conversation view** (after picking someone): header row with ⊕ (new
   conversation) and … actions + ✕ close; a name row "`<Name>` ○" with the
@@ -639,6 +654,22 @@ Structure, right-docked and full height:
   composer = bordered "Add a message" input with 📎 attach-file and 🔗
   share-link icon buttons beneath (same icon row grammar as the workspace
   composer).
+
+**Implementation addendum**: the launcher lives at the far right of the
+global bar (`ChatLauncher` in `src/components/chat-launcher.tsx`; panel in
+`chat-panel.tsx`). The panel is a fixed right slide-over (`w-[380px]`,
+white, `shadow-xl`, `z-50`, NO dimming backdrop — the page stays visible;
+ESC/✕ close), with a `w-14 bg-podio-page` mini-rail of recent-conversation
+avatars inside. Connections = all members of the user's orgs
+(`organization_members` × `user_profiles`, deduped). **Presence dots:
+filled orange (`bg-podio-orange`, #F7A11C) = online, hollow grey ring
+(`border-podio-disabled`) = offline.** Presence is one shared Supabase
+Realtime channel `"online"` keyed by user id (`use-presence.ts`), joined
+after mount in the launcher so anyone with the app open counts as online.
+Threads reuse the /messages RPCs (`start_conversation`, `send_message`) +
+`last_read_at` bookkeeping; own messages sit right-aligned on
+`bg-podio-row-alt`; live delivery = postgres_changes INSERT on
+`podio.messages` plus a 5s poll fallback while a thread is open.
 
 ## 14. My Tasks page (standalone /tasks)
 

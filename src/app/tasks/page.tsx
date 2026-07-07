@@ -287,9 +287,30 @@ export default async function MyTasksPage({
   // opens the cross-org workspace picker drawer (a slide-over, no navigation).
   const chooser = <OrgPickerDrawer orgs={pickerOrgs} />;
 
+  // Global-bar right cluster: profile (avatar) + unread notification count
+  const { data: myProfile } = await supabase
+    .from("user_profiles")
+    .select("full_name, avatar_url")
+    .eq("user_id", user.id)
+    .maybeSingle();
+  const { count: unread } = await supabase
+    .from("notifications")
+    .select("id", { count: "exact", head: true })
+    .eq("user_id", user.id)
+    .is("read_at", null);
+
   return (
     <div className="flex min-h-screen flex-col">
-      <GlobalBar left={chooser} activeTool="tasks" />
+      <GlobalBar
+        left={chooser}
+        activeTool="tasks"
+        user={{
+          id: user.id,
+          name: myProfile?.full_name ?? user.email ?? null,
+          avatarUrl: myProfile?.avatar_url ?? null,
+        }}
+        initialUnread={unread ?? 0}
+      />
 
       <main className="flex-1 px-4 py-4 md:px-6 md:py-5">
         <div className="mx-auto flex max-w-6xl flex-col rounded border border-podio-border bg-white shadow-sm md:flex-row">

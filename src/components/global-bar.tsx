@@ -1,5 +1,7 @@
 import Link from "next/link";
 import { PodioIcon } from "@/components/podio-icon";
+import { NotificationsBell } from "@/components/notifications-bell";
+import { ChatLauncher } from "@/components/chat-launcher";
 
 // The one grey-teal global bar (desktop + mobile variants), extracted
 // verbatim from the org layout so standalone pages (/tasks, /calendar,
@@ -9,14 +11,41 @@ import { PodioIcon } from "@/components/podio-icon";
 // pages a ☰ "Choose a workspace or app" link. `activeTool` puts that tool's
 // icon on a small white rounded card (Podio's active-tool highlight); when
 // omitted the markup is identical to the original org-layout bar.
+//
+// The RIGHT cluster matches real Podio (design skill layouts.md §1):
+// help "?" · search · round avatar · bell with red dot + yellow count pill ·
+// chat launcher (presence slide-over, §13). Call sites server-fetch the
+// user's profile + unread notification count and pass them down; without a
+// `user` the cluster degrades to the old plain bell link.
 export type GlobalBarTool = "search" | "calendar" | "messages" | "tasks";
+
+export type GlobalBarUser = {
+  id: string;
+  name: string | null;
+  avatarUrl: string | null;
+};
+
+function avatarInitials(name: string | null) {
+  const parts = (name ?? "").trim().split(/\s+/).filter(Boolean);
+  return (
+    parts
+      .slice(0, 2)
+      .map((w) => w[0])
+      .join("")
+      .toUpperCase() || "?"
+  );
+}
 
 export function GlobalBar({
   left,
   activeTool,
+  user,
+  initialUnread = 0,
 }: {
   left: React.ReactNode;
   activeTool?: GlobalBarTool;
+  user?: GlobalBarUser;
+  initialUnread?: number;
 }) {
   const tool = (t: GlobalBarTool) =>
     activeTool === t
@@ -47,10 +76,46 @@ export function GlobalBar({
           </Link>
         </nav>
         <div className="mx-auto font-semibold tracking-wide">Podio Clone</div>
+        {/* Right cluster, Podio order: ? · search · avatar · bell+pill · chat */}
         <div className="flex items-center gap-4">
-          <Link href="/notifications" title="Notifications" className="hover:opacity-80">
-            <PodioIcon icon="bell" className="h-5 w-5" />
+          <Link href="/home" title="Help" className="hover:opacity-80">
+            <PodioIcon icon="help" className="h-5 w-5" />
           </Link>
+          <Link href="/search" title="Search" className="hover:opacity-80">
+            <PodioIcon icon="search" className="h-5 w-5" />
+          </Link>
+          {user && (
+            <Link
+              href="/home"
+              title={user.name ?? "Profile"}
+              className="hover:opacity-80"
+            >
+              {user.avatarUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={user.avatarUrl}
+                  alt=""
+                  className="h-7 w-7 rounded-full object-cover"
+                />
+              ) : (
+                <span className="flex h-7 w-7 items-center justify-center rounded-full bg-podio-secondary text-xs font-semibold text-white">
+                  {avatarInitials(user.name)}
+                </span>
+              )}
+            </Link>
+          )}
+          {user ? (
+            <NotificationsBell userId={user.id} initialUnread={initialUnread} />
+          ) : (
+            <Link
+              href="/notifications"
+              title="Notifications"
+              className="hover:opacity-80"
+            >
+              <PodioIcon icon="bell" className="h-5 w-5" />
+            </Link>
+          )}
+          {user && <ChatLauncher userId={user.id} />}
         </div>
       </header>
 
