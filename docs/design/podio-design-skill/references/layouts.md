@@ -57,21 +57,23 @@ Two drawers fill the left slot, one per context:
 
 Sits directly under the global bar on the page background. Each app is an
 icon-over-label tab; the active one is a white rounded card. "ADD APP" is
-last, uppercase, disabled-grey, after a vertical divider.
+last, uppercase, disabled-grey, after a vertical divider. COMPACT per
+current Podio: short bar, 20px (`h-5`) monochrome icons, tight vertical
+padding, 12px labels, ~72px tab width.
 
 ```jsx
-<nav className="flex items-end gap-1 bg-[#EDEDED] px-4 pt-2">
+<nav className="flex items-end gap-0.5 bg-[#EDEDED] px-4 pt-1.5">
   {apps.map((a) => (
     <a key={a.id} href={a.href}
-      className={`flex w-24 flex-col items-center gap-1 rounded-lg px-3 py-3 text-[13px]
+      className={`flex w-[4.5rem] flex-col items-center gap-0.5 rounded-md px-2 pb-2 pt-2 text-xs
         ${a.active ? "bg-white text-[#333333] shadow-sm" : "text-[#6E7A7A] hover:bg-[#E4E4E4]"}`}>
-      <span className="text-2xl leading-none">{a.icon}</span>
+      <PodioIcon icon={a.icon} name={a.name} className="h-5 w-5" />
       {a.name}
     </a>
   ))}
-  <span className="mx-2 h-10 w-px self-center bg-[#DADADA]" />
-  <button className="flex w-24 flex-col items-center gap-1 px-3 py-3 text-[13px] uppercase text-[#B8C2C2]">
-    <span className="text-2xl leading-none">⊕</span>Add app
+  <span className="mx-2 h-8 w-px self-center bg-[#DADADA]" />
+  <button className="flex w-[4.5rem] flex-col items-center gap-0.5 px-2 pb-2 pt-2 text-xs uppercase text-[#B8C2C2]">
+    <PodioIcon icon="add" className="h-5 w-5" />Add app
   </button>
 </nav>
 ```

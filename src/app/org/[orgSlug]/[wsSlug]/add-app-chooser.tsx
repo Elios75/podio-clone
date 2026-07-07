@@ -24,9 +24,9 @@ export function AddAppChooser({
     <>
       <button
         onClick={() => setOpen(true)}
-        className="flex w-20 shrink-0 flex-col items-center gap-1 px-2 py-3 text-[13px] uppercase text-podio-disabled hover:text-podio-secondary"
+        className="flex w-[4.5rem] shrink-0 flex-col items-center gap-0.5 px-2 pb-2 pt-2 text-xs uppercase text-podio-disabled hover:text-podio-secondary"
       >
-        <PodioIcon icon="add" className="h-6 w-6" />
+        <PodioIcon icon="add" className="h-5 w-5" />
         Add app
       </button>
 
