@@ -39,7 +39,7 @@ export function NewConversation({ people }: { people: Person[] }) {
     return (
       <button
         onClick={() => setOpen(true)}
-        className="rounded-lg bg-blue-600 px-3 py-2 text-sm font-medium text-white hover:bg-blue-700"
+        className="w-full rounded-sm bg-podio-teal px-3 py-2 text-sm font-semibold text-white hover:bg-podio-teal-dark"
       >
         + New conversation
       </button>
@@ -47,16 +47,19 @@ export function NewConversation({ people }: { people: Person[] }) {
   }
 
   return (
-    <div className="rounded-lg border border-blue-200 bg-white p-3">
+    <div className="rounded border border-podio-border bg-white p-3">
       <input
         placeholder="Subject (optional)"
         value={subject}
         onChange={(e) => setSubject(e.target.value)}
-        className="w-full rounded-lg border border-slate-300 px-2 py-1.5 text-sm focus:border-blue-500 focus:outline-none"
+        className="w-full rounded-sm border border-podio-border px-2 py-1.5 text-sm text-podio-ink outline-none placeholder:text-podio-meta focus:border-podio-teal"
       />
       <div className="mt-2 max-h-40 space-y-1 overflow-y-auto">
         {people.map((p) => (
-          <label key={p.user_id} className="flex items-center gap-2 text-sm">
+          <label
+            key={p.user_id}
+            className="flex items-center gap-2 text-sm text-podio-ink"
+          >
             <input
               type="checkbox"
               checked={selected.includes(p.user_id)}
@@ -66,16 +69,16 @@ export function NewConversation({ people }: { people: Person[] }) {
           </label>
         ))}
         {people.length === 0 && (
-          <p className="text-xs text-slate-400">No other users yet.</p>
+          <p className="text-xs text-podio-meta">No other users yet.</p>
         )}
       </div>
       <div className="mt-2 flex gap-2">
         <button onClick={start}
-          className="rounded bg-blue-600 px-3 py-1 text-xs font-medium text-white hover:bg-blue-700">
+          className="rounded-sm bg-podio-teal px-3 py-1 text-xs font-semibold text-white hover:bg-podio-teal-dark">
           Start
         </button>
         <button onClick={() => setOpen(false)}
-          className="rounded border border-slate-300 px-3 py-1 text-xs hover:bg-slate-100">
+          className="rounded-sm border border-podio-border px-3 py-1 text-xs text-podio-secondary hover:bg-podio-row-hover">
           Cancel
         </button>
       </div>

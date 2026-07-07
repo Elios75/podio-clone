@@ -67,6 +67,8 @@ Two drawers fill the left slot, one per context:
 </header>
 ```
 
+Chromed standalone pages (complete set): `/home`, `/tasks`, `/search`, `/calendar`, `/messages`, `/notifications` — every one renders `GlobalBar` (+ ☰ `OrgPickerDrawer`), the newer four via the shared server helper `getGlobalChrome()` (`src/lib/global-chrome.ts`); only `/login` and the public webform/portal routes are intentionally chromeless.
+
 ## 2. App tab bar
 
 Sits directly under the global bar on the page background. Each app is an

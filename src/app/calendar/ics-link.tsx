@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { createClient } from "@/lib/supabase/client";
+import { PodioIcon } from "@/components/podio-icon";
 
 // Calendar sync out (Phase 13): calendars subscribe to the tokenized ICS feed
 // and auto-refresh on their own schedule — no OAuth needed. Google/Outlook take
@@ -26,20 +27,20 @@ export function IcsLink() {
         <a
           href={`https://calendar.google.com/calendar/r?cid=${enc}`}
           target="_blank" rel="noreferrer"
-          className="rounded border border-slate-300 px-2 py-1 text-xs text-slate-700 hover:bg-slate-100"
+          className="rounded-sm border border-podio-border bg-white px-2 py-1 text-xs text-podio-secondary hover:bg-podio-row-hover"
         >
           Add to Google
         </a>
         <a
           href={`https://outlook.live.com/calendar/0/addfromweb?url=${encodeURIComponent(url)}&name=${encodeURIComponent("Podio Clone")}`}
           target="_blank" rel="noreferrer"
-          className="rounded border border-slate-300 px-2 py-1 text-xs text-slate-700 hover:bg-slate-100"
+          className="rounded-sm border border-podio-border bg-white px-2 py-1 text-xs text-podio-secondary hover:bg-podio-row-hover"
         >
           Add to Outlook
         </a>
         <a
           href={webcal}
-          className="rounded border border-slate-300 px-2 py-1 text-xs text-slate-700 hover:bg-slate-100"
+          className="rounded-sm border border-podio-border bg-white px-2 py-1 text-xs text-podio-secondary hover:bg-podio-row-hover"
           title="Apple Calendar and any app that supports webcal subscriptions"
         >
           Apple / webcal
@@ -50,7 +51,7 @@ export function IcsLink() {
             setCopied(true);
             setTimeout(() => setCopied(false), 2000);
           }}
-          className="rounded border border-slate-300 px-2 py-1 text-xs text-slate-600 hover:bg-slate-100"
+          className="rounded-sm border border-podio-border bg-white px-2 py-1 text-xs text-podio-secondary hover:bg-podio-row-hover"
         >
           {copied ? "Copied ✓" : "Copy URL"}
         </button>
@@ -60,10 +61,11 @@ export function IcsLink() {
   return (
     <button
       onClick={reveal}
-      className="rounded-lg border border-slate-300 px-3 py-1.5 text-xs text-slate-600 hover:bg-slate-100"
+      className="inline-flex items-center gap-1.5 rounded-sm border border-podio-border bg-white px-3 py-1.5 text-xs text-podio-secondary hover:bg-podio-row-hover"
       title="Subscribe from Google Calendar, Outlook, or Apple Calendar"
     >
-      📅 Subscribe to calendar
+      <PodioIcon icon="calendar" className="h-4 w-4" />
+      Subscribe to calendar
     </button>
   );
 }

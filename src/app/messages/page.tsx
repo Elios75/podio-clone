@@ -1,20 +1,27 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { createClient } from "@/lib/supabase/server";
+import { GlobalBar } from "@/components/global-bar";
+import { OrgPickerDrawer } from "@/components/org-picker-drawer";
+import { getGlobalChrome } from "@/lib/global-chrome";
 import { Thread } from "./thread";
 import { NewConversation } from "./new-conversation";
 
+// Standalone messages page, styled like the §13 chat panel grammar:
+// conversation list on the left (white bordered panel, hairline dividers),
+// selected thread on the right. The global chrome NEVER disappears: the
+// shared GlobalBar renders here with the messages tool active and the ☰
+// org/workspace picker drawer in its left slot (design skill layouts.md §1).
 export default async function MessagesPage({
   searchParams,
 }: {
   searchParams: Promise<{ c?: string }>;
 }) {
   const { c: selectedId } = await searchParams;
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) redirect("/login");
+  const chrome = await getGlobalChrome();
+  if (!chrome) redirect("/login");
+  const { supabase, user } = chrome;
+  // Plain const so no narrowing is needed inside the hoisted helpers below.
+  const userId = user.id;
 
   // Conversations I'm in (RLS handles filtering), newest activity first
   const { data: conversations } = await supabase
@@ -55,17 +62,17 @@ export default async function MessagesPage({
   function convLabel(convId: string, subject: string | null) {
     if (subject) return subject;
     const others = (participants ?? [])
-      .filter((p) => p.conversation_id === convId && p.user_id !== user!.id)
+      .filter((p) => p.conversation_id === convId && p.user_id !== userId)
       .map((p) => nameOf.get(p.user_id) ?? "Member");
     return others.join(", ") || "Just you";
   }
 
   function isUnread(convId: string) {
     const me = (participants ?? []).find(
-      (p) => p.conversation_id === convId && p.user_id === user!.id
+      (p) => p.conversation_id === convId && p.user_id === userId
     );
     const last = lastMsg.get(convId);
-    if (!last || last.sender_id === user!.id) return false;
+    if (!last || last.sender_id === userId) return false;
     return !me?.last_read_at || new Date(last.created_at) > new Date(me.last_read_at);
   }
 
@@ -81,71 +88,81 @@ export default async function MessagesPage({
     : { data: [] as any[] };
 
   return (
-    <main className="mx-auto flex h-screen max-w-5xl flex-col p-4 sm:p-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-xl font-semibold">Messages</h1>
-        <Link href="/home" className="text-sm text-slate-500 hover:underline">← Home</Link>
-      </div>
+    <div className="flex h-screen flex-col bg-podio-page">
+      <GlobalBar
+        left={<OrgPickerDrawer orgs={chrome.pickerOrgs} />}
+        activeTool="messages"
+        user={chrome.barUser}
+        initialUnread={chrome.unread}
+      />
 
-      <div className="mt-4 flex min-h-0 flex-1 gap-4">
-        {/* Conversation list */}
-        <div className="flex w-64 shrink-0 flex-col gap-2 overflow-y-auto">
-          <NewConversation
-            people={(profiles ?? [])
-              .filter((p) => p.user_id !== user.id)
-              .map((p) => ({ user_id: p.user_id, full_name: p.full_name }))}
-          />
-          {(conversations ?? []).map((c) => (
-            <Link
-              key={c.id}
-              href={`/messages?c=${c.id}`}
-              className={`rounded-lg border p-3 ${
-                c.id === selectedId
-                  ? "border-blue-400 bg-blue-50"
-                  : "border-slate-200 bg-white hover:border-blue-300"
-              }`}
-            >
-              <div className="flex items-center gap-2">
-                <span className="truncate text-sm font-medium">
-                  {convLabel(c.id, c.subject)}
-                </span>
-                {isUnread(c.id) && (
-                  <span className="h-2 w-2 shrink-0 rounded-full bg-blue-600" />
-                )}
-              </div>
-              {lastMsg.get(c.id) && (
-                <p className="mt-0.5 truncate text-xs text-slate-400">
-                  {lastMsg.get(c.id).body}
+      <main className="mx-auto flex min-h-0 w-full max-w-5xl flex-1 flex-col px-4 py-4 md:py-5">
+        <h1 className="text-xl font-semibold text-podio-ink">Messages</h1>
+
+        <div className="mt-3 flex min-h-0 flex-1 gap-4">
+          {/* Conversation list (left, §13 connection-row grammar) */}
+          <div className="flex w-64 shrink-0 flex-col overflow-hidden rounded border border-podio-border bg-white shadow-sm md:w-72">
+            <div className="border-b border-podio-border p-3">
+              <NewConversation
+                people={(profiles ?? [])
+                  .filter((p) => p.user_id !== userId)
+                  .map((p) => ({ user_id: p.user_id, full_name: p.full_name }))}
+              />
+            </div>
+            <div className="min-h-0 flex-1 overflow-y-auto">
+              {(conversations ?? []).map((c) => (
+                <Link
+                  key={c.id}
+                  href={`/messages?c=${c.id}`}
+                  className={`block border-b border-podio-border px-3 py-3 ${
+                    c.id === selectedId
+                      ? "bg-podio-row-hover"
+                      : "hover:bg-podio-row-alt"
+                  }`}
+                >
+                  <div className="flex items-center gap-2">
+                    <span className="truncate text-sm font-semibold text-podio-ink">
+                      {convLabel(c.id, c.subject)}
+                    </span>
+                    {isUnread(c.id) && (
+                      <span className="h-2 w-2 shrink-0 rounded-full bg-podio-orange" />
+                    )}
+                  </div>
+                  {lastMsg.get(c.id) && (
+                    <p className="mt-0.5 truncate text-xs text-podio-meta">
+                      {lastMsg.get(c.id).body}
+                    </p>
+                  )}
+                </Link>
+              ))}
+              {(conversations ?? []).length === 0 && (
+                <p className="p-6 text-center text-xs text-podio-meta">
+                  No conversations yet.
                 </p>
               )}
-            </Link>
-          ))}
-          {(conversations ?? []).length === 0 && (
-            <p className="rounded-lg border border-dashed border-slate-300 p-6 text-center text-xs text-slate-400">
-              No conversations yet.
-            </p>
-          )}
-        </div>
-
-        {/* Thread */}
-        <div className="flex min-w-0 flex-1 flex-col rounded-lg border border-slate-200 bg-white">
-          {selected ? (
-            <Thread
-              conversationId={selected.id}
-              title={convLabel(selected.id, selected.subject)}
-              currentUserId={user.id}
-              messages={(messages ?? []).map((m) => ({
-                ...m,
-                sender_name: nameOf.get(m.sender_id) ?? "Member",
-              }))}
-            />
-          ) : (
-            <div className="flex flex-1 items-center justify-center text-sm text-slate-400">
-              Select or start a conversation
             </div>
-          )}
+          </div>
+
+          {/* Thread (right) */}
+          <div className="flex min-w-0 flex-1 flex-col rounded border border-podio-border bg-white shadow-sm">
+            {selected ? (
+              <Thread
+                conversationId={selected.id}
+                title={convLabel(selected.id, selected.subject)}
+                currentUserId={userId}
+                messages={(messages ?? []).map((m) => ({
+                  ...m,
+                  sender_name: nameOf.get(m.sender_id) ?? "Member",
+                }))}
+              />
+            ) : (
+              <div className="flex flex-1 items-center justify-center text-sm text-podio-meta">
+                Select or start a conversation
+              </div>
+            )}
+          </div>
         </div>
-      </div>
-    </main>
+      </main>
+    </div>
   );
 }

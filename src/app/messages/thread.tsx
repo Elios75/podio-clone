@@ -84,10 +84,12 @@ export function Thread({
 
   return (
     <>
-      <div className="border-b border-slate-200 px-4 py-3">
-        <p className="truncate text-sm font-medium">{title}</p>
+      <div className="border-b border-podio-border px-4 py-3">
+        <p className="truncate text-sm font-semibold text-podio-ink">{title}</p>
       </div>
 
+      {/* Messages, §13 chat-panel grammar: own messages right-aligned on
+          bg-podio-row-alt, others plain on white; every message timestamped. */}
       <div className="flex-1 space-y-2 overflow-y-auto p-4">
         {messages.map((m) => {
           const day = dayFmt(m.created_at);
@@ -97,25 +99,22 @@ export function Thread({
           return (
             <div key={m.id}>
               {showDay && (
-                <p className="my-2 text-center text-[11px] text-slate-300">{day}</p>
+                <p className="my-2 text-center text-[11px] text-podio-meta">{day}</p>
               )}
-              <div className={`flex ${mine ? "justify-end" : "justify-start"}`}>
-                <div
-                  className={`max-w-[75%] rounded-2xl px-3 py-2 text-sm ${
-                    mine ? "bg-blue-600 text-white" : "bg-slate-100 text-slate-800"
-                  }`}
-                >
-                  {!mine && (
-                    <p className="text-[11px] font-medium text-slate-500">
-                      {m.sender_name}
-                    </p>
-                  )}
-                  <p className="whitespace-pre-wrap">{m.body}</p>
-                  <p className={`mt-0.5 text-right text-[10px] ${
-                    mine ? "text-blue-200" : "text-slate-400"}`}>
-                    {timeFmt(m.created_at)}
-                  </p>
-                </div>
+              <div
+                className={`max-w-[75%] rounded px-3 py-2 ${
+                  mine ? "ml-auto bg-podio-row-alt" : "mr-auto bg-white"
+                }`}
+              >
+                <p className="text-xs text-podio-meta">
+                  <span className="font-semibold text-podio-secondary">
+                    {mine ? "You" : m.sender_name}
+                  </span>{" "}
+                  · {timeFmt(m.created_at)}
+                </p>
+                <p className="mt-0.5 whitespace-pre-wrap text-sm text-podio-ink">
+                  {m.body}
+                </p>
               </div>
             </div>
           );
@@ -123,10 +122,10 @@ export function Thread({
         <div ref={bottomRef} />
       </div>
 
-      <div className="flex gap-2 border-t border-slate-200 p-3">
+      <div className="flex gap-2 border-t border-podio-border p-3">
         <textarea
           rows={1}
-          placeholder="Type a message…"
+          placeholder="Add a message"
           value={body}
           onChange={(e) => setBody(e.target.value)}
           onKeyDown={(e) => {
@@ -135,12 +134,12 @@ export function Thread({
               send();
             }
           }}
-          className="flex-1 resize-none rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
+          className="flex-1 resize-none rounded-sm border border-podio-border px-3 py-2 text-sm text-podio-ink outline-none placeholder:text-podio-meta focus:border-podio-teal"
         />
         <button
           onClick={send}
           disabled={sending || !body.trim()}
-          className="rounded-lg bg-blue-600 px-4 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
+          className="rounded-sm bg-podio-teal px-4 text-sm font-semibold text-white hover:bg-podio-teal-dark disabled:opacity-50"
         >
           Send
         </button>

@@ -119,12 +119,12 @@ export function PushToggle() {
     <div className="flex items-center gap-2">
       {state === "enabled" ? (
         <>
-          <span className="text-sm font-medium text-[#15808D]">
+          <span className="text-sm font-semibold text-podio-teal">
             Push enabled ✓
           </span>
           <button
             onClick={disable}
-            className="rounded border border-[#E3E3E3] px-2 py-1 text-xs text-[#6E7A7A] hover:bg-[#ECECEC]"
+            className="rounded-sm border border-podio-border bg-white px-2 py-1 text-xs text-podio-secondary hover:bg-podio-row-hover"
           >
             Disable
           </button>
@@ -133,7 +133,7 @@ export function PushToggle() {
         <button
           onClick={enable}
           disabled={state === "busy"}
-          className="rounded bg-[#15808D] px-3 py-1.5 text-sm font-medium text-white hover:bg-[#0F6D79] disabled:opacity-50"
+          className="rounded-sm bg-podio-teal px-3 py-1.5 text-sm font-semibold text-white hover:bg-podio-teal-dark disabled:opacity-50"
         >
           {state === "busy" ? "Enabling…" : "Enable push notifications"}
         </button>

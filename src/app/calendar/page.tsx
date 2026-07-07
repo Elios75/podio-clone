@@ -1,20 +1,22 @@
-import Link from "next/link";
 import { redirect } from "next/navigation";
-import { createClient } from "@/lib/supabase/server";
+import { GlobalBar } from "@/components/global-bar";
+import { OrgPickerDrawer } from "@/components/org-picker-drawer";
+import { getGlobalChrome } from "@/lib/global-chrome";
 import { CalendarView } from "../org/[orgSlug]/[wsSlug]/[appSlug]/calendar-view";
 import { IcsLink } from "./ics-link";
 
+// Standalone personal calendar. The global chrome NEVER disappears: the
+// shared GlobalBar renders here with the calendar tool active and the ☰
+// org/workspace picker drawer in its left slot (design skill layouts.md §1).
 export default async function PersonalCalendarPage({
   searchParams,
 }: {
   searchParams: Promise<{ month?: string }>;
 }) {
   const sp = await searchParams;
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) redirect("/login");
+  const chrome = await getGlobalChrome();
+  if (!chrome) redirect("/login");
+  const { supabase, user } = chrome;
 
   const monthStr =
     sp.month && /^\d{4}-\d{2}$/.test(sp.month)
@@ -64,25 +66,31 @@ export default async function PersonalCalendarPage({
   }
 
   return (
-    <main className="mx-auto max-w-4xl p-8">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold text-podio-ink">My calendar</h1>
-        <div className="flex items-center gap-3">
+    <div className="flex min-h-screen flex-col bg-podio-page">
+      <GlobalBar
+        left={<OrgPickerDrawer orgs={chrome.pickerOrgs} />}
+        activeTool="calendar"
+        user={chrome.barUser}
+        initialUnread={chrome.unread}
+      />
+
+      <main className="mx-auto w-full max-w-4xl flex-1 px-4 py-8">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <h1 className="text-2xl font-semibold text-podio-ink">My calendar</h1>
           <IcsLink />
-          <Link href="/home" className="text-sm text-podio-teal hover:underline">← Home</Link>
         </div>
-      </div>
-      <p className="mt-1 text-sm text-podio-secondary">
-        Your tasks plus every dated item across your workspaces.
-      </p>
-      <div className="mt-6 rounded border border-podio-border bg-white p-4 shadow-sm">
-        <CalendarView
-          monthStr={monthStr}
-          cardsByDay={cardsByDay}
-          baseHref="/calendar"
-          viewQuery="v=personal"
-        />
-      </div>
-    </main>
+        <p className="mt-1 text-sm text-podio-secondary">
+          Your tasks plus every dated item across your workspaces.
+        </p>
+        <div className="mt-6 rounded border border-podio-border bg-white p-4 shadow-sm">
+          <CalendarView
+            monthStr={monthStr}
+            cardsByDay={cardsByDay}
+            baseHref="/calendar"
+            viewQuery="v=personal"
+          />
+        </div>
+      </main>
+    </div>
   );
 }
