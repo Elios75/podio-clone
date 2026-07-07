@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { PodioIcon } from "@/components/podio-icon";
 
 type Comment = {
   id: string;
@@ -16,7 +17,9 @@ type Member = { user_id: string; full_name: string | null };
 type Attachment = { id: string; name: string; url: string | null };
 type Reaction = { emoji: string; count: number; mine: boolean };
 
-const EMOJIS = ["👍", "❤️", "🎉"];
+// Podio comments have a single "Like" (heart). We map it to the ❤️ reaction so
+// existing hearts carry over as likes.
+const LIKE_EMOJI = "❤️";
 
 export function CommentsSection({
   itemId,
@@ -164,6 +167,8 @@ export function CommentsSection({
   }
 
   const timeFmt = (d: string) => new Date(d).toLocaleString();
+  const likeOf = (id: string) =>
+    (reactionsByComment[id] ?? []).find((x) => x.emoji === LIKE_EMOJI) ?? null;
 
   return (
     <div className="mt-3">
@@ -174,25 +179,49 @@ export function CommentsSection({
         <div className="space-y-3">
           {comments.map((c) => (
             <div key={c.id} className="rounded-lg border border-slate-200 bg-white p-3">
-              <div className="flex items-center gap-2 text-xs text-slate-400">
-                <span className="font-medium text-slate-600">
+              <div className="flex items-center gap-2 text-xs text-podio-meta">
+                <span className="font-medium text-podio-secondary">
                   {c.author_name ?? "Member"}
                 </span>
                 <span>{timeFmt(c.created_at)}</span>
                 {c.is_edited && <span>(edited)</span>}
-                {c.created_by === currentUserId && editingId !== c.id && (
-                  <span className="ml-auto flex gap-2">
+                {editingId !== c.id && (
+                  <span className="ml-auto flex items-center gap-2.5 text-podio-meta">
+                    {c.created_by === currentUserId && (
+                      <>
+                        <button
+                          onClick={() => {
+                            setEditingId(c.id);
+                            setEditBody(c.body);
+                          }}
+                          title="Edit"
+                          aria-label="Edit comment"
+                          className="hover:text-podio-teal"
+                        >
+                          <PodioIcon icon="pencil" className="h-4 w-4" />
+                        </button>
+                        <button
+                          onClick={() => deleteComment(c.id)}
+                          title="Delete"
+                          aria-label="Delete comment"
+                          className="hover:text-red-600"
+                        >
+                          <PodioIcon icon="trash" className="h-4 w-4" />
+                        </button>
+                      </>
+                    )}
                     <button
-                      onClick={() => {
-                        setEditingId(c.id);
-                        setEditBody(c.body);
-                      }}
-                      className="hover:text-blue-600"
+                      onClick={() => toggleReaction(c.id, LIKE_EMOJI, likeOf(c.id)?.mine ?? false)}
+                      title={likeOf(c.id)?.mine ? "Unlike" : "Like"}
+                      aria-label="Like comment"
+                      className={`flex items-center gap-1 ${
+                        likeOf(c.id)?.mine
+                          ? "text-podio-teal"
+                          : "hover:text-podio-teal"
+                      }`}
                     >
-                      edit
-                    </button>
-                    <button onClick={() => deleteComment(c.id)} className="hover:text-red-600">
-                      delete
+                      <PodioIcon icon="heart" className="h-4 w-4" />
+                      {likeOf(c.id)?.count ? <span>{likeOf(c.id)!.count}</span> : null}
                     </button>
                   </span>
                 )}
@@ -235,26 +264,6 @@ export function CommentsSection({
                 )
               )}
 
-              {/* Reactions */}
-              <div className="mt-2 flex gap-1">
-                {EMOJIS.map((emoji) => {
-                  const r = (reactionsByComment[c.id] ?? []).find((x) => x.emoji === emoji);
-                  return (
-                    <button
-                      key={emoji}
-                      onClick={() => toggleReaction(c.id, emoji, r?.mine ?? false)}
-                      className={`rounded-full border px-2 py-0.5 text-xs ${
-                        r?.mine
-                          ? "border-blue-300 bg-blue-50"
-                          : "border-slate-200 hover:bg-slate-50"
-                      } ${r?.count ? "" : "opacity-40 hover:opacity-100"}`}
-                    >
-                      {emoji}
-                      {r?.count ? ` ${r.count}` : ""}
-                    </button>
-                  );
-                })}
-              </div>
             </div>
           ))}
           {comments.length === 0 && (
