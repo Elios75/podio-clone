@@ -23,15 +23,16 @@ export default {
         },
       },
       fontFamily: {
-        // var() carries an inline fallback: without it, an undefined variable
-        // invalidates the whole font-family declaration and the browser
-        // falls back to serif.
+        // Current Progress-era Podio uses the platform's system UI font
+        // (Segoe UI on Windows, SF Pro on macOS, Roboto on Android) — no
+        // webfont. Same stack here = same rendering as Podio everywhere.
         sans: [
-          "var(--font-source-sans, 'Source Sans 3')",
-          "Source Sans 3",
-          "Source Sans Pro",
-          "Segoe UI",
           "system-ui",
+          "-apple-system",
+          "Segoe UI",
+          "Roboto",
+          "Helvetica Neue",
+          "Arial",
           "sans-serif",
         ],
       },

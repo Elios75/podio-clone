@@ -391,6 +391,14 @@ const PATHS: Record<string, ReactNode> = {
   // ---- UI-chrome icons (NOT in PODIO_ICONS / the app-icon picker) --------
   // Pulse wave.
   activity: <path d="M3.5 12.5h3.3L9.5 6l5 12 2.2-5.5h3.8" />,
+  // Kanban board: three columns of differing heights.
+  board: (
+    <>
+      <rect x="3.5" y="4.5" width="4.6" height="13" rx="1" />
+      <rect x="9.7" y="4.5" width="4.6" height="9" rx="1" />
+      <rect x="15.9" y="4.5" width="4.6" height="15" rx="1" />
+    </>
+  ),
   // Circle with a plus.
   add: (
     <>

@@ -60,10 +60,12 @@ color, so the same option is always the same color everywhere it appears.
 
 ## Typography
 
-Podio uses a humanist sans (Source Sans Pro family). In the clone:
+Current (Progress-era) Podio ships NO webfont — it renders in the platform's
+system UI font: Segoe UI on Windows, SF Pro on macOS, Roboto on Android.
+(Classic Podio used Source Sans Pro; that face is retired here.) In the clone:
 
 ```css
-font-family: "Source Sans 3", "Source Sans Pro", "Segoe UI", system-ui, sans-serif;
+font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
 ```
 
 - Base size 15–16px; tables and chips 14px; meta 12–13px.

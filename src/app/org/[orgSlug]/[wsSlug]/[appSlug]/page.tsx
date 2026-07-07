@@ -1,3 +1,4 @@
+import { Fragment } from "react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
@@ -5,14 +6,16 @@ import {
   formatDuration,
   tableSummary,
   CATEGORY_COLORS,
+  NON_SORTABLE_FIELD_TYPES,
   type CategoryOption,
+  type FieldType,
 } from "@/lib/fields";
 import { PodioIcon } from "@/components/podio-icon";
 import { AppTabBar } from "../app-tab-bar";
-import { BoardView } from "./board-view";
 import { CalendarView } from "./calendar-view";
 import { ViewToolbar, type Filter, type Sort, type LayoutToggle } from "./view-toolbar";
 import { ViewsPane, type PaneView } from "./views-pane";
+import { SheetTable } from "./sheet-table";
 import { ExportButton } from "./export-button";
 import { SaveTemplateButton } from "./save-template-button";
 import { AppToolsMenu } from "./app-tools-menu";
@@ -277,19 +280,7 @@ export default async function AppPage({
 
   // Filtering + sorting happened in SQL (query_items); results are already shaped.
   const visibleItems = items;
-  const categoryField = fields.find((f) => f.type === "category");
   const dateField = fields.find((f) => f.type === "date");
-
-  // Board data: each item's current option for the first category field
-  const boardCards = visibleItems.map((item) => ({
-    id: item.id,
-    item_number: item.item_number,
-    title: item.title,
-    optionId:
-      (categoryField &&
-        valueMap.get(item.id)?.get(categoryField.id)?.value_text) ??
-      null,
-  }));
 
   // Calendar data: items bucketed by the first date field's day
   const monthStr =
@@ -397,17 +388,16 @@ export default async function AppPage({
     .map((f) => ({ id: f.id, label: f.label }));
 
   // Layout toggles for the view toolbar (active one renders as the orange
-  // pill). Podio order: Dig | Sheet | Board | Calendar | Stream.
+  // pill). Current Podio naming/order: Badge | Table | Card | Activity |
+  // Calendar.
   const layoutToggles: LayoutToggle[] = [
-    { key: "badge", label: "Dig", href: `${baseHref}?view=badge` },
-    { key: "table", label: "Sheet", href: baseHref },
-    categoryField
-      ? { key: "board", label: "Board", href: `${baseHref}?view=board` }
-      : { key: "board", label: "Board", disabledTitle: "Add a Category field to use the board" },
+    { key: "badge", label: "Badge", href: `${baseHref}?view=badge` },
+    { key: "table", label: "Table", href: baseHref },
+    { key: "board", label: "Card", href: `${baseHref}?view=board` },
+    { key: "stream", label: "Activity", href: `${baseHref}?view=stream` },
     dateField
       ? { key: "calendar", label: "Calendar", href: `${baseHref}?view=calendar` }
       : { key: "calendar", label: "Calendar", disabledTitle: "Add a Date field to use the calendar" },
-    { key: "stream", label: "Stream", href: `${baseHref}?view=stream` },
   ];
 
   return (
@@ -491,14 +481,47 @@ export default async function AppPage({
       />
 
       <div className="px-4 pb-8 pt-4 lg:px-6">
-      {view === "board" && categoryField && (
-        <div>
-          <BoardView
-            fieldId={categoryField.id}
-            options={(categoryField.config?.options ?? []) as CategoryOption[]}
-            cards={boardCards}
-            baseHref={baseHref}
-          />
+      {view === "board" && (
+        // Card layout: one large card per record showing all its visible
+        // fields — a straight grid, no category grouping (that was the old
+        // kanban board; per Podio's current naming, Card = record cards).
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+          {visibleItems.map((item) => (
+            <Link
+              key={item.id}
+              href={`${baseHref}/${item.item_number}`}
+              className="flex flex-col rounded border border-podio-border bg-white shadow-sm hover:border-podio-teal"
+            >
+              <h3 className="truncate px-5 pt-4 text-lg font-semibold text-podio-teal">
+                {item.title ?? `#${item.item_number}`}
+              </h3>
+              <dl className="space-y-2 px-5 py-3">
+                {visibleFields.map((f) => (
+                  <div key={f.id} className="flex items-start gap-3 text-sm">
+                    <dt className="w-28 shrink-0 truncate pt-0.5 text-podio-meta">
+                      {f.label}
+                    </dt>
+                    <dd className="min-w-0 flex-1 truncate text-podio-ink">
+                      {render(f, item.id)}
+                    </dd>
+                  </div>
+                ))}
+              </dl>
+              <footer className="mt-auto flex items-center border-t border-podio-border px-5 py-2.5 text-sm text-podio-meta">
+                #{item.item_number}
+                {item.updated_at && (
+                  <span className="ml-auto">
+                    {new Date(item.updated_at).toLocaleDateString()}
+                  </span>
+                )}
+              </footer>
+            </Link>
+          ))}
+          {visibleItems.length === 0 && (
+            <p className="col-span-full rounded border border-dashed border-podio-border bg-white p-10 text-sm text-podio-meta">
+              No {app.item_name.toLowerCase()}s match.
+            </p>
+          )}
         </div>
       )}
 
@@ -581,53 +604,35 @@ export default async function AppPage({
       )}
 
       {view === "table" && (
-      // Sheet sits directly on the white surface (no floating card wrapper);
-      // the table keeps its own header background and row hairlines.
-      <div className="overflow-x-auto">
-        <table className="w-full text-left text-[15px]">
-          <thead className="bg-podio-row-alt font-semibold text-podio-ink">
-            <tr>
-              <th className="w-10 border-b border-podio-border px-2 py-2" />
-              <th className="border-b border-podio-border px-3 py-2 font-semibold">#</th>
-              {visibleFields.map((f) => (
-                <th key={f.id} className="border-b border-podio-border px-3 py-2 font-semibold">
-                  {f.label}
-                </th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {visibleItems.map((item, i) => (
-              <tr key={item.id} className="hover:bg-podio-row-hover">
-                <td className="border-b border-[#EFEFEF] px-2 py-2.5 text-right text-podio-disabled">
-                  {i + 1}
-                </td>
-                <td className="border-b border-[#EFEFEF] px-3 py-2.5">
-                  <Link
-                    href={`/org/${orgSlug}/${wsSlug}/${app.slug}/${item.item_number}`}
-                    className="text-podio-teal hover:underline"
-                  >
-                    {item.item_number}
-                  </Link>
-                </td>
-                {visibleFields.map((f) => (
-                  <td key={f.id} className="border-b border-[#EFEFEF] px-3 py-2.5 text-podio-ink">
-                    {render(f, item.id)}
-                  </td>
-                ))}
-              </tr>
-            ))}
-            {visibleItems.length === 0 && (
-              <tr>
-                <td colSpan={2 + visibleFields.length}
-                  className="px-4 py-10 text-podio-meta">
-                  No {app.item_name.toLowerCase()}s yet.
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
-      </div>
+      // Sheet chrome (sortable headers + resizable columns) is a client
+      // component; the CELLS are still rendered here on the server so
+      // signed URLs / member names / chips work unchanged. Keyed Fragments
+      // keep React happy about JSX arrays crossing the server→client boundary.
+      <SheetTable
+        appId={app.id}
+        columns={visibleFields.map((f) => ({
+          id: f.id,
+          label: f.label,
+          sortable: !NON_SORTABLE_FIELD_TYPES.includes(f.type as FieldType),
+        }))}
+        sort={sort}
+        activeViewId={activeView?.id ?? null}
+        emptyText={`No ${app.item_name.toLowerCase()}s yet.`}
+        rows={visibleItems.map((item) => ({
+          id: item.id,
+          numberCell: (
+            <Link
+              href={`${baseHref}/${item.item_number}`}
+              className="text-podio-teal hover:underline"
+            >
+              {item.item_number}
+            </Link>
+          ),
+          cells: visibleFields.map((f) => (
+            <Fragment key={f.id}>{render(f, item.id)}</Fragment>
+          )),
+        }))}
+      />
       )}
       </div>
         </section>

@@ -1,20 +1,13 @@
 import type { Metadata, Viewport } from "next";
-import localFont from "next/font/local";
 import "./globals.css";
 import { SwRegister } from "./sw-register";
 
-// Podio's UI typeface is Source Sans (Pro → now "Source Sans 3").
-// SELF-HOSTED (src/app/fonts/, OFL-licensed): next/font/google needs to
-// reach Google Fonts at build time, and when that fetch fails it still
-// stamps <body> with private font names that resolve to nothing — which
-// out-specificities every fallback and lands on serif. A local file makes
-// the font deterministic: no network, no failure mode.
-const sourceSans = localFont({
-  src: "./fonts/SourceSans3-Variable.woff2",
-  weight: "200 900",
-  variable: "--font-source-sans",
-  display: "swap",
-});
+// Typography: the current Progress-era Podio UI renders in the operating
+// system's own UI font (Segoe UI on Windows, SF Pro on macOS) — it does NOT
+// ship a webfont. We match it with the same system stack (declared in
+// tailwind.config.ts fontFamily.sans), so the clone is pixel-identical to
+// Podio on every platform. The old self-hosted Source Sans 3 (classic
+// Podio's face) has been removed.
 
 export const metadata: Metadata = {
   title: "Podio Clone",
@@ -34,11 +27,11 @@ export default function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html lang="en" className={sourceSans.variable}>
+    <html lang="en">
       {/* suppressHydrationWarning: browser extensions (Grammarly, password
           managers, …) inject attributes into <body> before React hydrates,
           which otherwise triggers a spurious hydration-mismatch warning. */}
-      <body className={`${sourceSans.className} font-sans`} suppressHydrationWarning>
+      <body className="font-sans" suppressHydrationWarning>
         <SwRegister />
         {children}
       </body>

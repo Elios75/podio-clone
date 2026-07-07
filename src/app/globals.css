@@ -4,8 +4,10 @@
 
 body {
   @apply bg-podio-page text-podio-ink antialiased;
-  /* Variable-free fallback: even if the next/font CSS variable or Tailwind
-     font-sans stack fails to compile, we never fall back to serif. */
-  font-family: "Source Sans 3", "Source Sans Pro", "Segoe UI", system-ui,
-    sans-serif;
+  /* Current Progress-era Podio renders in the platform's system UI font
+     (Segoe UI on Windows, SF Pro on macOS) — no webfont. This plain CSS
+     declaration is a compile-independent fallback matching the Tailwind
+     font-sans stack, so we can never land on serif. */
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto,
+    "Helvetica Neue", Arial, sans-serif;
 }

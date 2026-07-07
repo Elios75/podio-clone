@@ -30,6 +30,14 @@ export const FIELD_TYPES: { value: FieldType; label: string }[] = [
 
 export type CategoryOption = { id: string; label: string; color: string };
 
+// Field types that can't be filtered or sorted (no scalar ordering / no
+// query_items support). Drives the view toolbar's field pickers AND the
+// sheet's clickable column headers — keep the two in sync via this list.
+// Lives here (not in a "use client" module) so server components can read it.
+export const NON_SORTABLE_FIELD_TYPES: readonly FieldType[] = [
+  "separator", "calculation", "image", "file", "relationship", "table",
+];
+
 // ---------------------------------------------------------------------------
 // Table field (beyond-Podio feature): an embedded one-to-many sub-table
 // inside a record (e.g. a Customer with invoice lines: Date, Product,

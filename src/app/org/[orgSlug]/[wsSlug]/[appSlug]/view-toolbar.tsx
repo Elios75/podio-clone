@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { PodioIcon } from "@/components/podio-icon";
-import type { CategoryOption, FieldType } from "@/lib/fields";
+import { NON_SORTABLE_FIELD_TYPES, type CategoryOption, type FieldType } from "@/lib/fields";
 
 type Field = {
   id: string;
@@ -96,19 +96,27 @@ export function ViewToolbar({
 }) {
   const router = useRouter();
   const supabase = createClient();
+  // Shared exclusion list (also drives the sheet's sortable column headers).
   const filterable = fields.filter(
-    (f) =>
-      !["separator", "calculation", "image", "file", "relationship", "table"].includes(
-        f.type
-      )
+    (f) => !NON_SORTABLE_FIELD_TYPES.includes(f.type)
   );
   const [filters, setFilters] = useState<Filter[]>(initialFilters);
   const [sortField, setSortField] = useState(initialSort[0]?.field_id ?? "");
   const [sortDir, setSortDir] = useState<"asc" | "desc">(initialSort[0]?.dir ?? "asc");
-  const [panelOpen, setPanelOpen] = useState(
-    initialFilters.length > 0 || initialSort.length > 0
-  );
+  // Open the panel for FILTERS only — sorting now lives in the sheet's own
+  // column headers, and auto-expanding this panel on every header click made
+  // sorting feel heavyweight.
+  const [panelOpen, setPanelOpen] = useState(initialFilters.length > 0);
   const [colsOpen, setColsOpen] = useState(false);
+  const [layoutOpen, setLayoutOpen] = useState(false);
+  // Monochrome glyph per layout key for the switcher dropdown.
+  const LAYOUT_ICONS: Record<string, string> = {
+    badge: "grid",
+    table: "table-grid",
+    board: "board",
+    calendar: "calendar",
+    stream: "activity",
+  };
   const [cols, setCols] = useState<string[] | null>(initialCols);
 
   function toggleCol(id: string) {
@@ -209,10 +217,71 @@ export function ViewToolbar({
       {/* Main toolbar row — min-h-10 matches the views pane's app title row
           so both top rows sit at the same height. */}
       <div className="flex min-h-10 flex-wrap items-center gap-3 text-[15px]">
-        {/* Quiet layout/sort affordances (visual parity with Podio) */}
-        <span className="text-podio-secondary" aria-hidden>
-          <PodioIcon icon="grid" className="h-5 w-5" />
-        </span>
+        {/* Layout switcher: the grid icon opens a Podio-style dropdown listing
+            every layout with a ✓ on the active one. */}
+        <div className="relative">
+          <button
+            onClick={() => setLayoutOpen(!layoutOpen)}
+            title="Switch layout"
+            aria-expanded={layoutOpen}
+            className={`block ${layoutOpen ? "text-podio-ink" : "text-podio-secondary"} hover:text-podio-ink`}
+          >
+            <PodioIcon icon={LAYOUT_ICONS[layout] ?? "grid"} className="h-5 w-5" />
+          </button>
+          {layoutOpen && (
+            <div className="absolute left-0 top-8 z-30 w-52 rounded border border-podio-border bg-white py-1.5 shadow-lg">
+              {layouts.map((l) => {
+                const icon = (
+                  <PodioIcon
+                    icon={LAYOUT_ICONS[l.key] ?? "grid"}
+                    className="h-5 w-5 shrink-0 text-podio-secondary"
+                  />
+                );
+                const check = (
+                  <span className="w-5 shrink-0 text-center text-podio-teal">
+                    {l.key === layout ? "✓" : ""}
+                  </span>
+                );
+                if (l.key === layout)
+                  return (
+                    <button
+                      key={l.key}
+                      onClick={() => setLayoutOpen(false)}
+                      className="flex w-full items-center gap-2 px-3 py-2 text-left text-[15px] font-semibold text-podio-ink"
+                    >
+                      {check}
+                      {icon}
+                      {l.label}
+                    </button>
+                  );
+                if (l.href)
+                  return (
+                    <Link
+                      key={l.key}
+                      href={l.href}
+                      onClick={() => setLayoutOpen(false)}
+                      className="flex items-center gap-2 px-3 py-2 text-[15px] text-podio-ink hover:bg-podio-row-hover"
+                    >
+                      {check}
+                      {icon}
+                      {l.label}
+                    </Link>
+                  );
+                return (
+                  <span
+                    key={l.key}
+                    title={l.disabledTitle}
+                    className="flex cursor-not-allowed items-center gap-2 px-3 py-2 text-[15px] text-podio-disabled"
+                  >
+                    {check}
+                    {icon}
+                    {l.label}
+                  </span>
+                );
+              })}
+            </div>
+          )}
+        </div>
         <span className="text-podio-secondary" aria-hidden>
           <PodioIcon icon="sort" className="h-5 w-5" />
         </span>

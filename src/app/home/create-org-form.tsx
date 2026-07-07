@@ -47,12 +47,12 @@ export function CreateOrgForm() {
         placeholder="New organization name"
         value={name}
         onChange={(e) => setName(e.target.value)}
-        className="flex-1 rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
+        className="flex-1 rounded-sm border border-podio-border bg-white px-3 py-2 text-sm text-podio-ink placeholder:text-podio-meta focus:border-podio-teal focus:outline-none"
       />
       <button
         type="submit"
         disabled={loading}
-        className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
+        className="rounded-sm bg-podio-teal px-4 py-2 text-sm font-semibold text-white hover:bg-podio-teal-dark disabled:opacity-50"
       >
         {loading ? "Creating…" : "Create"}
       </button>

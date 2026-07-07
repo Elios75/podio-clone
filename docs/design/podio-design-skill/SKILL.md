@@ -69,7 +69,8 @@ JSX/Tailwind for each pattern:
    radios Standard/Event/Contact, monochrome icon picker)
 9. Iconography & font (tokens.md): app/tool icons are monochrome outline
    SVGs via the PodioIcon component — never colorful emoji; the typeface is
-   Source Sans (Podio's own), already wired as font-sans
+   the platform's system UI font (Segoe UI / SF Pro — modern Podio ships no
+   webfont), already wired as font-sans
 10. Category chips (pastel background + dark saturated text; solid orange/red
     reserved for priority-like options)
 11. App Market (grey category sidebar with search + Functional/Industry

@@ -15,6 +15,29 @@ Administration, ← All organizations). There is NO persistent workspaces
 sidebar: page content owns the full width, so an app's views pane (§3) is
 the leftmost column on screen, exactly like real Podio.
 
+Standalone pages (home / tasks / calendar / search) keep this exact bar —
+the global chrome NEVER disappears, and `/home` ("Your organizations") is
+no exception. The bar lives in the shared `GlobalBar` component
+(`src/components/global-bar.tsx`) with a `left` slot and an `activeTool`
+prop that puts the current page's tool icon on a small white rounded card.
+
+Two drawers fill the left slot, one per context:
+
+- **Inside an org** (`/org/[orgSlug]/…`): `WorkspaceDrawer` — ☰ + org
+  name; opens that org's workspace list.
+- **Outside any org** (`/home`, `/tasks`, …): `OrgPickerDrawer`
+  (`src/components/org-picker-drawer.tsx`) — ☰ + "Choose a workspace or
+  app". It NEVER navigates; it opens the same style of left slide-over
+  (white `w-80` panel over a `bg-black/30` backdrop; backdrop click and
+  ESC close) listing EVERY organization: org header row (initial in a
+  chrome-grey logo square + semibold ink name → org overview), its
+  workspace rows (monochrome brick `PodioIcon` + teal name →
+  `/org/{org}/{ws}`), then per-org "+ Create a workspace" (→ the org
+  page, where creation lives) and "Manage workspaces" (→
+  `/org/{org}/admin`). Lists longer than 10 workspaces collapse behind
+  an uppercase "MORE WORKSPACES ⌄" toggle. Footer: "← All organizations"
+  → `/home`.
+
 ```jsx
 <header className="flex h-14 items-center gap-4 bg-[#CBDBDB] px-4 text-[#333333]">
   <button aria-label="Menu">☰</button>
@@ -183,6 +206,29 @@ first column; `›` at the far right hints horizontal scroll.
   </tbody>
 </table>
 ```
+
+Header interactions (implemented in `[appSlug]/sheet-table.tsx`; cells stay
+server-rendered and are passed in as keyed ReactNodes):
+
+- **Click-to-sort headers**: every sortable column header is a button that
+  cycles asc → desc → clear. Active column shows a small ▲/▼ after the label
+  in teal (`text-podio-teal`); hovering an inactive header shows a faint hint
+  arrow. It writes the SAME `?s=` JSON (`[{ field_id, dir }]`) the view
+  toolbar's sort control uses — one `query_items p_sort` path — preserving
+  all other params and pinning `viewId` so saved-view filters survive.
+  Non-sortable types reuse the toolbar's exclusion list
+  (`NON_SORTABLE_FIELD_TYPES` in `src/lib/fields.ts`: separator, calculation,
+  image, file, relationship, table) and render as plain headers, as do the
+  leading checkbox/# columns.
+- **Resizable columns** (a deliberate beyond-Podio affordance — real Podio's
+  sheet has fixed column widths): each header's right edge has a 6px
+  `cursor-col-resize` grab zone, invisible until the header is hovered (a 1px
+  `podio-border` line, teal while grabbed). Dragging sets that column's width
+  (min 80 / max 640px) via inline styles on `<colgroup>` `<col>`s; the table
+  flips to `table-layout: fixed` and fixed-width cells `truncate`. Widths
+  persist per app in localStorage `podio.sheet-widths.${appId}`
+  (`{ fieldId: px }`), hydrated only after mount (SSR-safe); double-clicking
+  a handle resets its column. Resizing never triggers the sort click.
 
 ## 6. Card ("Dig") view
 
@@ -591,3 +637,50 @@ Structure, right-docked and full height:
   composer = bordered "Add a message" input with 📎 attach-file and 🔗
   share-link icon buttons beneath (same icon row grammar as the workspace
   composer).
+
+## 14. My Tasks page (standalone /tasks)
+
+Reference: the My Tasks screenshot. The page keeps the global bar (§1) via
+`GlobalBar activeTool="tasks"` with the ☰ "Choose a workspace or app" left
+slot. Body: ONE white panel (`border-podio-border shadow-sm`, `max-w-6xl`,
+centered on the page grey) split into a main column (~3/4) and a right rail
+(`md:w-64 border-l`).
+
+**Main column**, top to bottom:
+
+- **Underline tab row**: `My tasks | My delegated tasks | My completed
+  tasks | All completed` — active tab is ink semibold with a 2px ink
+  underline (`-mb-px border-b-2 border-podio-ink`); inactive tabs are
+  secondary text. The tabs are real filters: delegated = created by me &
+  assigned to someone else (open); the completed views read
+  `completed_at` and sort descending. The label filter (`?label=`)
+  survives tab switches.
+- **Task composer**: large bordered input "Enter a task" with a
+  `check-square` line icon inside at the left — Enter creates via the
+  `create_task` RPC (`p_ws: null`, org = the user's first membership).
+  Attached below, a `bg-podio-row-alt` affordance strip of quiet icons:
+  calendar (due date + optional time → `all_day = false`), contact
+  (assignee select from org members), tag (label multi-toggle). Chosen
+  values echo in teal next to their icon.
+- **Task list** grouped under small semibold ink headings: `Overdue`
+  (due < today, date in red) / `Today` / `Upcoming` / `No due date`;
+  empty groups are hidden. Row grammar (~44px min height, hairline
+  `border-podio-border` dividers, `hover:bg-podio-row-alt`): checkbox
+  (completes / reopens) · date `MM/DD/YYYY` (`tabular-nums`, fixed width,
+  red when overdue) · time or `--:--` in meta · title in ink (completed =
+  struck-through disabled) with an optional teal deep-link to the linked
+  item · label dots · assignee chip (`contact` line icon + name, meta
+  color) · a hover-revealed right icon cluster: calendar (reschedule
+  popover with a date input + Clear) · tag (per-task label popover
+  writing `task_label_links`) · trash (red hover; shown only when the
+  viewer created the task, matching RLS). All date/time strings and the
+  overdue flag are computed server-side and passed down as plain props —
+  no client date math at render time, no hydration drift.
+
+**Right rail "Labels"**: teal semibold heading; the user's personal
+`task_labels` as rows — pale-green `tag` glyph (the label's stored color,
+default `#86BFA0`) + ink name, hairline dividers. Clicking a label filters
+the list (`?label=` searchParam); the active label renders teal semibold
+and clicking it again clears the filter. Hover reveals a small trash that
+deletes the label; a quiet "+ Add label" affordance at the bottom inserts
+one. No colorful emoji anywhere — every glyph is a PodioIcon line icon.
