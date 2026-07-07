@@ -11,6 +11,7 @@ import { ShareSection } from "./share-section";
 import { SendEmail } from "./send-email";
 import { RecordRail } from "./record-rail";
 import { FollowToggleHeader } from "./follow-toggle-header";
+import { ActionsMenu } from "./actions-menu";
 
 export default async function ItemDetailPage({
   params,
@@ -167,6 +168,30 @@ export default async function ItemDetailPage({
     });
   }
 
+  // Files for the Actions → "Download all files" action: file/image field
+  // values plus comment attachments, all resolved to signed URLs above.
+  const downloadFiles: { name: string; url: string }[] = [];
+  for (const f of allFields ?? []) {
+    if (f.type !== "file" && f.type !== "image") continue;
+    const v: any = initialValues[f.id];
+    if (v?.path && signedUrls[v.path]) {
+      downloadFiles.push({ name: v.name ?? v.path.split("/").pop() ?? "file", url: signedUrls[v.path] });
+    }
+  }
+  for (const list of Object.values(attachmentsByComment)) {
+    for (const a of list) if (a.url) downloadFiles.push({ name: a.name ?? "file", url: a.url });
+  }
+
+  // Inbound email address for this app (Actions → "Email to item" shows the
+  // per-item plus-address; the menu auto-creates one if none exists yet).
+  const { data: appEmail } = await supabase
+    .from("app_email_addresses")
+    .select("address")
+    .eq("app_id", app.id)
+    .eq("is_active", true)
+    .limit(1)
+    .maybeSingle();
+
   // Reactions
   const { data: reactionRows } = commentIds.length
     ? await supabase
@@ -252,12 +277,18 @@ export default async function ItemDetailPage({
         >
           Modify Template
         </Link>
-        <button
-          type="button"
-          className="mb-2 px-1 py-1.5 text-sm text-podio-secondary hover:text-podio-ink"
-        >
-          Actions ⌄
-        </button>
+        <ActionsMenu
+          itemId={item.id}
+          appId={app.id}
+          appSlug={app.slug}
+          itemNumber={item.item_number}
+          appHref={backHref}
+          emailAddress={appEmail?.address ?? null}
+          files={downloadFiles}
+          apiPath={`/api/v1/items/${item.id}`}
+          createdAt={item.created_at}
+          updatedAt={item.updated_at}
+        />
 
         {/* Center: breadcrumb */}
         <nav className="mx-auto mb-2 hidden items-center gap-1.5 text-sm md:flex">
