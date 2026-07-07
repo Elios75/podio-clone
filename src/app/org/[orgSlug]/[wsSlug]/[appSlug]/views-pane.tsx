@@ -59,7 +59,7 @@ export function ViewsPane({
   views: PaneView[];
   activeViewId: string | null;
   categoryFields: { id: string; label: string }[];
-  currentLayout: string; // "table" | "board" | "calendar" | "badge" | "stream"
+  currentLayout: string; // "table" | "board" | "kanban" | "calendar" | "badge" | "stream"
   currentFilters: Filter[];
   currentSort: Sort[];
   currentCols: string[] | null;

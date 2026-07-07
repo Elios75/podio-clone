@@ -1,0 +1,18 @@
+-- Podio Clone: Migration 51 - Kanban "Board" layout (6th view layout)
+--
+-- Revives the previously-orphaned board-view.tsx as a real, selectable layout.
+-- A Board groups an app's items into columns by a single Category field (one
+-- column per option + a "No value" column); dragging a card between columns
+-- writes that item's category value.
+--
+-- The layout is reachable transiently via `?view=kanban` with no DB change, but
+-- for a SAVED Board view (app_views.layout) to persist we need a new value in
+-- the view_layout enum. The existing set was
+-- ('table','card','calendar','badge','stream','dashboard') — 'kanban' joins it.
+--
+-- NOTE: a new enum value is not usable in the same transaction that adds it.
+-- Nothing below (or elsewhere in this migration) uses 'kanban', so this is safe.
+-- The app maps the enum value 1:1 to the "kanban" layout key; the "board" key
+-- in the UI remains an alias of the 'card' enum value (the Card/Dig grid), so
+-- no existing saved views are affected.
+alter type podio.view_layout add value if not exists 'kanban';

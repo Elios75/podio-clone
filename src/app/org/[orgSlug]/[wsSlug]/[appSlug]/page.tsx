@@ -13,6 +13,7 @@ import {
 import { PodioIcon } from "@/components/podio-icon";
 import { AppTabBar } from "../app-tab-bar";
 import { CalendarView } from "./calendar-view";
+import { BoardView } from "./board-view";
 import { ViewToolbar, type Filter, type Sort, type LayoutToggle } from "./view-toolbar";
 import { ViewsPane, type PaneView } from "./views-pane";
 import { SheetTable } from "./sheet-table";
@@ -32,6 +33,7 @@ export default async function AppPage({
     s?: string;
     viewId?: string;
     cols?: string;
+    group?: string;
   }>;
 }) {
   const { orgSlug, wsSlug, appSlug } = await params;
@@ -266,7 +268,9 @@ export default async function AppPage({
     : fields;
 
   // ----- View selection -----
-  const LAYOUTS = ["table", "board", "calendar", "badge", "stream"];
+  // "board" is the UI key for the Card/Dig grid (enum alias 'card'); "kanban"
+  // is the drag-to-columns Board layout (enum value 'kanban', migration 51).
+  const LAYOUTS = ["table", "board", "kanban", "calendar", "badge", "stream"];
   const savedLayout = activeView
     ? activeView.layout === "card"
       ? "board"
@@ -383,13 +387,54 @@ export default async function AppPage({
     };
   });
 
-  const categoryFieldChoices = fields
-    .filter((f) => f.type === "category")
-    .map((f) => ({ id: f.id, label: f.label }));
+  const categoryFields = fields.filter((f) => f.type === "category");
+  const categoryFieldChoices = categoryFields.map((f) => ({ id: f.id, label: f.label }));
+
+  // ----- Kanban (Board) layout data -----
+  // Group items into columns by a single SINGLE-SELECT category field. Multi-
+  // select is excluded: a drag writes one value, which would clobber the other
+  // selected options (and real Podio boards group by single-select too).
+  // Field choice: ?group=<fieldId> > the active saved view's
+  // settings.group_field_id > the app's first single-select category field.
+  const kanbanGroupFields = categoryFields.filter((f) => !f.config?.multiple);
+  const savedGroupId =
+    (activeView?.settings as { group_field_id?: string } | null)?.group_field_id ?? null;
+  const kanbanGroupField =
+    (sp.group ? kanbanGroupFields.find((f) => f.id === sp.group) : null) ??
+    (savedGroupId ? kanbanGroupFields.find((f) => f.id === savedGroupId) : null) ??
+    kanbanGroupFields[0] ??
+    null;
+  // Resolve each option's display color (stored color, else a stable palette
+  // slot by index — same rule the views pane uses for grouped sub-row dots).
+  const kanbanOptions: CategoryOption[] = kanbanGroupField
+    ? ((kanbanGroupField.config?.options ?? []) as CategoryOption[]).map((o, idx) => ({
+        id: o.id,
+        label: o.label,
+        color: o.color || CATEGORY_COLORS[idx % CATEGORY_COLORS.length],
+      }))
+    : [];
+  // One card per item; optionId is the item's value for the group field
+  // (single-select value_text, or the first id of a multi-select array).
+  const kanbanCards = kanbanGroupField
+    ? visibleItems.map((item) => {
+        const v = valueMap.get(item.id)?.get(kanbanGroupField.id);
+        const optionId = v
+          ? Array.isArray(v.value)
+            ? (v.value[0] ?? null)
+            : (v.value_text ?? null)
+          : null;
+        return {
+          id: item.id,
+          item_number: item.item_number,
+          title: item.title ?? null,
+          optionId,
+        };
+      })
+    : [];
 
   // Layout toggles for the view toolbar (active one renders as the orange
   // pill). Current Podio naming/order: Badge | Table | Card | Activity |
-  // Calendar.
+  // Calendar, then the beyond-Podio Board (kanban).
   const layoutToggles: LayoutToggle[] = [
     { key: "badge", label: "Badge", href: `${baseHref}?view=badge` },
     { key: "table", label: "Table", href: baseHref },
@@ -398,6 +443,9 @@ export default async function AppPage({
     dateField
       ? { key: "calendar", label: "Calendar", href: `${baseHref}?view=calendar` }
       : { key: "calendar", label: "Calendar", disabledTitle: "Add a Date field to use the calendar" },
+    kanbanGroupField
+      ? { key: "kanban", label: "Board", href: `${baseHref}?view=kanban` }
+      : { key: "kanban", label: "Board", disabledTitle: "Add a single-select Category field to use the board" },
   ];
 
   return (
@@ -535,6 +583,22 @@ export default async function AppPage({
           />
         </div>
       )}
+
+      {view === "kanban" &&
+        (kanbanGroupField ? (
+          <BoardView
+            fieldId={kanbanGroupField.id}
+            fieldLabel={kanbanGroupField.label}
+            options={kanbanOptions}
+            cards={kanbanCards}
+            baseHref={baseHref}
+            groupFields={kanbanGroupFields.map((f) => ({ id: f.id, label: f.label }))}
+          />
+        ) : (
+          <p className="rounded border border-dashed border-podio-border bg-white p-10 text-sm text-podio-meta">
+            Add a single-select Category field to this app to use the Board layout.
+          </p>
+        ))}
 
       {view === "badge" && (
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">

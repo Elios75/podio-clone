@@ -65,7 +65,7 @@ function opGroup(t: FieldType): keyof typeof OPS {
 // See docs/design/podio-design-skill/references/layouts.md §4.
 export function ViewToolbar({
   baseHref,
-  layout, // "table" | "board" | "calendar" | "badge" | "stream"
+  layout, // "table" | "board" | "kanban" | "calendar" | "badge" | "stream"
   layouts,
   newHref,
   itemName,
@@ -109,11 +109,14 @@ export function ViewToolbar({
   const [panelOpen, setPanelOpen] = useState(initialFilters.length > 0);
   const [colsOpen, setColsOpen] = useState(false);
   const [layoutOpen, setLayoutOpen] = useState(false);
-  // Monochrome glyph per layout key for the switcher dropdown.
+  // Monochrome glyph per layout key for the switcher dropdown. "board" is the
+  // Card/Dig grid (layout glyph); "kanban" is the drag-to-columns Board (board
+  // glyph) — they must not share an icon.
   const LAYOUT_ICONS: Record<string, string> = {
     badge: "grid",
     table: "table-grid",
-    board: "board",
+    board: "layout",
+    kanban: "board",
     calendar: "calendar",
     stream: "activity",
   };
