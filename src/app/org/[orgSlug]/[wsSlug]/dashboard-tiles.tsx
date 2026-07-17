@@ -47,13 +47,17 @@ export function DashboardTiles({
       return setError("Pick a number field.");
     if (kind === "grouped" && !groupField)
       return setError("Pick a category field to group by.");
+    // "fieldId:columnId" = a numeric column inside a table field (the picker
+    // lists them as "Invoices → Amount"); split back into the two config keys.
+    const [numFieldId, tableColumnId] = numberField.split(":");
     const { error: insError } = await supabase.from("dashboard_tiles").insert({
       workspace_id: wsId,
       app_id: appId,
       title,
       kind,
       config: {
-        number_field_id: numberField || null,
+        number_field_id: numFieldId || null,
+        table_column_id: tableColumnId || null,
         group_field_id: groupField || null,
       },
     });
@@ -117,7 +121,7 @@ export function DashboardTiles({
       </div>
 
       {open ? (
-        <div className="mt-3 flex flex-wrap items-center gap-2 rounded-lg border border-blue-200 bg-white p-3 text-sm">
+        <div className="mt-3 flex flex-wrap items-center gap-2 rounded border border-podio-border bg-white p-3 text-sm">
           <input placeholder="Tile title" value={title}
             onChange={(e) => setTitle(e.target.value)}
             className="rounded border border-slate-300 px-2 py-1.5 text-sm" />
@@ -148,7 +152,7 @@ export function DashboardTiles({
             </select>
           )}
           <button onClick={addTile}
-            className="rounded bg-blue-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-blue-700">
+            className="rounded bg-podio-teal px-3 py-1.5 text-xs font-semibold text-white hover:bg-podio-teal-dark">
             Add
           </button>
           <button onClick={() => setOpen(false)}

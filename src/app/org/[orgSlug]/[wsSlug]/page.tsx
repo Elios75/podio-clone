@@ -85,13 +85,30 @@ export default async function WorkspacePage({
         .eq("is_deleted", false);
       tiles.push({ id: t.id, title: t.title, kind: t.kind, value: count ?? 0 });
     } else if (t.kind === "sum" || t.kind === "avg") {
-      const { data: nums } = await supabase
-        .from("item_field_values")
-        .select("value_number")
-        .eq("field_id", cfg.number_field_id)
-        .not("value_number", "is", null)
-        .limit(2000);
-      const list = (nums ?? []).map((n) => Number(n.value_number));
+      // table_column_id set = the "number field" is a numeric COLUMN inside a
+      // table field (e.g. Invoices → Amount): sum every row's cell across all
+      // items. Otherwise it's a plain numeric field (value_number).
+      let list: number[];
+      if (cfg.table_column_id) {
+        const { data: tableVals } = await supabase
+          .from("item_field_values")
+          .select("value")
+          .eq("field_id", cfg.number_field_id)
+          .limit(2000);
+        list = (tableVals ?? []).flatMap((v: any) =>
+          (Array.isArray(v.value?.rows) ? v.value.rows : [])
+            .map((r: any) => r?.[cfg.table_column_id])
+            .filter((n: any) => typeof n === "number" && Number.isFinite(n))
+        );
+      } else {
+        const { data: nums } = await supabase
+          .from("item_field_values")
+          .select("value_number")
+          .eq("field_id", cfg.number_field_id)
+          .not("value_number", "is", null)
+          .limit(2000);
+        list = (nums ?? []).map((n) => Number(n.value_number));
+      }
       const sum = list.reduce((a, b) => a + b, 0);
       tiles.push({
         id: t.id, title: t.title, kind: t.kind,
@@ -106,7 +123,28 @@ export default async function WorkspacePage({
         .eq("field_id", cfg.group_field_id)
         .limit(2000);
       let numByItem = new Map<string, number>();
-      if (cfg.number_field_id) {
+      if (cfg.number_field_id && cfg.table_column_id) {
+        // Numeric column inside a table field: per item, sum that column's rows.
+        const { data: numVals } = await supabase
+          .from("item_field_values")
+          .select("item_id, value")
+          .eq("field_id", cfg.number_field_id)
+          .limit(2000);
+        numByItem = new Map(
+          (numVals ?? []).map((v: any) => [
+            v.item_id,
+            (Array.isArray(v.value?.rows) ? v.value.rows : []).reduce(
+              (a: number, r: any) =>
+                a +
+                (typeof r?.[cfg.table_column_id] === "number" &&
+                Number.isFinite(r[cfg.table_column_id])
+                  ? r[cfg.table_column_id]
+                  : 0),
+              0
+            ),
+          ])
+        );
+      } else if (cfg.number_field_id) {
         const { data: numVals } = await supabase
           .from("item_field_values")
           .select("item_id, value_number")
@@ -131,9 +169,20 @@ export default async function WorkspacePage({
   const appInfos = (apps ?? []).map((a) => ({
     id: a.id,
     name: a.name,
-    numberFields: (wsFields ?? [])
-      .filter((f) => f.app_id === a.id && ["number", "money", "progress", "duration"].includes(f.type))
-      .map((f) => ({ id: f.id, label: f.label })),
+    numberFields: [
+      ...(wsFields ?? [])
+        .filter((f) => f.app_id === a.id && ["number", "money", "progress", "duration"].includes(f.type))
+        .map((f) => ({ id: f.id, label: f.label })),
+      // Numeric columns inside table fields count too ("Invoices → Amount"):
+      // the composite id "fieldId:columnId" is split back apart on save.
+      ...(wsFields ?? [])
+        .filter((f) => f.app_id === a.id && f.type === "table")
+        .flatMap((f) =>
+          ((f.config?.columns ?? []) as { id: string; label: string; type: string }[])
+            .filter((c) => c.type === "number" || c.type === "money")
+            .map((c) => ({ id: `${f.id}:${c.id}`, label: `${f.label} → ${c.label}` }))
+        ),
+    ],
     categoryFields: (wsFields ?? [])
       .filter((f) => f.app_id === a.id && f.type === "category")
       .map((f) => ({ id: f.id, label: f.label })),
