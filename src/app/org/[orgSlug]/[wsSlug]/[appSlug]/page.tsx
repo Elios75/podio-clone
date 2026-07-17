@@ -34,6 +34,7 @@ export default async function AppPage({
     viewId?: string;
     cols?: string;
     group?: string;
+    cardf?: string;
   }>;
 }) {
   const { orgSlug, wsSlug, appSlug } = await params;
@@ -126,9 +127,12 @@ export default async function AppPage({
   // Names for contact fields
   const userIds = [...new Set((values ?? []).map((v) => v.ref_user_id).filter(Boolean))];
   const { data: profiles } = userIds.length
-    ? await supabase.from("user_profiles").select("user_id, full_name").in("user_id", userIds)
+    ? await supabase.from("user_profiles").select("user_id, full_name, avatar_url").in("user_id", userIds)
     : { data: [] as any[] };
   const nameByUser = new Map((profiles ?? []).map((p) => [p.user_id, p.full_name]));
+  const avatarByUser = new Map(
+    (profiles ?? []).map((p) => [p.user_id, p.avatar_url as string | null])
+  );
 
   // Titles for relationship fields
   const refItemIds = [...new Set((values ?? []).map((v) => v.ref_item_id).filter(Boolean))];
@@ -259,6 +263,48 @@ export default async function AppPage({
     }
   }
 
+  // Card-stack value: same renderers as the sheet but WITHOUT the label —
+  // real Podio cards show bare chips/avatars/values, and an italic
+  // "<Label> not set" placeholder when empty (layouts.md §6).
+  function cardValue(field: any, itemId: string) {
+    const v = valueMap.get(itemId)?.get(field.id);
+    if (!v) {
+      return (
+        <span className="text-[15px] italic text-podio-disabled">
+          {field.label} not set
+        </span>
+      );
+    }
+    if (field.type === "contact") {
+      const name = nameByUser.get(v.ref_user_id) ?? "Member";
+      const avatar = avatarByUser.get(v.ref_user_id);
+      const initials =
+        (name ?? "")
+          .trim()
+          .split(/\s+/)
+          .slice(0, 2)
+          .map((w: string) => w[0])
+          .join("")
+          .toUpperCase() || "?";
+      return (
+        <span className="flex items-center gap-2 text-[15px] text-podio-ink">
+          {avatar ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={avatar} alt="" className="h-7 w-7 rounded-full object-cover" />
+          ) : (
+            <span className="flex h-7 w-7 items-center justify-center rounded-full bg-podio-secondary text-xs font-semibold text-white">
+              {initials}
+            </span>
+          )}
+          {name}
+        </span>
+      );
+    }
+    return (
+      <span className="text-[15px] text-podio-ink">{render(field, itemId)}</span>
+    );
+  }
+
   // Visible table columns (URL > saved view > all)
   const colsList: string[] | null = sp.cols
     ? sp.cols.split(",").filter(Boolean)
@@ -266,6 +312,25 @@ export default async function AppPage({
   const visibleFields = colsList
     ? fields.filter((f) => colsList.includes(f.id))
     : fields;
+
+  // Card-layout fields (URL > saved view settings.card_fields > all non-title
+  // fields — the title is already the card header, so repeating the primary
+  // field as a row would duplicate it). Order follows the stored list.
+  const cardfList: string[] | null = sp.cardf
+    ? sp.cardf.split(",").filter(Boolean)
+    : ((activeView?.settings as { card_fields?: string[] } | null)?.card_fields ??
+      null);
+  const defaultCardFields = fields.filter((f) => !f.is_primary);
+  const cardFields = cardfList
+    ? (cardfList
+        .map((id) => fields.find((f) => f.id === id))
+        .filter(Boolean) as typeof fields)
+    : defaultCardFields;
+  // The first text field among the card fields renders as the grey excerpt
+  // block (design skill layouts.md §6); the rest stack as label-less values.
+  const excerptField =
+    cardFields.find((f) => f.type === "text" && !f.is_primary) ?? null;
+  const stackFields = cardFields.filter((f) => f.id !== excerptField?.id);
 
   // ----- View selection -----
   // "board" is the UI key for the Card/Dig grid (enum alias 'card'); "kanban"
@@ -281,6 +346,47 @@ export default async function AppPage({
   const view =
     sp.view && LAYOUTS.includes(sp.view) ? sp.view : savedLayout ?? "table";
   const baseHref = `/org/${orgSlug}/${wsSlug}/${app.slug}`;
+
+  // Card-view footer meta ("07/17/2026 by Fernan Delgado · 💬 3"): creator
+  // names + live comment counts, fetched only when the Card layout renders.
+  const cardMeta = new Map<
+    string,
+    { createdAt: string | null; creator: string | null }
+  >();
+  const commentCounts = new Map<string, number>();
+  if (view === "board" && itemIds.length) {
+    const { data: metaRows } = await supabase
+      .from("items")
+      .select("id, created_at, created_by")
+      .in("id", itemIds);
+    const creatorIds = [
+      ...new Set((metaRows ?? []).map((r) => r.created_by).filter(Boolean)),
+    ];
+    const { data: creatorProfiles } = creatorIds.length
+      ? await supabase
+          .from("user_profiles")
+          .select("user_id, full_name")
+          .in("user_id", creatorIds)
+      : { data: [] as any[] };
+    const creatorName = new Map(
+      (creatorProfiles ?? []).map((p) => [p.user_id, p.full_name])
+    );
+    for (const r of metaRows ?? []) {
+      cardMeta.set(r.id, {
+        createdAt: r.created_at,
+        creator: creatorName.get(r.created_by) ?? null,
+      });
+    }
+    const { data: commentRows } = await supabase
+      .from("comments")
+      .select("target_id")
+      .eq("target_type", "item")
+      .is("deleted_at", null)
+      .in("target_id", itemIds);
+    for (const c of commentRows ?? []) {
+      commentCounts.set(c.target_id, (commentCounts.get(c.target_id) ?? 0) + 1);
+    }
+  }
 
   // Filtering + sorting happened in SQL (query_items); results are already shaped.
   const visibleItems = items;
@@ -476,6 +582,7 @@ export default async function AppPage({
           currentFilters={filters}
           currentSort={sort}
           currentCols={colsList}
+          currentCardFields={cardfList}
           tools={
             <>
               <Link
@@ -522,6 +629,8 @@ export default async function AppPage({
         fields={fields as any}
         tableFields={fields.map((f) => ({ id: f.id, label: f.label }))}
         initialCols={colsList}
+        initialCardFields={cardfList}
+        defaultCardFieldIds={defaultCardFields.map((f) => f.id)}
         members={members}
         activeViewId={activeView?.id ?? null}
         initialFilters={filters}
@@ -530,41 +639,58 @@ export default async function AppPage({
 
       <div className="px-4 pb-8 pt-4 lg:px-6">
       {view === "board" && (
-        // Card layout: one large card per record showing all its visible
-        // fields — a straight grid, no category grouping (that was the old
-        // kanban board; per Podio's current naming, Card = record cards).
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-          {visibleItems.map((item) => (
-            <Link
-              key={item.id}
-              href={`${baseHref}/${item.item_number}`}
-              className="flex flex-col rounded border border-podio-border bg-white shadow-sm hover:border-podio-teal"
-            >
-              <h3 className="truncate px-5 pt-4 text-lg font-semibold text-podio-teal">
-                {item.title ?? `#${item.item_number}`}
-              </h3>
-              <dl className="space-y-2 px-5 py-3">
-                {visibleFields.map((f) => (
-                  <div key={f.id} className="flex items-start gap-3 text-sm">
-                    <dt className="w-28 shrink-0 truncate pt-0.5 text-podio-meta">
-                      {f.label}
-                    </dt>
-                    <dd className="min-w-0 flex-1 truncate text-podio-ink">
-                      {render(f, item.id)}
-                    </dd>
+        // Card ("Dig") layout — design skill layouts.md §6: title, grey
+        // excerpt block (first text card-field), label-less value stack
+        // (chips, avatar+name, "<Label> not set" italics), then a
+        // "date by creator · comment count" footer. WHICH fields show is
+        // configurable: ?cardf= > saved view settings.card_fields > all
+        // non-title fields (toolbar filter panel → "Card fields").
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+          {visibleItems.map((item) => {
+            const excerptVal = excerptField
+              ? valueMap.get(item.id)?.get(excerptField.id)?.value_text
+              : null;
+            const meta = cardMeta.get(item.id);
+            return (
+              <Link
+                key={item.id}
+                href={`${baseHref}/${item.item_number}`}
+                className="flex flex-col rounded border border-podio-border bg-white shadow-sm hover:border-podio-teal"
+              >
+                <h3 className="truncate px-4 pt-4 text-[17px] font-semibold text-podio-ink">
+                  {item.title ?? `#${item.item_number}`}
+                </h3>
+                {excerptField && (
+                  <div className="mx-4 mt-3 max-h-40 overflow-hidden bg-podio-row-alt p-3 text-[15px] text-[#4E5E5E]">
+                    {excerptVal ? (
+                      excerptVal
+                    ) : (
+                      <span className="italic text-podio-disabled">
+                        {excerptField.label} not set
+                      </span>
+                    )}
                   </div>
-                ))}
-              </dl>
-              <footer className="mt-auto flex items-center border-t border-podio-border px-5 py-2.5 text-sm text-podio-meta">
-                #{item.item_number}
-                {item.updated_at && (
-                  <span className="ml-auto">
-                    {new Date(item.updated_at).toLocaleDateString()}
-                  </span>
                 )}
-              </footer>
-            </Link>
-          ))}
+                <div className="flex flex-col items-start gap-2 px-4 py-3">
+                  {stackFields.map((f) => (
+                    <Fragment key={f.id}>{cardValue(f, item.id)}</Fragment>
+                  ))}
+                </div>
+                <footer className="mt-auto flex w-full items-center gap-1 px-4 pb-3 text-sm text-podio-disabled">
+                  <span className="truncate">
+                    {meta?.createdAt
+                      ? new Date(meta.createdAt).toLocaleDateString()
+                      : ""}
+                    {meta?.creator ? ` by ${meta.creator}` : ""}
+                  </span>
+                  <span className="ml-auto flex shrink-0 items-center gap-1">
+                    <PodioIcon icon="chat" className="h-4 w-4" />
+                    {commentCounts.get(item.id) ?? 0}
+                  </span>
+                </footer>
+              </Link>
+            );
+          })}
           {visibleItems.length === 0 && (
             <p className="col-span-full rounded border border-dashed border-podio-border bg-white p-10 text-sm text-podio-meta">
               No {app.item_name.toLowerCase()}s match.

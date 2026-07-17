@@ -78,6 +78,8 @@ export function ViewToolbar({
   initialSort,
   tableFields,
   initialCols,
+  initialCardFields,
+  defaultCardFieldIds,
 }: {
   baseHref: string;
   layout: string;
@@ -93,6 +95,9 @@ export function ViewToolbar({
   initialSort: Sort[];
   tableFields: { id: string; label: string }[];
   initialCols: string[] | null;
+  // Card-layout field picker: null = default (all non-title fields)
+  initialCardFields: string[] | null;
+  defaultCardFieldIds: string[];
 }) {
   const router = useRouter();
   const supabase = createClient();
@@ -129,6 +134,18 @@ export function ViewToolbar({
       : [...current, id];
     setCols(next.length === tableFields.length ? null : next);
   }
+
+  // Card-layout field picker (mirrors the Columns mechanism; ?cardf= param)
+  const [cardFieldsOpen, setCardFieldsOpen] = useState(false);
+  const [cardFields, setCardFields] = useState<string[] | null>(initialCardFields);
+
+  function toggleCardField(id: string) {
+    const current = cardFields ?? defaultCardFieldIds;
+    const next = current.includes(id)
+      ? current.filter((x) => x !== id)
+      : [...current, id];
+    setCardFields(next);
+  }
   const [error, setError] = useState<string | null>(null);
 
   const activeFilterCount = filters.filter((f) => f.field_id && f.op).length;
@@ -140,6 +157,7 @@ export function ViewToolbar({
     if (clean.length) q.set("f", JSON.stringify(clean));
     if (sortField) q.set("s", JSON.stringify([{ field_id: sortField, dir: sortDir }]));
     if (cols && cols.length > 0) q.set("cols", cols.join(","));
+    if (cardFields && cardFields.length > 0) q.set("cardf", cardFields.join(","));
     for (const [k, v] of Object.entries(extra ?? {})) q.set(k, v);
     return q.toString();
   }
@@ -438,6 +456,31 @@ export function ViewToolbar({
                       type="checkbox"
                       checked={(cols ?? tableFields.map((x) => x.id)).includes(f.id)}
                       onChange={() => toggleCol(f.id)}
+                    />
+                    {f.label}
+                  </label>
+                ))}
+              </span>
+            )}
+            {layout === "board" && (
+              <button
+                onClick={() => setCardFieldsOpen(!cardFieldsOpen)}
+                className="rounded border border-podio-border px-2 py-1 text-xs text-podio-ink hover:bg-podio-row-alt"
+              >
+                Card fields{" "}
+                {cardFields
+                  ? `(${cardFields.length}/${tableFields.length})`
+                  : "▾"}
+              </button>
+            )}
+            {layout === "board" && cardFieldsOpen && (
+              <span className="flex flex-wrap gap-x-3 gap-y-1 rounded border border-podio-border bg-podio-row-alt px-2 py-1">
+                {tableFields.map((f) => (
+                  <label key={f.id} className="flex items-center gap-1 text-xs text-podio-secondary">
+                    <input
+                      type="checkbox"
+                      checked={(cardFields ?? defaultCardFieldIds).includes(f.id)}
+                      onChange={() => toggleCardField(f.id)}
                     />
                     {f.label}
                   </label>

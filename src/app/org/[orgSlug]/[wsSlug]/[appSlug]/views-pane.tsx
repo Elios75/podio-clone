@@ -47,6 +47,7 @@ export function ViewsPane({
   currentFilters,
   currentSort,
   currentCols,
+  currentCardFields,
   tools,
 }: {
   appId: string;
@@ -63,6 +64,7 @@ export function ViewsPane({
   currentFilters: Filter[];
   currentSort: Sort[];
   currentCols: string[] | null;
+  currentCardFields: string[] | null; // card-layout field list (?cardf=)
   tools?: ReactNode; // utility icon cluster (webform, bell, wrench menu, expand)
 }) {
   const router = useRouter();
@@ -162,7 +164,12 @@ export function ViewsPane({
         filters: currentFilters.filter((f) => f.field_id && f.op),
         sort: currentSort,
         columns: currentCols,
-        settings: groupFieldId ? { group_field_id: groupFieldId } : {},
+        settings: {
+          ...(groupFieldId ? { group_field_id: groupFieldId } : {}),
+          ...(currentCardFields && currentCardFields.length
+            ? { card_fields: currentCardFields }
+            : {}),
+        },
       })
       .select()
       .single();
