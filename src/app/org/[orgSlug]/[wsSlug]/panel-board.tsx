@@ -8,12 +8,15 @@
 // (native HTML5 DnD, custom MIME, 2D pointer insertion index, teal top-border
 // indicator — same technique as the app editor's canvas).
 //
-// Persistence: localStorage per workspace as { order, sizes }. Older layouts
-// stored as { left, right } column arrays are migrated on read (left → width
-// 4, right → width 2). Hydration safety: the first client render always uses
-// the incoming panel order and NO inline sizes (matching SSR); the stored
-// layout and desktop-only grid styles are applied in effects afterwards. On
-// small screens the grid collapses to a plain stack and sizes are ignored.
+// Persistence: ACCOUNT-SYNCED — the layout lives in
+// podio.workspace_panel_layouts (one row per user per workspace, RLS-owned),
+// so the arrangement follows the account across machines. The server page
+// fetches the row and passes it as `initialLayout`, which seeds the very
+// first render (SSR and client agree — no flash). Every change upserts the
+// row. Legacy layouts: a localStorage layout from the pre-sync era (either
+// the { order, sizes } shape or the older { left, right } column arrays) is
+// adopted into the DB once when no server layout exists yet. On small
+// screens the grid collapses to a plain stack and sizes are ignored.
 
 import {
   useEffect,
@@ -23,6 +26,7 @@ import {
   type PointerEvent as ReactPointerEvent,
   type ReactNode,
 } from "react";
+import { createClient } from "@/lib/supabase/client";
 
 export type WorkspacePanel = {
   id: string;
@@ -39,17 +43,80 @@ const GRID_UNITS = 6;
 const WIDTH_STOPS = [2, 3, 4, 6]; // 1/3 · 1/2 · 2/3 · full
 const MIN_H = 140;
 
+// Validate + normalize a stored layout (server jsonb or legacy localStorage;
+// accepts the { order, sizes } shape and the older { left, right } column
+// arrays). Unknown ids are dropped, panels missing from the stored order are
+// spliced back in, widths clamped to the allowed stops. Returns null when the
+// payload holds nothing usable.
+function sanitizeStored(
+  stored: unknown,
+  panels: WorkspacePanel[],
+  defaults: Layout
+): Layout | null {
+  if (!stored || typeof stored !== "object") return null;
+  const s = stored as any;
+  const known = new Set(panels.map((p) => p.id));
+  let order: string[] = [];
+  const sizes: Record<string, PanelSize> = {};
+  if (Array.isArray(s.order)) {
+    order = s.order.filter(
+      (id: unknown): id is string => typeof id === "string" && known.has(id)
+    );
+    for (const [id, sz] of Object.entries(s.sizes ?? {})) {
+      if (!known.has(id)) continue;
+      const w = Number((sz as any)?.w);
+      const h = Number((sz as any)?.h);
+      sizes[id] = {
+        w: WIDTH_STOPS.includes(w) ? w : 4,
+        ...(Number.isFinite(h) && h >= MIN_H ? { h } : {}),
+      };
+    }
+  } else if (Array.isArray(s.left) || Array.isArray(s.right)) {
+    const left = (s.left ?? []).filter(
+      (id: unknown): id is string => typeof id === "string" && known.has(id)
+    );
+    const right = (s.right ?? []).filter(
+      (id: unknown): id is string => typeof id === "string" && known.has(id)
+    );
+    for (let i = 0; i < Math.max(left.length, right.length); i++) {
+      if (left[i]) order.push(left[i]);
+      if (right[i]) order.push(right[i]);
+    }
+    for (const id of left) sizes[id] = { w: 4 };
+    for (const id of right) sizes[id] = { w: 2 };
+  } else {
+    return null;
+  }
+  if (order.length === 0) return null;
+  const placed = new Set(order);
+  for (const id of defaults.order) {
+    if (!placed.has(id)) {
+      order.push(id);
+      placed.add(id);
+    }
+  }
+  for (const p of panels) {
+    if (!sizes[p.id]) sizes[p.id] = defaults.sizes[p.id] ?? { w: 4 };
+  }
+  return { order, sizes };
+}
+
 export function PanelBoard({
   wsId,
+  userId,
+  initialLayout,
   panels,
   rightFooter,
 }: {
   wsId: string;
+  userId: string | null;
+  initialLayout?: unknown; // stored layout row from the server (jsonb)
   panels: WorkspacePanel[];
   rightFooter?: ReactNode;
 }) {
   const storageKey = `podio.ws-panels.${wsId}`;
   const byId = new Map(panels.map((p) => [p.id, p]));
+  const supabase = createClient();
 
   // Default: interleave left/right panels (L0 R0 L1 R1 …) with widths 4/2 so
   // the default rendering approximates the old two-column layout — a wide
@@ -67,8 +134,10 @@ export function PanelBoard({
     return { order, sizes };
   })();
 
-  const [layout, setLayout] = useState<Layout>(defaultLayout);
-  const [hasStored, setHasStored] = useState(false);
+  // The server-fetched layout seeds the FIRST render (SSR + client agree).
+  const serverLayout = sanitizeStored(initialLayout, panels, defaultLayout);
+  const [layout, setLayout] = useState<Layout>(serverLayout ?? defaultLayout);
+  const [hasStored, setHasStored] = useState(serverLayout !== null);
   const [isDesktop, setIsDesktop] = useState(false);
   const [dragging, setDragging] = useState<string | null>(null);
   const [overIndex, setOverIndex] = useState<number | null>(null);
@@ -86,9 +155,10 @@ export function PanelBoard({
     return () => mq.removeEventListener("change", apply);
   }, []);
 
-  // Apply the stored layout AFTER hydration. Unknown ids are dropped; panels
-  // missing from the stored order are spliced back in at their default spot.
+  // One-time adoption of a pre-sync localStorage layout: only when the
+  // account has no stored layout yet, so it never overrides the synced one.
   useEffect(() => {
+    if (serverLayout) return;
     let raw: string | null = null;
     try {
       raw = window.localStorage.getItem(storageKey);
@@ -97,66 +167,31 @@ export function PanelBoard({
     }
     if (!raw) return;
     try {
-      const stored = JSON.parse(raw) as any;
-      const known = new Set(panels.map((p) => p.id));
-      let order: string[] = [];
-      let sizes: Record<string, PanelSize> = {};
-      if (Array.isArray(stored?.order)) {
-        order = stored.order.filter(
-          (id: unknown): id is string => typeof id === "string" && known.has(id)
-        );
-        for (const [id, s] of Object.entries(stored.sizes ?? {})) {
-          if (!known.has(id)) continue;
-          const w = Number((s as any)?.w);
-          const h = Number((s as any)?.h);
-          sizes[id] = {
-            w: WIDTH_STOPS.includes(w) ? w : 4,
-            ...(Number.isFinite(h) && h >= MIN_H ? { h } : {}),
-          };
-        }
-      } else if (Array.isArray(stored?.left) || Array.isArray(stored?.right)) {
-        // v1 two-column shape → interleave, widths from the column.
-        const left = (stored.left ?? []).filter(
-          (id: unknown): id is string => typeof id === "string" && known.has(id)
-        );
-        const right = (stored.right ?? []).filter(
-          (id: unknown): id is string => typeof id === "string" && known.has(id)
-        );
-        for (let i = 0; i < Math.max(left.length, right.length); i++) {
-          if (left[i]) order.push(left[i]);
-          if (right[i]) order.push(right[i]);
-        }
-        for (const id of left) sizes[id] = { w: 4 };
-        for (const id of right) sizes[id] = { w: 2 };
-      } else {
-        return;
-      }
-      const placed = new Set(order);
-      for (const id of defaultLayout.order) {
-        if (!placed.has(id)) {
-          order.push(id);
-          placed.add(id);
-        }
-      }
-      for (const p of panels) {
-        if (!sizes[p.id]) sizes[p.id] = defaultLayout.sizes[p.id] ?? { w: 4 };
-      }
-      setLayout({ order, sizes });
+      const adopted = sanitizeStored(JSON.parse(raw), panels, defaultLayout);
+      if (!adopted) return;
+      setLayout(adopted);
       setHasStored(true);
+      saveRemote(adopted);
     } catch {
       /* corrupt payload — keep the default layout */
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [storageKey]);
 
+  function saveRemote(next: Layout) {
+    if (!userId) return;
+    void supabase.from("workspace_panel_layouts").upsert({
+      workspace_id: wsId,
+      user_id: userId,
+      layout: next,
+      updated_at: new Date().toISOString(),
+    });
+  }
+
   function persist(next: Layout) {
     setLayout(next);
     setHasStored(true);
-    try {
-      window.localStorage.setItem(storageKey, JSON.stringify(next));
-    } catch {
-      /* storage unavailable — layout still applies for this visit */
-    }
+    saveRemote(next);
   }
 
   function resetLayout() {
@@ -164,6 +199,13 @@ export function PanelBoard({
       window.localStorage.removeItem(storageKey);
     } catch {
       /* ignore */
+    }
+    if (userId) {
+      void supabase
+        .from("workspace_panel_layouts")
+        .delete()
+        .eq("workspace_id", wsId)
+        .eq("user_id", userId);
     }
     setLayout(defaultLayout);
     setHasStored(false);

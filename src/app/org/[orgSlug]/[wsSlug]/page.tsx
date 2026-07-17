@@ -275,6 +275,19 @@ export default async function WorkspacePage({
   const {
     data: { user },
   } = await supabase.auth.getUser();
+  // Account-synced panel layout (workspace_panel_layouts, migration 75):
+  // fetched here so the very first render already uses the saved arrangement.
+  let panelLayout: unknown = null;
+  if (user) {
+    const { data: layoutRow } = await supabase
+      .from("workspace_panel_layouts")
+      .select("layout")
+      .eq("workspace_id", ws.id)
+      .eq("user_id", user.id)
+      .maybeSingle();
+    panelLayout = layoutRow?.layout ?? null;
+  }
+
   let followMuted = false;
   if (user) {
     const { data: followRow } = await supabase
@@ -302,10 +315,13 @@ export default async function WorkspacePage({
       />
 
       {/* Podio workspace landing = the Activity stream. Apps appear only in
-          the tab bar above; the body is a two-column feed + right rail whose
-          panels can be dragged to rearrange (order kept in localStorage). */}
+          the tab bar above; the body is a configurable panel grid (drag +
+          corner resize) whose layout is synced to the account per workspace
+          (workspace_panel_layouts). */}
       <PanelBoard
         wsId={ws.id}
+        userId={user?.id ?? null}
+        initialLayout={panelLayout}
         panels={[
           {
             id: "header",
