@@ -16,7 +16,7 @@ Written after completing Phases 0–7. Every item below is in `podio-clone.md` (
 
 - **Personal project mode**: billing limits are intentionally disabled — both orgs are set to the `enterprise` plan (unlimited). Ignore plan-limit concerns until commercialization; the Stripe/billing machinery is built but dormant (env-gated).
 - Migrations through **52** are applied to the dedicated Podio-Clone project (`gwtfthmlwtylefvfklht`); the old FuelTrack project (`bonjyxumwuokdwlrcxwx`) is unrelated and off-limits — never touch it. Repo migration files are kept in sync for fresh installs. Use the Supabase connector for migrations/SQL.
-- Workflow: develop in a sandbox clone, apply migrations via the Supabase connector, copy changed files to `C:\Users\fd\podio-clone`, and the user commits/pushes (the GitHub connector is read-only).
+- Workflow: edit files in `C:\Users\fd\podio-clone` directly, apply migrations via the Supabase connector (ONLY project `gwtfthmlwtylefvfklht`), then Claude typechecks + commits + pushes via **unsandboxed** local git (verified 2026-07-17: `credential.helper=manager` authenticates non-interactively; the old index.lock/CRLF-noise/phantom-tsc problems were all sandbox-only artifacts — never run git or repo-wide tsc sandboxed). The user no longer pushes manually.
 - `.env.local` exists locally (gitignored) with the Supabase URL + anon key. Optional keys documented in `.env.local.example` (Turnstile, Stripe, Anthropic).
 
 ---
