@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { PodioIcon } from "@/components/podio-icon";
+import { categoryLabel } from "./category-label";
 
 // One App Market "app entry" (§11): lighter than a card — no border. Line
 // icon + ink semibold name inline, grey truncated description, teal stars,
@@ -176,7 +177,7 @@ export function TemplateCard({
           <button type="button"
             onClick={() => onPickCategory?.(template.category as string)}
             className="text-podio-teal hover:underline">
-            {template.category}
+            {categoryLabel(template.category)}
           </button>
         ) : (
           <span>Uncategorized</span>

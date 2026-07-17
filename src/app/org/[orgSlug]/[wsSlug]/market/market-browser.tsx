@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { TemplateCard, type MarketTemplate, type TemplateReview } from "./template-card";
+import { categoryLabel } from "./category-label";
 
 // Client shell for the App Market body: grey category sidebar (search row,
 // "My organizations", "Functional" category list) + white main column with
@@ -64,7 +65,9 @@ export function MarketBrowser({
     ? `Results for “${query.trim()}”`
     : mineOnly
     ? `From ${orgName}`
-    : category ?? "Recommended apps";
+    : category
+    ? categoryLabel(category)
+    : "Recommended apps";
 
   function pickCategory(c: string | null) {
     setCategory(c);
@@ -153,7 +156,7 @@ export function MarketBrowser({
                 onClick={() => pickCategory(c)}
                 className={`${rowBase} ${category === c ? rowActive : rowIdle}`}
               >
-                {c}
+                {categoryLabel(c)}
               </button>
             </li>
           ))}
