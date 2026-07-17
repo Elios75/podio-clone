@@ -295,7 +295,16 @@ export function PanelBoard({
     const onUp = () => {
       window.removeEventListener("pointermove", onMove);
       setResizing(null);
-      persist(layoutRef.current);
+      // Dragged past the content's bottom = "don't clip": release the height
+      // back to auto so the panel hugs its content again.
+      const cur = layoutRef.current;
+      const s = cur.sizes[id] ?? { w: 4 };
+      const bodyEl = panelEl.querySelector<HTMLElement>("[data-panel-body]");
+      const next =
+        s.h && bodyEl && s.h >= bodyEl.scrollHeight - 4
+          ? { ...cur, sizes: { ...cur.sizes, [id]: { w: s.w } } }
+          : cur;
+      persist(next);
     };
     window.addEventListener("pointermove", onMove);
     window.addEventListener("pointerup", onUp, { once: true });
@@ -324,7 +333,10 @@ export function PanelBoard({
                   ? { gridColumn: `span ${size.w} / span ${size.w}` }
                   : undefined
               }
-              className={`group relative border-t-2 ${
+              // min-w-0 is load-bearing: grid items default to min-width:auto,
+              // so without it a panel narrower than its content OVERFLOWS into
+              // (and under) the neighboring cell instead of clipping.
+              className={`group relative min-w-0 border-t-2 ${
                 overIndex === i && dragging !== id
                   ? "border-podio-teal"
                   : "border-transparent"
@@ -368,13 +380,17 @@ export function PanelBoard({
                 </svg>
               </div>
 
-              {/* Panel body: a user-set height clips + scrolls the content. */}
+              {/* Panel body: always clips horizontally (so shrunken panels
+                  never invade their neighbor); a user-set height also clips +
+                  scrolls vertically, with a hairline closing the cut edge. */}
               <div
-                style={
+                data-panel-body
+                className={`min-w-0 overflow-x-hidden ${
                   isDesktop && size.h
-                    ? { height: size.h, overflowY: "auto" }
-                    : undefined
-                }
+                    ? "overflow-y-auto rounded-b border-b border-podio-border"
+                    : ""
+                }`}
+                style={isDesktop && size.h ? { height: size.h } : undefined}
               >
                 {p.node}
               </div>
