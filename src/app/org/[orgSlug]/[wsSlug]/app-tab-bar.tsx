@@ -26,7 +26,7 @@ export function AppTabBar({
         className={`flex w-[4.5rem] shrink-0 flex-col items-center gap-0.5 rounded-md px-2 pb-2 pt-2 text-xs ${
           activityActive
             ? "bg-white text-podio-ink shadow-sm"
-            : "text-podio-secondary hover:bg-[#E4E4E4]"
+            : "text-[#4E5E5E] hover:bg-[#E4E4E4]"
         }`}
       >
         <PodioIcon icon="activity" className="h-5 w-5" />
@@ -39,7 +39,7 @@ export function AppTabBar({
           className={`flex w-[4.5rem] shrink-0 flex-col items-center gap-0.5 rounded-md px-2 pb-2 pt-2 text-center text-xs ${
             a.slug === activeAppSlug
               ? "bg-white text-podio-ink shadow-sm"
-              : "text-podio-secondary hover:bg-[#E4E4E4]"
+              : "text-[#4E5E5E] hover:bg-[#E4E4E4]"
           }`}
         >
           <PodioIcon icon={a.icon} name={a.name} className="h-5 w-5" />
