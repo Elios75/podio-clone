@@ -163,12 +163,99 @@ export default async function WorkspacePage({
         };
       });
       tiles.push({ id: t.id, title: t.title, kind: t.kind, groups });
+    } else if (t.kind === "tasks") {
+      // Workspace overview tiles (Podio's "Overviews" picker tab)
+      const { data: tRows } = await supabase
+        .from("tasks")
+        .select("id, title, due_at")
+        .eq("workspace_id", ws.id)
+        .is("completed_at", null)
+        .order("due_at", { ascending: true, nullsFirst: false })
+        .limit(6);
+      tiles.push({
+        id: t.id, title: t.title, kind: t.kind,
+        tasks: (tRows ?? []).map((x) => ({ id: x.id, title: x.title, due_date: x.due_at })),
+      });
+    } else if (t.kind === "calendar") {
+      const { data: cRows } = await supabase
+        .from("tasks")
+        .select("id, title, due_at")
+        .eq("workspace_id", ws.id)
+        .not("due_at", "is", null)
+        .gte("due_at", new Date().toISOString())
+        .order("due_at", { ascending: true })
+        .limit(6);
+      tiles.push({
+        id: t.id, title: t.title, kind: t.kind,
+        events: (cRows ?? []).map((x) => ({
+          id: x.id, title: x.title, when: x.due_at as string, href: "/tasks",
+        })),
+      });
+    } else if (t.kind === "files") {
+      const { data: fRows } = await supabase
+        .from("files")
+        .select("id, name, storage_path, external_url, created_at")
+        .eq("workspace_id", ws.id)
+        .is("deleted_at", null)
+        .order("created_at", { ascending: false })
+        .limit(6);
+      const fPaths = (fRows ?? [])
+        .map((f) => f.storage_path)
+        .filter(Boolean) as string[];
+      const { data: fSigned } = fPaths.length
+        ? await supabase.storage.from("podio-files").createSignedUrls(fPaths, 3600)
+        : { data: [] as any[] };
+      const fSignedBy = new Map(
+        (fSigned ?? []).filter((s) => s.signedUrl).map((s) => [s.path, s.signedUrl])
+      );
+      tiles.push({
+        id: t.id, title: t.title, kind: t.kind,
+        files: (fRows ?? []).map((f) => ({
+          id: f.id, name: f.name, created_at: f.created_at,
+          href:
+            f.external_url ??
+            (f.storage_path ? fSignedBy.get(f.storage_path) ?? null : null),
+        })),
+      });
+    } else if (t.kind === "contacts") {
+      tiles.push({
+        id: t.id, title: t.title, kind: t.kind,
+        members: (members ?? []).map((m: any) => ({
+          user_id: m.user_id,
+          full_name: m.user_profiles?.full_name ?? null,
+          avatar_url: m.user_profiles?.avatar_url ?? null,
+        })),
+      });
+    } else if (t.kind === "app") {
+      // App content tile (the "Apps" picker tab): the app's newest items
+      const tileApp = (apps ?? []).find((a) => a.id === t.app_id);
+      const { data: iRows } = await supabase
+        .from("items")
+        .select("id, title, item_number")
+        .eq("app_id", t.app_id)
+        .eq("is_deleted", false)
+        .order("created_at", { ascending: false })
+        .limit(5);
+      tiles.push({
+        id: t.id, title: t.title, kind: t.kind,
+        items: (iRows ?? []).map((i) => ({
+          id: i.id,
+          title: i.title ?? `#${i.item_number}`,
+          href: tileApp
+            ? `/org/${orgSlug}/${wsSlug}/${tileApp.slug}/${i.item_number}`
+            : "#",
+        })),
+      });
+    } else {
+      // text / iframe / youtube — the config IS the content
+      tiles.push({ id: t.id, title: t.title, kind: t.kind, config: cfg });
     }
   }
 
   const appInfos = (apps ?? []).map((a) => ({
     id: a.id,
     name: a.name,
+    icon: a.icon ?? null,
     numberFields: [
       ...(wsFields ?? [])
         .filter((f) => f.app_id === a.id && ["number", "money", "progress", "duration"].includes(f.type))
@@ -534,7 +621,7 @@ export default async function WorkspacePage({
           >
             <h2 className="font-semibold text-podio-teal">Dashboard</h2>
             <div className="mt-3">
-              <DashboardTiles wsId={ws.id} apps={appInfos} tiles={tiles} />
+              <DashboardTiles wsId={ws.id} wsName={ws.name} apps={appInfos} tiles={tiles} />
             </div>
           </section>
             ),
