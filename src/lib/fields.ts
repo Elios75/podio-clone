@@ -59,6 +59,7 @@ export type TableColumn = {
   label: string;
   type: TableColumnType;
   options?: CategoryOption[]; // category columns only
+  width?: number; // persisted pixel width (definition-level), set by resize
 };
 
 export type TableRow = Record<string, string | number | boolean | null>;

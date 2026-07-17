@@ -2,6 +2,7 @@ import Link from "next/link";
 import { PodioIcon } from "@/components/podio-icon";
 import { NotificationsBell } from "@/components/notifications-bell";
 import { ChatLauncher } from "@/components/chat-launcher";
+import { GlobalSearch } from "@/components/global-search";
 
 // The one grey-teal global bar (desktop + mobile variants), extracted
 // verbatim from the org layout so standalone pages (/tasks, /calendar,
@@ -81,9 +82,10 @@ export function GlobalBar({
           <Link href="/home" title="Help" className="hover:opacity-80">
             <PodioIcon icon="help" className="h-5 w-5" />
           </Link>
-          <Link href="/search" title="Search" className="hover:opacity-80">
-            <PodioIcon icon="search" className="h-5 w-5" />
-          </Link>
+          {/* Inline expanding search — stays on the page, scoped to the
+              current app (real Podio behavior); /search stays reachable
+              via the dropdown's "Search everywhere" link. */}
+          <GlobalSearch />
           {user && (
             <Link
               href="/home"

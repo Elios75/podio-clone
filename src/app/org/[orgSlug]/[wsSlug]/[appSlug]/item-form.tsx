@@ -6,16 +6,14 @@ import { createClient } from "@/lib/supabase/client";
 import {
   CURRENCIES,
   FORM_GRID_COLS,
-  currencySymbol,
   normalizeColumns,
   splitSections,
-  tableColumnTotals,
   type CategoryOption,
   type FieldType,
   type TableColumn,
-  type TableRow,
 } from "@/lib/fields";
 import { PodioIcon } from "@/components/podio-icon";
+import { TableField } from "./table-field";
 
 type Field = {
   id: string;
@@ -399,162 +397,16 @@ export function ItemForm({
         );
       }
       case "table": {
-        // Embedded sub-table (beyond-Podio): editable grid with typed cells,
-        // per-row ✕, "+ Add row" and a totals footer for number/money columns.
-        const cols = (f.config.columns ?? []) as TableColumn[];
-        const rows: TableRow[] = Array.isArray(values[f.id]?.rows)
-          ? values[f.id].rows
-          : [];
-        if (cols.length === 0) {
-          return (
-            <p className="rounded border border-dashed border-podio-border px-3 py-2 text-sm text-podio-meta">
-              No columns yet — add columns to this table in the template editor.
-            </p>
-          );
-        }
-        const currency = f.config.currency ?? "USD";
-        const numericCols = cols.filter(
-          (c) => c.type === "number" || c.type === "money"
-        );
-        const totals = tableColumnTotals(rows, cols);
-        const setRows = (next: TableRow[]) => set(f.id, { rows: next });
-        const updCell = (ri: number, colId: string, cv: any) =>
-          setRows(rows.map((r, i) => (i === ri ? { ...r, [colId]: cv } : r)));
-        const addRow = () =>
-          setRows([
-            ...rows,
-            Object.fromEntries(
-              cols.map((c) => [c.id, c.type === "checkbox" ? false : null])
-            ) as TableRow,
-          ]);
-        const cellCls =
-          "w-full rounded border border-podio-border bg-white px-2 py-1 text-sm text-podio-ink focus:border-podio-teal focus:outline-none";
-        const cell = (row: TableRow, ri: number, c: TableColumn) => {
-          const cv = row?.[c.id];
-          switch (c.type) {
-            case "number":
-              return (
-                <input type="number" step="any" value={typeof cv === "number" ? cv : ""}
-                  onChange={(e) =>
-                    updCell(ri, c.id, e.target.value === "" ? null : Number(e.target.value))}
-                  className={cellCls} />
-              );
-            case "money":
-              return (
-                <div className="flex items-center gap-1">
-                  <span className="shrink-0 text-xs text-podio-meta">
-                    {currencySymbol(currency)}
-                  </span>
-                  <input type="number" step="0.01" value={typeof cv === "number" ? cv : ""}
-                    onChange={(e) =>
-                      updCell(ri, c.id, e.target.value === "" ? null : Number(e.target.value))}
-                    className={cellCls} />
-                </div>
-              );
-            case "date":
-              return (
-                <input type="date" value={typeof cv === "string" ? cv : ""}
-                  onChange={(e) => updCell(ri, c.id, e.target.value || null)}
-                  className={cellCls} />
-              );
-            case "checkbox":
-              return (
-                <div className="flex justify-center">
-                  <input type="checkbox" checked={cv === true}
-                    onChange={(e) => updCell(ri, c.id, e.target.checked)} />
-                </div>
-              );
-            case "category": {
-              const opt = (c.options ?? []).find((o) => o.id === cv);
-              return (
-                <div className="flex items-center gap-1.5">
-                  {opt && (
-                    <span className="h-2.5 w-2.5 shrink-0 rounded-full"
-                      style={{ backgroundColor: opt.color }} />
-                  )}
-                  <select value={typeof cv === "string" ? cv : ""}
-                    onChange={(e) => updCell(ri, c.id, e.target.value || null)}
-                    className={cellCls}>
-                    <option value="">—</option>
-                    {(c.options ?? []).map((o) => (
-                      <option key={o.id} value={o.id}>{o.label}</option>
-                    ))}
-                  </select>
-                </div>
-              );
-            }
-            default:
-              return (
-                <input value={typeof cv === "string" ? cv : ""}
-                  onChange={(e) => updCell(ri, c.id, e.target.value || null)}
-                  className={cellCls} />
-              );
-          }
-        };
+        // Embedded sub-table (beyond-Podio). The typed grid, plus resizable and
+        // reorderable columns (persisted to the field definition), live in
+        // TableField; row data stays keyed by column id in value.rows.
         return (
-          <div className="overflow-x-auto rounded border border-podio-border">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="bg-podio-row-alt">
-                  {cols.map((c) => (
-                    <th key={c.id}
-                      className="px-2 py-1.5 text-left text-xs font-semibold uppercase tracking-wide text-podio-meta">
-                      {c.label}
-                    </th>
-                  ))}
-                  <th className="w-8 px-2 py-1.5" aria-label="Remove row" />
-                </tr>
-              </thead>
-              <tbody>
-                {rows.map((row, ri) => (
-                  <tr key={ri} className="border-t border-podio-border">
-                    {cols.map((c) => (
-                      <td key={c.id} className="px-1.5 py-1 align-middle">
-                        {cell(row, ri, c)}
-                      </td>
-                    ))}
-                    <td className="px-1 py-1 text-center">
-                      <button type="button" title="Remove row"
-                        onClick={() => setRows(rows.filter((_, i) => i !== ri))}
-                        className="text-xs text-podio-meta hover:text-red-600">
-                        ✕
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-                {rows.length === 0 && (
-                  <tr className="border-t border-podio-border">
-                    <td colSpan={cols.length + 1}
-                      className="px-3 py-3 text-center text-xs text-podio-meta">
-                      No rows yet.
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-              {numericCols.length > 0 && rows.length > 0 && (
-                <tfoot>
-                  <tr className="border-t-2 border-podio-border">
-                    {cols.map((c) => (
-                      <td key={c.id} className="px-2 py-1.5 text-sm font-semibold text-podio-ink">
-                        {c.type === "money" &&
-                          `${currencySymbol(currency)}${(totals[c.id] ?? 0).toLocaleString(
-                            "en-US", { maximumFractionDigits: 2 })}`}
-                        {c.type === "number" &&
-                          (totals[c.id] ?? 0).toLocaleString("en-US", {
-                            maximumFractionDigits: 2,
-                          })}
-                      </td>
-                    ))}
-                    <td />
-                  </tr>
-                </tfoot>
-              )}
-            </table>
-            <button type="button" onClick={addRow}
-              className="block w-full border-t border-podio-border px-3 py-2 text-left text-sm font-semibold text-podio-teal hover:bg-podio-row-alt">
-              + Add row
-            </button>
-          </div>
+          <TableField
+            fieldId={f.id}
+            config={f.config as { columns?: TableColumn[]; currency?: string }}
+            value={values[f.id]}
+            onChange={(v) => set(f.id, v)}
+          />
         );
       }
       case "calculation": {
