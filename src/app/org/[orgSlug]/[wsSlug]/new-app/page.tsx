@@ -33,12 +33,21 @@ export default async function NewAppPage({
     .single();
   if (!ws) notFound();
 
-  const { data: workspaceApps } = await supabase
+  // Relationship-target choices span the whole org (RLS limits to workspaces
+  // the user belongs to); labels are "Workspace / App" so cross-workspace
+  // targets are unambiguous.
+  const { data: orgApps } = await supabase
     .from("apps")
-    .select("id, name")
-    .eq("workspace_id", ws.id)
+    .select("id, name, workspaces:workspace_id(name, organization_id)")
     .eq("is_archived", false)
     .order("name");
+  const workspaceApps = (orgApps ?? [])
+    .filter((a: any) => a.workspaces?.organization_id === org.id)
+    .map((a: any) => ({
+      id: a.id as string,
+      name: `${a.workspaces?.name ?? "?"} / ${a.name}`,
+    }))
+    .sort((a, b) => a.name.localeCompare(b.name));
 
   return (
     <main className="mx-auto max-w-2xl p-8">

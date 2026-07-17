@@ -59,6 +59,22 @@ export default async function EditAppPage({
         .eq("status", "active")
     : { data: [] as any[] };
 
+  // Relationship-target choices: every non-archived app the user can see in
+  // this org, across ALL workspaces (RLS already limits to memberships).
+  // Labeled "Workspace / App"; includes this app itself (subtask hierarchies).
+  const { data: orgApps } = await supabase
+    .from("apps")
+    .select("id, name, workspaces:workspace_id(name, organization_id)")
+    .eq("is_archived", false)
+    .order("name");
+  const relAppChoices = (orgApps ?? [])
+    .filter((a: any) => a.workspaces?.organization_id === org.id)
+    .map((a: any) => ({
+      id: a.id as string,
+      label: `${a.workspaces?.name ?? "?"} / ${a.name}`,
+    }))
+    .sort((a, b) => a.label.localeCompare(b.label));
+
   const { data: revisions } = await supabase
     .from("app_schema_revisions")
     .select("version, created_at, changed_by")
@@ -79,6 +95,7 @@ export default async function EditAppPage({
         revisions={(revisions ?? []) as any}
         rollupSources={rollupSources}
         srcNumFields={(srcNumFields ?? []) as any}
+        relAppChoices={relAppChoices}
       />
     </main>
   );

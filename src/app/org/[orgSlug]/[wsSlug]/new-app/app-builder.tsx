@@ -384,7 +384,8 @@ export function AppBuilder({
                 </select>
                 {workspaceApps.length === 0 && (
                   <p className="mt-1 text-xs text-amber-600">
-                    No other apps in this workspace yet — create the related app first.
+                    No apps to link to yet — create the related app first (any
+                    workspace works).
                   </p>
                 )}
               </div>

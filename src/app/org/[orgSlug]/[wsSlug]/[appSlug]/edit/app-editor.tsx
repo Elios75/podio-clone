@@ -40,6 +40,7 @@ type EditField = {
   rollupSource: string;   // relationship field id in the source app
   rollupAgg: string;      // sum | count | avg
   rollupValueField: string;
+  relatedAppId: string;   // relationship target app (any workspace in the org)
   defaultValue: string;   // text/number
   tableColumns: TableColumn[]; // table (sub-table column schema)
   tableCurrency: string;  // table (currency for money columns)
@@ -210,6 +211,7 @@ export function AppEditor({
   revisions,
   rollupSources,
   srcNumFields,
+  relAppChoices,
 }: {
   app: any;
   wsName: string;
@@ -221,6 +223,9 @@ export function AppEditor({
   revisions: { version: number; created_at: string }[];
   rollupSources: { id: string; label: string; app_id: string }[];
   srcNumFields: { id: string; label: string; app_id: string }[];
+  // Relationship target choices: every app the user can see in this org,
+  // across ALL workspaces (labels are "Workspace / App").
+  relAppChoices: { id: string; label: string }[];
 }) {
   const router = useRouter();
   const supabase = createClient();
@@ -248,6 +253,7 @@ export function AppEditor({
       rollupSource: f.config?.rollup?.source_field_id ?? "",
       rollupAgg: f.config?.rollup?.agg ?? "sum",
       rollupValueField: f.config?.rollup?.value_field_id ?? "",
+      relatedAppId: f.config?.related_app_id ?? "",
       defaultValue:
         f.config?.default !== undefined && f.config?.default !== null
           ? String(f.config.default)
@@ -364,7 +370,7 @@ export function AppEditor({
       help_text: "", is_required: false, is_hidden: false,
       is_primary: false, options: [], multiple: false, endDate: false,
       formula: "", calcMode: "formula", rollupSource: "",
-      rollupAgg: "sum", rollupValueField: "", defaultValue: "",
+      rollupAgg: "sum", rollupValueField: "", relatedAppId: "", defaultValue: "",
       tableColumns: [], tableCurrency: "USD",
       column: type === "separator" || type === "table" ? 0 : col,
       origType: null,
@@ -920,6 +926,10 @@ export function AppEditor({
       if (["text", "number"].includes(f.type) && f.defaultValue !== "") {
         config.default = f.type === "number" ? Number(f.defaultValue) : f.defaultValue;
       }
+      // Must be re-emitted on every publish: update_app_schema replaces
+      // config wholesale, so omitting this would silently unlink the field.
+      if (f.type === "relationship" && f.relatedAppId)
+        config.related_app_id = f.relatedAppId;
       if (f.type === "table") {
         config.columns = f.tableColumns;
         config.currency = f.tableCurrency || "USD";
@@ -1377,6 +1387,27 @@ export function AppEditor({
                           onChange={(e) => upd(f.key, { endDate: e.target.checked })} />
                         Allow an end date (date range)
                       </label>
+                    )}
+
+                    {f.type === "relationship" && (
+                      <div className="mt-3 flex flex-wrap items-center gap-2 text-xs">
+                        <span className="text-podio-secondary">Links to</span>
+                        <select
+                          value={f.relatedAppId}
+                          onChange={(e) => upd(f.key, { relatedAppId: e.target.value })}
+                          className="rounded-sm border border-podio-border px-1.5 py-1 text-xs"
+                        >
+                          <option value="">— pick an app (any workspace) —</option>
+                          {relAppChoices.map((a) => (
+                            <option key={a.id} value={a.id}>{a.label}</option>
+                          ))}
+                        </select>
+                        {!f.relatedAppId && (
+                          <span className="text-amber-600">
+                            Without a target app this field can’t pick items.
+                          </span>
+                        )}
+                      </div>
                     )}
 
                     {f.type === "calculation" && (
