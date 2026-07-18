@@ -8,6 +8,27 @@ import { AppTabBar } from "./app-tab-bar";
 import { WorkspaceHeader } from "./workspace-header";
 import { FollowToggle } from "./follow-toggle";
 import { PanelBoard } from "./panel-board";
+import { FeedComment } from "./feed-comment";
+import { PodioIcon } from "@/components/podio-icon";
+
+// Relative timestamps for the activity feed ("2 months ago"), Podio-style.
+function timeAgo(iso: string): string {
+  const s = Math.max(1, Math.floor((Date.now() - new Date(iso).getTime()) / 1000));
+  const steps: [number, string][] = [
+    [31536000, "year"],
+    [2592000, "month"],
+    [86400, "day"],
+    [3600, "hour"],
+    [60, "minute"],
+  ];
+  for (const [span, unit] of steps) {
+    if (s >= span) {
+      const n = Math.floor(s / span);
+      return `${n} ${unit}${n === 1 ? "" : "s"} ago`;
+    }
+  }
+  return "just now";
+}
 
 export default async function WorkspacePage({
   params,
@@ -313,29 +334,142 @@ export default async function WorkspacePage({
 
   const { data: activityRows } = await supabase
     .from("activity_events")
-    .select("id, event_type, actor_id, payload, created_at")
+    .select("id, event_type, actor_id, item_id, payload, created_at")
     .eq("workspace_id", ws.id)
     .order("created_at", { ascending: false })
-    .limit(20);
+    .limit(30);
+
+  // ----- Podio-style expanded feed: one entry per item, fully open -----
+  // Group events by their item (newest first); each entry shows the item
+  // title, creator meta, attachments, sub-activity lines and the inline
+  // comment thread with an always-open Add-comment composer.
+  const feedItemIds: string[] = [];
+  const eventsByItem = new Map<string, any[]>();
+  for (const a of activityRows ?? []) {
+    if (!a.item_id) continue;
+    if (!eventsByItem.has(a.item_id)) {
+      eventsByItem.set(a.item_id, []);
+      feedItemIds.push(a.item_id);
+    }
+    eventsByItem.get(a.item_id)!.push(a);
+  }
+  const shownItemIds = feedItemIds.slice(0, 8);
+
+  const { data: feedItems } = shownItemIds.length
+    ? await supabase
+        .from("items")
+        .select(
+          "id, title, item_number, created_at, created_by, apps:app_id(name, slug, item_name)"
+        )
+        .in("id", shownItemIds)
+    : { data: [] as any[] };
+  const feedItemById = new Map((feedItems ?? []).map((i: any) => [i.id, i]));
+
+  const { data: feedComments } = shownItemIds.length
+    ? await supabase
+        .from("comments")
+        .select("id, target_id, body, created_by, created_at")
+        .eq("target_type", "item")
+        .in("target_id", shownItemIds)
+        .is("deleted_at", null)
+        .order("created_at", { ascending: true })
+    : { data: [] as any[] };
+  const commentsByItem = new Map<string, any[]>();
+  for (const c of feedComments ?? []) {
+    if (!commentsByItem.has(c.target_id)) commentsByItem.set(c.target_id, []);
+    commentsByItem.get(c.target_id)!.push(c);
+  }
+
+  // Files attached to the feed items (chips under the title, like Podio)
+  const { data: itemAttachRows } = shownItemIds.length
+    ? await supabase
+        .from("file_attachments")
+        .select("target_id, files:file_id(id, name, storage_path, external_url)")
+        .eq("target_type", "item")
+        .in("target_id", shownItemIds)
+    : { data: [] as any[] };
+  const itemAttachPaths = (itemAttachRows ?? [])
+    .map((a: any) => a.files?.storage_path)
+    .filter(Boolean) as string[];
+  const { data: itemSigned } = itemAttachPaths.length
+    ? await supabase.storage.from("podio-files").createSignedUrls(itemAttachPaths, 3600)
+    : { data: [] as any[] };
+  const itemSignedBy = new Map(
+    (itemSigned ?? []).filter((s) => s.signedUrl).map((s) => [s.path, s.signedUrl])
+  );
+  const attachmentsByItem = new Map<string, { name: string; url: string | null }[]>();
+  for (const a of itemAttachRows ?? []) {
+    const list = attachmentsByItem.get((a as any).target_id) ?? [];
+    list.push({
+      name: (a as any).files?.name ?? "file",
+      url:
+        (a as any).files?.external_url ??
+        ((a as any).files?.storage_path
+          ? itemSignedBy.get((a as any).files.storage_path) ?? null
+          : null),
+    });
+    attachmentsByItem.set((a as any).target_id, list);
+  }
+
+  // Names + avatars for everyone appearing in the feed: event actors, the
+  // workspace creator, status authors, comment authors and item creators.
   const feedActorIds = [
     ...new Set(
-      [...(activityRows ?? []).map((a) => a.actor_id), ws.created_by].filter(
-        Boolean
-      )
+      [
+        ...(activityRows ?? []).map((a) => a.actor_id),
+        ...(statusRows ?? []).map((s) => s.created_by),
+        ...(feedComments ?? []).map((c) => c.created_by),
+        ...(feedItems ?? []).map((i: any) => i.created_by),
+        ws.created_by,
+      ].filter(Boolean)
     ),
   ];
   const { data: feedProfiles } = feedActorIds.length
     ? await supabase
         .from("user_profiles")
-        .select("user_id, full_name")
+        .select("user_id, full_name, avatar_url")
         .in("user_id", feedActorIds)
     : { data: [] as any[] };
   const actorName = new Map(
     (feedProfiles ?? []).map((p) => [p.user_id, p.full_name])
   );
+  const actorAvatar = new Map(
+    (feedProfiles ?? []).map((p) => [p.user_id, p.avatar_url as string | null])
+  );
   const creatorName = ws.created_by
     ? actorName.get(ws.created_by) ?? "Someone"
     : "Someone";
+
+  // Avatar (photo or initials circle) for feed rows.
+  function feedAvatar(uid: string | null, cls: string, textCls: string) {
+    const avatarUrl = uid ? actorAvatar.get(uid) : null;
+    const name = (uid ? actorName.get(uid) : null) ?? "?";
+    if (avatarUrl) {
+      return (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={avatarUrl}
+          alt=""
+          className={`${cls} shrink-0 rounded-full object-cover`}
+        />
+      );
+    }
+    const initials =
+      name
+        .trim()
+        .split(/\s+/)
+        .slice(0, 2)
+        .map((w: string) => w[0])
+        .join("")
+        .toUpperCase() || "?";
+    return (
+      <span
+        className={`${cls} flex shrink-0 items-center justify-center rounded-full bg-podio-secondary font-semibold text-white ${textCls}`}
+      >
+        {initials}
+      </span>
+    );
+  }
 
   // ----- Right-rail: open tasks + upcoming calendar entries -----
   const {
@@ -476,25 +610,151 @@ export default async function WorkspacePage({
                 ))}
               </ul>
             )}
-            <ul className="mt-4 space-y-1.5 border-t border-podio-border pt-3">
-              {(activityRows ?? []).map((a: any) => (
-                <li key={a.id} className="flex items-center gap-2 px-1 py-1.5 text-sm text-podio-secondary">
-                  <span className="font-semibold text-podio-ink">
-                    {a.actor_id ? actorName.get(a.actor_id) ?? "Someone" : "Someone"}
-                  </span>
-                  <span>
-                    {a.event_type === "item_created" && "created"}
-                    {a.event_type === "item_updated" && "updated"}
-                    {a.event_type === "comment_added" && "commented on"}
-                  </span>
-                  <span className="truncate font-semibold text-podio-ink">
-                    {a.payload?.item_title ?? "an item"}
-                  </span>
-                  <span className="ml-auto shrink-0 text-xs text-podio-meta">
-                    {new Date(a.created_at).toLocaleString()}
-                  </span>
-                </li>
-              ))}
+            <ul className="mt-4 space-y-6 border-t border-podio-border pt-4">
+              {shownItemIds.map((itemId) => {
+                const it: any = feedItemById.get(itemId);
+                if (!it) return null; // deleted or not visible under RLS
+                const evs = eventsByItem.get(itemId) ?? [];
+                const itemHref = `/org/${orgSlug}/${wsSlug}/${it.apps?.slug}/${it.item_number}`;
+                const appHref = `/org/${orgSlug}/${wsSlug}/${it.apps?.slug}`;
+                const comments = commentsByItem.get(itemId) ?? [];
+                const shownComments = comments.slice(-3);
+                const attach = attachmentsByItem.get(itemId) ?? [];
+                const subEvents = evs
+                  .filter((e: any) => e.event_type !== "item_created")
+                  .slice(0, 2);
+                const earlier =
+                  evs.length -
+                  subEvents.length -
+                  (evs.some((e: any) => e.event_type === "item_created") ? 1 : 0);
+                return (
+                  <li key={itemId} className="flex gap-3">
+                    {feedAvatar(it.created_by, "h-10 w-10", "text-sm")}
+                    <div className="min-w-0 flex-1">
+                      <Link
+                        href={itemHref}
+                        className="text-[17px] font-semibold text-podio-teal hover:underline"
+                      >
+                        {it.title ?? `#${it.item_number}`}
+                      </Link>
+                      <p className="mt-0.5 text-sm text-podio-secondary">
+                        <PodioIcon
+                          icon="task"
+                          className="mr-1 inline h-4 w-4 align-text-bottom"
+                        />
+                        {it.apps?.item_name ?? "Item"} by{" "}
+                        <span className="text-podio-ink">
+                          {actorName.get(it.created_by) ?? "Someone"}
+                        </span>
+                        , {timeAgo(it.created_at)} ·{" "}
+                        <Link href={appHref} className="text-podio-teal hover:underline">
+                          {it.apps?.name}
+                        </Link>{" "}
+                        ·{" "}
+                        <Link href={itemHref} className="text-podio-teal hover:underline">
+                          Comment
+                        </Link>
+                      </p>
+
+                      {attach.length > 0 && (
+                        <p className="mt-1.5 flex flex-wrap gap-1.5">
+                          {attach.map((f, i) =>
+                            f.url ? (
+                              <a
+                                key={i}
+                                href={f.url}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="rounded border border-podio-border bg-podio-row-alt px-2 py-0.5 text-sm text-podio-teal hover:bg-podio-row-hover"
+                              >
+                                <PodioIcon
+                                  icon="paperclip"
+                                  className="mr-1 inline h-3.5 w-3.5 align-text-bottom text-podio-secondary"
+                                />
+                                {f.name}
+                              </a>
+                            ) : (
+                              <span
+                                key={i}
+                                className="rounded border border-podio-border bg-podio-row-alt px-2 py-0.5 text-sm text-podio-meta"
+                              >
+                                {f.name}
+                              </span>
+                            )
+                          )}
+                        </p>
+                      )}
+
+                      {subEvents.map((e: any) => (
+                        <p key={e.id} className="mt-1.5 text-sm text-podio-secondary">
+                          <PodioIcon
+                            icon="chat"
+                            className="mr-1.5 inline h-4 w-4 align-text-bottom"
+                          />
+                          <span className="font-semibold text-podio-ink">
+                            {actorName.get(e.actor_id) ?? "Someone"}
+                          </span>{" "}
+                          {e.event_type === "comment_added"
+                            ? "commented on this"
+                            : e.event_type === "item_updated"
+                            ? "updated this"
+                            : (e.event_type ?? "").replaceAll("_", " ")}{" "}
+                          <span className="text-xs text-podio-meta">
+                            {timeAgo(e.created_at)}
+                          </span>
+                        </p>
+                      ))}
+                      {earlier > 0 && (
+                        <p className="mt-1.5 text-sm text-podio-meta">
+                          <PodioIcon
+                            icon="activity"
+                            className="mr-1.5 inline h-4 w-4 align-text-bottom"
+                          />
+                          {earlier} earlier {earlier === 1 ? "activity" : "activities"}
+                        </p>
+                      )}
+
+                      {/* Comment thread — always open, Podio-style. */}
+                      <div className="mt-3 overflow-hidden rounded border border-podio-border bg-podio-row-alt">
+                        {comments.length > shownComments.length && (
+                          <Link
+                            href={itemHref}
+                            className="block border-b border-podio-border px-4 py-2.5 text-sm text-podio-meta hover:text-podio-teal"
+                          >
+                            <PodioIcon
+                              icon="chat"
+                              className="mr-1.5 inline h-4 w-4 align-text-bottom"
+                            />
+                            Show all {comments.length} comments
+                          </Link>
+                        )}
+                        {shownComments.map((c: any) => (
+                          <div
+                            key={c.id}
+                            className="flex gap-2.5 border-b border-podio-border px-4 py-3 last:border-b-0"
+                          >
+                            {feedAvatar(c.created_by, "h-7 w-7", "text-[10px]")}
+                            <div className="min-w-0 flex-1">
+                              <p className="text-sm">
+                                <span className="font-semibold text-podio-ink">
+                                  {actorName.get(c.created_by) ?? "Someone"}
+                                </span>{" "}
+                                <span className="text-xs text-podio-meta">
+                                  {timeAgo(c.created_at)}
+                                </span>
+                              </p>
+                              <p className="whitespace-pre-wrap break-words text-[15px] text-podio-ink">
+                                {c.body}
+                              </p>
+                            </div>
+                          </div>
+                        ))}
+                        <FeedComment itemId={itemId} />
+                      </div>
+                    </div>
+                  </li>
+                );
+              })}
               {/* Genesis entry — always the last row of the feed */}
               <li className="flex items-center gap-2 px-1 py-1.5 text-sm text-podio-secondary">
                 <span aria-hidden="true">⚡</span>
