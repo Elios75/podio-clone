@@ -10,7 +10,7 @@ export type ImportRun = {
   source_space_id: number;
   source_space_name: string | null;
   workspace_id: string | null;
-  status: "running" | "completed" | "failed";
+  status: "queued" | "running" | "completed" | "failed";
   phase: string | null;
   counts: Record<string, number> | null;
   notes: string[] | null;
@@ -22,6 +22,7 @@ export type ImportRun = {
 type WorkspaceInfo = { slug: string; name: string };
 
 const CHIP_STYLES: Record<ImportRun["status"], { bg: string; label: string }> = {
+  queued: { bg: "#CFE8F7", label: "Queued" },
   running: { bg: "#F5EFC8", label: "Running" },
   completed: { bg: "#D9F2E5", label: "Completed" },
   failed: { bg: "#F9D7D4", label: "Failed" },
@@ -82,10 +83,17 @@ export function ImportRuns({
   const wsMapRef = useRef(wsMap);
   wsMapRef.current = wsMap;
 
-  const anyRunning = runs.some((r) => r.status === "running");
+  // Pick up fresh server data after router.refresh() (e.g. a newly queued run).
+  useEffect(() => {
+    setRuns(initialRuns);
+  }, [initialRuns]);
+
+  const anyActive = runs.some(
+    (r) => r.status === "queued" || r.status === "running"
+  );
 
   useEffect(() => {
-    if (!anyRunning) return;
+    if (!anyActive) return;
     const supabase = createClient();
 
     const tick = async () => {
@@ -125,7 +133,7 @@ export function ImportRuns({
 
     const interval = setInterval(tick, 5000);
     return () => clearInterval(interval);
-  }, [anyRunning, orgId]);
+  }, [anyActive, orgId]);
 
   if (runs.length === 0) {
     return (

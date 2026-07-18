@@ -2,10 +2,12 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { ImportRuns, type ImportRun } from "./import-runs";
+import { ConnectPodio } from "./connect-podio";
 
-// Import-from-Podio status page. Imports themselves run via the local
-// importer script (scripts/podio/import-space.mjs) — this page only shows
-// live progress from podio.import_runs.
+// Import-from-Podio page. Connect Podio credentials and queue imports
+// in-app (via podio.* RPCs); the background importer picks queued runs up
+// and this page shows live progress from podio.import_runs. The local
+// importer script (scripts/podio/import-space.mjs) still works too.
 export default async function ImportPage({
   params,
 }: {
@@ -57,15 +59,28 @@ export default async function ImportPage({
         </Link>
       </div>
       <p className="mt-1 text-sm text-podio-secondary">
-        Imports run via the local importer script — see{" "}
+        Connect your Podio API credentials, then queue imports right here —
+        full guide in{" "}
         <code className="rounded bg-podio-row-alt px-1 py-0.5 text-[13px]">
           docs/PODIO-IMPORT.md
         </code>{" "}
         in the repo. This page shows live progress of each run.
       </p>
 
-      <section className="mt-6 rounded border border-podio-border bg-white p-4 shadow-sm">
-        <h2 className="text-base font-semibold text-podio-ink">Setup</h2>
+      <ConnectPodio orgId={org.id} />
+
+      <h2 className="mt-8 text-lg font-medium text-podio-ink">Import runs</h2>
+      <ImportRuns
+        orgId={org.id}
+        orgSlug={org.slug}
+        initialRuns={(runs ?? []) as ImportRun[]}
+        workspaceSlugs={workspaceSlugs}
+      />
+
+      <details className="mt-8 text-sm text-podio-secondary">
+        <summary className="cursor-pointer text-xs text-podio-meta hover:text-podio-secondary">
+          Advanced: run the importer locally
+        </summary>
         <ol className="mt-2 list-decimal space-y-1.5 pl-5 text-sm text-podio-secondary">
           <li>
             Create a Podio API key at{" "}
@@ -96,7 +111,7 @@ export default async function ImportPage({
             <code className="rounded bg-podio-row-alt px-1 py-0.5 text-[13px]">
               node scripts/podio/import-space.mjs &lt;space_id&gt;
             </code>{" "}
-            — progress appears below within a few seconds.
+            — progress appears above within a few seconds.
           </li>
         </ol>
         <p className="mt-3 text-xs text-podio-meta">
@@ -106,15 +121,7 @@ export default async function ImportPage({
           </code>
           . Imports always create a new workspace and are safe to re-run.
         </p>
-      </section>
-
-      <h2 className="mt-8 text-lg font-medium text-podio-ink">Import runs</h2>
-      <ImportRuns
-        orgId={org.id}
-        orgSlug={org.slug}
-        initialRuns={(runs ?? []) as ImportRun[]}
-        workspaceSlugs={workspaceSlugs}
-      />
+      </details>
     </main>
   );
 }
