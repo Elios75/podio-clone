@@ -3,7 +3,7 @@
 import { useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
-import { normalizeEmbedUrl } from "./tiles/iframe-tile";
+import { IframeTile } from "./tiles/iframe-tile";
 import { TileBody, type TileData } from "./dashboard-tiles";
 import { AddTileModal, type TileApp, type TileSpec } from "./tiles/add-tile-modal";
 
@@ -71,37 +71,9 @@ export function WorkspaceCanvas({
   // the shared TileBody in a full-width card.
   function tabContent(tab: CanvasTab) {
     if (tab.tile.kind === "iframe") {
-      const frame = normalizeEmbedUrl(tab.tile.config?.url ?? "");
-      if (!frame.url) {
-        return (
-          <div className="rounded border border-podio-border bg-podio-row-alt p-6 text-sm text-podio-meta">
-            {frame.reason ?? "This link can't be embedded."}
-          </div>
-        );
-      }
-      return (
-        <>
-          <iframe
-            src={frame.url}
-            title={tab.title}
-            loading="lazy"
-            referrerPolicy="no-referrer"
-            sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-presentation"
-            className="h-[calc(100dvh_-_13rem)] min-h-[420px] w-full rounded border border-podio-border bg-white"
-          />
-          <div className="mt-1 flex items-center justify-between text-xs text-podio-meta">
-            <span className="min-w-0 truncate">{new URL(frame.url).hostname}</span>
-            <a
-              href={frame.url}
-              target="_blank"
-              rel="noreferrer"
-              className="ml-2 shrink-0 text-podio-teal hover:underline"
-            >
-              Open ↗
-            </a>
-          </div>
-        </>
-      );
+      // Shared renderer: viewport-filling frame, hostname footer, the
+      // Grid | Preview toggle for Google Sheets, and the Open ↗ escape hatch.
+      return <IframeTile url={tab.tile.config?.url ?? ""} fill />;
     }
     return (
       <div className={tab.tile.kind === "youtube" ? "max-w-4xl" : undefined}>
