@@ -1,12 +1,27 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { Suspense, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 
+// useSearchParams needs a Suspense boundary at prerender time (next build).
 export default function LoginPage() {
+  return (
+    <Suspense>
+      <LoginForm />
+    </Suspense>
+  );
+}
+
+function LoginForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const supabase = createClient();
+  // Post-login destination (e.g. the OAuth consent page) — same-origin
+  // relative paths only, so ?next= can't be abused as an open redirect.
+  const rawNext = searchParams.get("next") ?? "";
+  const nextPath =
+    rawNext.startsWith("/") && !rawNext.startsWith("//") ? rawNext : "/home";
   const [mode, setMode] = useState<"signin" | "signup">("signin");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -38,7 +53,7 @@ export default function LoginPage() {
       setError(error.message);
       return;
     }
-    router.push("/home");
+    router.push(nextPath);
     router.refresh();
   }
 

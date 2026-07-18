@@ -1,10 +1,9 @@
+// Local calling helper for the items_api dispatcher (items-depth slice).
+// Mirrors the apiCall idiom in src/lib/api-auth.ts but targets podio.items_api
+// instead of podio.api_request.
 import { createClient } from "@supabase/supabase-js";
-import { createHash } from "crypto";
 import { NextResponse } from "next/server";
-
-export function hashKey(raw: string) {
-  return createHash("sha256").update(raw).digest("hex");
-}
+import { hashKey } from "@/lib/api-auth";
 
 function anonClient() {
   return createClient(
@@ -14,7 +13,11 @@ function anonClient() {
   );
 }
 
-export async function apiCall(req: Request, action: string, params: Record<string, any> = {}) {
+export async function itemsApiCall(
+  req: Request,
+  action: string,
+  params: Record<string, any> = {}
+) {
   const auth = req.headers.get("authorization") ?? "";
   const raw = auth.replace(/^Bearer\s+/i, "").trim();
   if (!raw) {
@@ -25,21 +28,11 @@ export async function apiCall(req: Request, action: string, params: Record<strin
   }
 
   const sb = anonClient();
-  const keyHash = hashKey(raw);
-  const { data, error } = await sb.rpc("api_request", {
-    p_key_hash: keyHash,
+  const { data, error } = await sb.rpc("items_api", {
+    p_key_hash: hashKey(raw),
     p_action: action,
     p_params: params,
   });
-
-  // X-Rate-Limit headers on every authenticated response (podio-style).
-  const { data: rate } = await sb.rpc("api_rate_status", { p_key_hash: keyHash });
-  const headers: Record<string, string> = rate
-    ? {
-        "X-Rate-Limit-Limit": String(rate.limit ?? ""),
-        "X-Rate-Limit-Remaining": String(rate.remaining ?? ""),
-      }
-    : {};
 
   if (error) {
     const msg = error.message ?? "request failed";
@@ -48,7 +41,7 @@ export async function apiCall(req: Request, action: string, params: Record<strin
       : msg.includes("rate limit exceeded") ? 429
       : msg.includes("not found") ? 404
       : 400;
-    return NextResponse.json({ error: msg }, { status, headers });
+    return NextResponse.json({ error: msg }, { status });
   }
-  return NextResponse.json(data, { headers });
+  return NextResponse.json(data);
 }

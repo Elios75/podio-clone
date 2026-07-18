@@ -1,175 +1,187 @@
-const ENDPOINTS = [
+import Link from "next/link";
+import {
+  Callout,
+  CodeBlock,
+  InlineCode,
+  PageHeader,
+  SectionHeading,
+} from "./_components/docs";
+
+const AREAS: { title: string; desc: string; href: string }[] = [
   {
-    method: "GET", path: "/api/v1/apps",
-    desc: "List all apps in your organization, including field definitions (external_id, label, type).",
-    scope: "read",
+    title: "Authentication",
+    desc: "API keys with read/write scopes, plus OAuth2 (authorization code, refresh, app and password grants).",
+    href: "/developers/authentication",
   },
   {
-    method: "GET", path: "/api/v1/workspaces",
-    desc: "List workspaces with app counts.",
-    scope: "read",
+    title: "Applications",
+    desc: "List apps and their field definitions (external_id, label, type) and workspaces with app counts.",
+    href: "/developers/items#apps",
   },
   {
-    method: "GET", path: "/api/v1/apps/:appId/items?limit=50&offset=0",
-    desc: "List items in an app. Values are keyed by field external_id.",
-    scope: "read",
+    title: "Items",
+    desc: "CRUD, revisions and diffs, revert, clone, single-field updates and bulk delete.",
+    href: "/developers/items#items",
   },
   {
-    method: "POST", path: "/api/v1/apps/:appId/items",
-    desc: 'Create an item. Body: { "values": { "<field-external-id>": <value>, … } }. Fires item_created automations and webhooks.',
-    scope: "write",
+    title: "Tasks",
+    desc: "List, create and complete tasks with assignees and due dates.",
+    href: "/developers/items#tasks",
   },
   {
-    method: "GET", path: "/api/v1/items/:itemId",
-    desc: "Get a single item with all field values.",
-    scope: "read",
+    title: "Hooks",
+    desc: "App-, field- and space-level webhooks with a verification handshake and delivery log.",
+    href: "/developers/hooks",
   },
   {
-    method: "PUT", path: "/api/v1/items/:itemId",
-    desc: 'Update field values on an item. Body: { "values": { … } }.',
-    scope: "write",
+    title: "Flows",
+    desc: "Create and manage automation flows via API: triggers, effects, activate/deactivate, attribute discovery.",
+    href: "/developers/flows",
   },
   {
-    method: "DELETE", path: "/api/v1/items/:itemId",
-    desc: "Soft-delete an item.",
-    scope: "write",
+    title: "Subscriptions & Notifications",
+    desc: "Follow objects for change notifications; list and mark-read your notification inbox.",
+    href: "/developers/flows#subscriptions",
   },
   {
-    method: "GET", path: "/api/v1/tasks?status=open&limit=50",
-    desc: "List tasks in your organization. Optional status filter (open / completed).",
-    scope: "read",
+    title: "Forms",
+    desc: "Public webform submissions with optional Turnstile captcha.",
+    href: "/developers/forms#forms",
   },
   {
-    method: "POST", path: "/api/v1/tasks",
-    desc: 'Create a task. Body: { "title": "…", "description"?, "workspace_id"?, "assignee_id"?, "due_at"? (ISO timestamp) }.',
-    scope: "write",
+    title: "Files & Export",
+    desc: "Item PDF rendering, iCalendar feeds, inbound email, and XLSX export patterns.",
+    href: "/developers/forms#files",
   },
   {
-    method: "POST", path: "/api/v1/tasks/:taskId/complete",
-    desc: "Mark a task completed.",
-    scope: "write",
-  },
-  {
-    method: "POST", path: "/api/v1/webhooks/verify",
-    desc: 'Webhook verification handshake. When a webhook is created it receives a hook.verify delivery containing a verify_token; echo it here — body { "token": "…" } (GET ?token=… also works). The webhook only receives events after verification.',
-    scope: "none (token is the credential)",
+    title: "Rate limits",
+    desc: "60 requests/minute per key, 429 semantics and the rate-limit response headers.",
+    href: "/developers/authentication#rate-limits",
   },
 ];
 
-const methodColor: Record<string, string> = {
-  GET: "bg-green-100 text-green-700",
-  POST: "bg-blue-100 text-blue-700",
-  PUT: "bg-amber-100 text-amber-700",
-  DELETE: "bg-red-100 text-red-700",
-};
-
 export default function DevelopersPage() {
   return (
-    <main className="mx-auto max-w-3xl p-8">
-      <h1 className="text-2xl font-semibold">API documentation</h1>
-      <p className="mt-2 text-sm text-slate-500">
-        REST API v1.1 — programmatic access to apps, items, workspaces, tasks, and webhooks.
+    <div>
+      <PageHeader
+        title="API documentation"
+        lede={
+          <>
+            REST API v1.1 — programmatic access to apps, items, tasks, workspaces,
+            hooks, flows, forms and notifications. All endpoints live under{" "}
+            <InlineCode>/api</InlineCode> on your Podio Clone domain and accept and
+            return JSON. Authenticate with an API key or an OAuth2 bearer token.
+          </>
+        }
+      />
+
+      <SectionHeading id="quickstart">Quick start</SectionHeading>
+      <p className="mt-3 text-[15px] leading-relaxed text-podio-secondary">
+        Create an API key in your organization settings (Settings → API keys),
+        export it in your shell, and make your first call:
+      </p>
+      <CodeBlock>{`export BASE_URL="https://your-domain"
+export PODIO_CLONE_KEY="pk_your_api_key"
+
+curl "$BASE_URL/api/v1/apps" \\
+  -H "Authorization: Bearer $PODIO_CLONE_KEY"`}</CodeBlock>
+      <p className="mt-3 text-[15px] leading-relaxed text-podio-secondary">
+        Every example in these docs is runnable as-is once{" "}
+        <InlineCode>$BASE_URL</InlineCode> and{" "}
+        <InlineCode>$PODIO_CLONE_KEY</InlineCode> are set. New to the API? Start
+        with the{" "}
+        <Link href="/developers/tutorials" className="text-podio-teal hover:underline">
+          tutorials
+        </Link>
+        .
       </p>
 
-      <section className="mt-8">
-        <h2 className="text-lg font-medium">Authentication</h2>
-        <p className="mt-2 text-sm text-slate-600">
-          Create an API key in your organization settings (Settings → API keys). Send it as a
-          bearer token on every request:
-        </p>
-        <pre className="mt-3 overflow-x-auto rounded-lg bg-slate-900 p-4 text-xs text-slate-100">
-{`curl https://your-domain/api/v1/apps \\
-  -H "Authorization: Bearer pk_your_api_key"`}
-        </pre>
-        <p className="mt-2 text-sm text-slate-600">
-          Keys carry scopes: <code className="rounded bg-slate-100 px-1">read</code> and{" "}
-          <code className="rounded bg-slate-100 px-1">write</code>. Write endpoints require the
-          write scope.
-        </p>
-      </section>
-
-      <section className="mt-8">
-        <h2 className="text-lg font-medium">Rate limits</h2>
-        <p className="mt-2 text-sm text-slate-600">
-          Each key allows <strong>60 requests per minute</strong> by default (fixed one-minute
-          windows). Exceeding the limit returns <code className="rounded bg-slate-100 px-1">429</code>{" "}
-          with an explanatory message. Contact your org admin to raise a key's limit.
-        </p>
-      </section>
-
-      <section className="mt-8">
-        <h2 className="text-lg font-medium">Endpoints</h2>
-        <div className="mt-3 space-y-3">
-          {ENDPOINTS.map((e) => (
-            <div key={e.method + e.path} className="rounded-lg border border-slate-200 bg-white p-4">
-              <div className="flex flex-wrap items-center gap-2">
-                <span className={`rounded px-2 py-0.5 text-xs font-bold ${methodColor[e.method]}`}>
-                  {e.method}
-                </span>
-                <code className="text-sm font-medium">{e.path}</code>
-                <span className="ml-auto text-xs text-slate-400">scope: {e.scope}</span>
-              </div>
-              <p className="mt-2 text-sm text-slate-600">{e.desc}</p>
+      <SectionHeading id="areas">API areas</SectionHeading>
+      <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
+        {AREAS.map((a) => (
+          <Link
+            key={a.title}
+            href={a.href}
+            className="group rounded border border-podio-border bg-white p-4 hover:border-podio-teal hover:bg-podio-row-alt"
+          >
+            <div className="text-[15px] font-semibold text-podio-teal group-hover:underline">
+              {a.title}
             </div>
-          ))}
-        </div>
-      </section>
+            <p className="mt-1 text-[13px] leading-relaxed text-podio-secondary">
+              {a.desc}
+            </p>
+          </Link>
+        ))}
+      </div>
 
-      <section className="mt-8">
-        <h2 className="text-lg font-medium">Webhooks</h2>
-        <p className="mt-2 text-sm text-slate-600">
-          Webhooks are configured per organization (Settings → Webhooks) and deliver JSON payloads
-          signed with an HMAC-SHA256 signature in the{" "}
-          <code className="rounded bg-slate-100 px-1">X-Webhook-Signature</code> header. Verify the
-          signature by computing HMAC-SHA256 of the raw body with your webhook secret.
+      <SectionHeading id="best-practices">Best practices</SectionHeading>
+      <Callout title="Build a good API citizen">
+        <ul className="list-disc space-y-1.5 pl-5">
+          <li>
+            <strong className="text-podio-ink">Batch</strong> — create or delete
+            many items in one call (bulk delete, one POST per item is a smell in a
+            loop) instead of hammering single-item endpoints.
+          </li>
+          <li>
+            <strong className="text-podio-ink">Cache</strong> — app and field
+            definitions change rarely; cache <InlineCode>GET /api/v1/apps</InlineCode>{" "}
+            instead of re-fetching it on every request.
+          </li>
+          <li>
+            <strong className="text-podio-ink">Filter server-side</strong> — use{" "}
+            <InlineCode>limit</InlineCode>/<InlineCode>offset</InlineCode> and query
+            filters rather than pulling everything and filtering in your code.
+          </li>
+          <li>
+            <strong className="text-podio-ink">Hooks, not polling</strong> —
+            subscribe to <InlineCode>item.create</InlineCode>/
+            <InlineCode>item.update</InlineCode> hooks instead of polling item lists
+            on a timer.
+          </li>
+          <li>
+            <strong className="text-podio-ink">Respect 429</strong> — on{" "}
+            <InlineCode>429 Too Many Requests</InlineCode>, back off using the{" "}
+            <InlineCode>Retry-After</InlineCode> and{" "}
+            <InlineCode>X-RateLimit-*</InlineCode> headers; never retry in a tight
+            loop.
+          </li>
+        </ul>
+      </Callout>
+
+      <SectionHeading id="recipes">Integration recipes</SectionHeading>
+      <div className="mt-3 space-y-3 text-[15px] leading-relaxed text-podio-secondary">
+        <p>
+          <strong className="text-podio-ink">Slack / Microsoft Teams:</strong>{" "}
+          create an incoming webhook in your Slack workspace or Teams channel, then
+          add a &quot;Post to Slack / Teams&quot; action to any automation and paste the
+          webhook URL. Messages send as{" "}
+          <InlineCode>{'{"text": "…"}'}</InlineCode>, which both accept.
         </p>
-        <p className="mt-2 text-sm text-slate-600">
-          <strong>Verification handshake:</strong> immediately after you create a webhook, it
-          receives a <code className="rounded bg-slate-100 px-1">hook.verify</code> event with a{" "}
-          <code className="rounded bg-slate-100 px-1">verify_token</code>. POST that token to{" "}
-          <code className="rounded bg-slate-100 px-1">/api/v1/webhooks/verify</code>. Until then the
-          webhook receives no events. Deliveries retry with exponential backoff (up to 5 attempts).
+        <p>
+          <strong className="text-podio-ink">Zapier / Make (Integromat):</strong>{" "}
+          use &quot;Webhooks by Zapier&quot; or the Make HTTP module.{" "}
+          <em>Inbound to Podio Clone:</em> POST to an automation&apos;s inbound-webhook
+          URL (create an automation with the &quot;Inbound webhook received&quot; trigger,
+          copy its URL) or call the REST API with an API key.{" "}
+          <em>Outbound from Podio Clone:</em> point a hook at your Zap/scenario&apos;s
+          catch-hook URL — remember to complete the{" "}
+          <Link href="/developers/hooks#handshake" className="text-podio-teal hover:underline">
+            verification handshake
+          </Link>{" "}
+          first.
         </p>
-        <p className="mt-2 text-sm text-slate-600">
-          Events: <code className="rounded bg-slate-100 px-1">item_created</code>,{" "}
-          <code className="rounded bg-slate-100 px-1">item_updated</code>,{" "}
-          <code className="rounded bg-slate-100 px-1">comment_added</code>,{" "}
-          <code className="rounded bg-slate-100 px-1">form_submitted</code>,{" "}
-          <code className="rounded bg-slate-100 px-1">email_received</code>, and more — any activity
-          event type can be subscribed to.
+        <p>
+          <strong className="text-podio-ink">Stripe billing:</strong> set{" "}
+          <InlineCode>STRIPE_SECRET_KEY</InlineCode>,{" "}
+          <InlineCode>STRIPE_WEBHOOK_SECRET</InlineCode>,{" "}
+          <InlineCode>STRIPE_PRICE_TEAM / _BUSINESS / _ENTERPRISE</InlineCode> and{" "}
+          <InlineCode>STRIPE_RPC_PROOF</InlineCode> (matching the{" "}
+          <InlineCode>stripe_rpc_proof</InlineCode> Vault secret), then point a
+          Stripe webhook at <InlineCode>/api/billing/webhook</InlineCode> for{" "}
+          <InlineCode>checkout.session.completed</InlineCode> and{" "}
+          <InlineCode>customer.subscription.deleted</InlineCode>.
         </p>
-      </section>
-      <section className="mt-8">
-        <h2 className="text-lg font-medium">Integration recipes</h2>
-        <div className="mt-2 space-y-3 text-sm text-slate-600">
-          <p>
-            <strong>Slack / Microsoft Teams:</strong> create an incoming webhook in your
-            Slack workspace or Teams channel, then add a "Post to Slack / Teams" action to
-            any automation and paste the webhook URL. Messages send as{" "}
-            <code className="rounded bg-slate-100 px-1">{'{"text": "…"}'}</code>, which both accept.
-          </p>
-          <p>
-            <strong>Zapier / Make (Integromat):</strong> use "Webhooks by Zapier" or the
-            Make HTTP module. <em>Inbound to Podio Clone:</em> POST to an automation's
-            inbound-webhook URL (create an automation with the "Inbound webhook received"
-            trigger, copy its URL) or call the REST API with an API key.{" "}
-            <em>Outbound from Podio Clone:</em> point an organization webhook at your
-            Zap/scenario's catch-hook URL — remember to echo the verification token first.
-          </p>
-          <p>
-            <strong>Stripe billing:</strong> set{" "}
-            <code className="rounded bg-slate-100 px-1">STRIPE_SECRET_KEY</code>,{" "}
-            <code className="rounded bg-slate-100 px-1">STRIPE_WEBHOOK_SECRET</code>,{" "}
-            <code className="rounded bg-slate-100 px-1">STRIPE_PRICE_TEAM / _BUSINESS / _ENTERPRISE</code>{" "}
-            and <code className="rounded bg-slate-100 px-1">STRIPE_RPC_PROOF</code> (matching the{" "}
-            <code className="rounded bg-slate-100 px-1">stripe_rpc_proof</code> Vault secret), then
-            point a Stripe webhook at{" "}
-            <code className="rounded bg-slate-100 px-1">/api/billing/webhook</code> for{" "}
-            <code className="rounded bg-slate-100 px-1">checkout.session.completed</code> and{" "}
-            <code className="rounded bg-slate-100 px-1">customer.subscription.deleted</code>.
-          </p>
-        </div>
-      </section>
-    </main>
+      </div>
+    </div>
   );
 }
