@@ -161,7 +161,9 @@ export function WorkspaceCanvas({
                 loading="lazy"
                 referrerPolicy="no-referrer"
                 sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-presentation"
-                className="h-[calc(100vh-15rem)] w-full rounded border border-podio-border bg-white"
+                // Tailwind calc values need underscores for spaces — without
+                // them the CSS is invalid and the iframe collapses to 150px.
+                className="h-[calc(100dvh_-_13rem)] min-h-[420px] w-full rounded border border-podio-border bg-white"
               />
               <div className="mt-1 flex items-center justify-between text-xs text-podio-meta">
                 <span className="min-w-0 truncate">

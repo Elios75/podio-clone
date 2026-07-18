@@ -148,7 +148,7 @@ export function CreateAppModal({
       onClick={onClose}
     >
       <div
-        className="flex max-h-[calc(100vh-6.5rem)] w-full max-w-2xl flex-col rounded bg-white shadow-lg"
+        className="flex max-h-[calc(100vh_-_6.5rem)] w-full max-w-2xl flex-col rounded bg-white shadow-lg"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header: ink title on white, bottom border, grey ✕ */}

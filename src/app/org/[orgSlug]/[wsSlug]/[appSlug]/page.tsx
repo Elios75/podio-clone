@@ -565,7 +565,7 @@ export default async function AppPage({
 
       {/* One continuous white surface below the tab bar: views pane + main
           column share the same top edge, flush under the active tab card. */}
-      <div className="flex min-h-[calc(100vh-8.5rem)] flex-col bg-white lg:flex-row lg:items-stretch">
+      <div className="flex min-h-[calc(100vh_-_8.5rem)] flex-col bg-white lg:flex-row lg:items-stretch">
         {/* Left views pane (client: collapse, tabs, + Add form) */}
         <ViewsPane
           appId={app.id}

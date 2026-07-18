@@ -80,7 +80,7 @@ export function MarketBrowser({
   const rowIdle = "text-podio-ink hover:bg-[#EFEFEF]";
 
   return (
-    <div className="flex min-h-[calc(100vh-8.5rem)] flex-col lg:flex-row lg:items-stretch">
+    <div className="flex min-h-[calc(100vh_-_8.5rem)] flex-col lg:flex-row lg:items-stretch">
       {/* Left category sidebar: light grey panel with a search row on top,
           then link lists under section headings (§11). */}
       <aside className="w-full shrink-0 border-b border-podio-border bg-podio-row-alt lg:w-72 lg:border-b-0 lg:border-r">
