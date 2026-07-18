@@ -3,6 +3,7 @@ import { PodioIcon } from "@/components/podio-icon";
 import { NotificationsBell } from "@/components/notifications-bell";
 import { ChatLauncher } from "@/components/chat-launcher";
 import { GlobalSearch } from "@/components/global-search";
+import { UserMenu } from "@/components/user-menu";
 
 // The one grey-teal global bar (desktop + mobile variants), extracted
 // verbatim from the org layout so standalone pages (/tasks, /calendar,
@@ -86,26 +87,9 @@ export function GlobalBar({
               current app (real Podio behavior); /search stays reachable
               via the dropdown's "Search everywhere" link. */}
           <GlobalSearch />
-          {user && (
-            <Link
-              href="/home"
-              title={user.name ?? "Profile"}
-              className="hover:opacity-80"
-            >
-              {user.avatarUrl ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img
-                  src={user.avatarUrl}
-                  alt=""
-                  className="h-7 w-7 rounded-full object-cover"
-                />
-              ) : (
-                <span className="flex h-7 w-7 items-center justify-center rounded-full bg-podio-secondary text-xs font-semibold text-white">
-                  {avatarInitials(user.name)}
-                </span>
-              )}
-            </Link>
-          )}
+          {/* Avatar opens the Podio-style user menu (profile, account,
+              org creation, sign out). */}
+          {user && <UserMenu user={user} />}
           {user ? (
             <NotificationsBell userId={user.id} initialUnread={initialUnread} />
           ) : (
