@@ -37,7 +37,9 @@ export type TileData = {
 // Wide-content kinds span two grid columns so embeds stay usable.
 const WIDE_KINDS = new Set(["iframe", "youtube", "grouped"]);
 
-function TileBody({ t }: { t: TileData }) {
+// Exported so workspace tabs (workspace-embeds.tsx) render the same kinds
+// full-canvas.
+export function TileBody({ t }: { t: TileData }) {
   if (t.kind === "tasks") return <TasksTile tasks={t.tasks ?? []} moreHref="/tasks" />;
   if (t.kind === "calendar") return <CalendarTile events={t.events ?? []} />;
   if (t.kind === "files") return <FilesTile files={t.files ?? []} />;

@@ -4,64 +4,60 @@ import { useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { normalizeEmbedUrl } from "./tiles/iframe-tile";
+import { TileBody, type TileData } from "./dashboard-tiles";
+import { AddTileModal, type TileApp, type TileSpec } from "./tiles/add-tile-modal";
 
-// Beyond-Podio: a tab bar above the workspace dashboard holding saved
-// external embeds (websites, Google Sheets…). "Dashboard" is always the
-// first tab and the default on every visit; clicking an embed tab swaps the
-// whole canvas for that site full-width WITHOUT leaving the workspace.
-// Embeds are shared per workspace (podio.workspace_embeds, migration 78).
+// Beyond-Podio: a tab bar above the workspace dashboard. "Dashboard" is
+// always the first tab and the default on every visit. The "+" opens the
+// STANDARD tile picker (Overviews / Apps / Reports & Charts / Text / Web
+// Embed / YouTube) and the chosen tile becomes a tab rendered FULL-CANVAS —
+// a website or Google Sheet fills the viewport, any other kind renders as a
+// full-width card. Tabs are shared per workspace (podio.workspace_embeds).
 
-type Embed = { id: string; title: string; url: string };
+export type CanvasTab = { id: string; title: string; tile: TileData };
 
 export function WorkspaceCanvas({
   wsId,
-  embeds,
+  wsName,
+  apps,
+  tabs,
   children,
 }: {
   wsId: string;
-  embeds: Embed[];
+  wsName: string;
+  apps: TileApp[];
+  tabs: CanvasTab[];
   children: ReactNode; // the panel board (server-rendered)
 }) {
   const router = useRouter();
   const supabase = createClient();
   const [activeId, setActiveId] = useState<string | null>(null); // null = Dashboard
-  const [adding, setAdding] = useState(false);
-  const [title, setTitle] = useState("");
-  const [url, setUrl] = useState("");
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [picking, setPicking] = useState(false);
 
-  const active = embeds.find((e) => e.id === activeId) ?? null;
+  const active = tabs.find((t) => t.id === activeId) ?? null;
 
-  async function addEmbed() {
-    const t = title.trim();
-    const u = url.trim();
-    if (!t || busy) return;
-    const normalized = normalizeEmbedUrl(u);
-    if (!normalized.url) {
-      setError(normalized.reason ?? "Enter a valid http(s) URL.");
-      return;
-    }
-    setBusy(true);
-    setError(null);
-    const { data: row, error: insError } = await supabase
+  async function addTab(spec: TileSpec): Promise<string | null> {
+    const { data: row, error } = await supabase
       .from("workspace_embeds")
-      .insert({ workspace_id: wsId, title: t, url: u, position: embeds.length })
+      .insert({
+        workspace_id: wsId,
+        title: spec.title,
+        kind: spec.kind,
+        app_id: spec.appId,
+        config: spec.config,
+        url: spec.config?.url ?? "",
+        position: tabs.length,
+      })
       .select()
       .single();
-    setBusy(false);
-    if (insError) {
-      setError(insError.message);
-      return;
-    }
-    setAdding(false);
-    setTitle("");
-    setUrl("");
+    if (error) return error.message;
+    setPicking(false);
     if (row) setActiveId(row.id);
     router.refresh();
+    return null;
   }
 
-  async function removeEmbed(id: string) {
+  async function removeTab(id: string) {
     await supabase.from("workspace_embeds").delete().eq("id", id);
     if (activeId === id) setActiveId(null);
     router.refresh();
@@ -71,12 +67,58 @@ export function WorkspaceCanvas({
   const tabActive = `${tabBase} bg-podio-orange font-semibold text-white`;
   const tabIdle = `${tabBase} text-podio-teal hover:underline`;
 
-  const frame = active ? normalizeEmbedUrl(active.url) : null;
+  // Full-viewport iframe for embed tabs; every other kind renders through
+  // the shared TileBody in a full-width card.
+  function tabContent(tab: CanvasTab) {
+    if (tab.tile.kind === "iframe") {
+      const frame = normalizeEmbedUrl(tab.tile.config?.url ?? "");
+      if (!frame.url) {
+        return (
+          <div className="rounded border border-podio-border bg-podio-row-alt p-6 text-sm text-podio-meta">
+            {frame.reason ?? "This link can't be embedded."}
+          </div>
+        );
+      }
+      return (
+        <>
+          <iframe
+            src={frame.url}
+            title={tab.title}
+            loading="lazy"
+            referrerPolicy="no-referrer"
+            sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-presentation"
+            className="h-[calc(100dvh_-_13rem)] min-h-[420px] w-full rounded border border-podio-border bg-white"
+          />
+          <div className="mt-1 flex items-center justify-between text-xs text-podio-meta">
+            <span className="min-w-0 truncate">{new URL(frame.url).hostname}</span>
+            <a
+              href={frame.url}
+              target="_blank"
+              rel="noreferrer"
+              className="ml-2 shrink-0 text-podio-teal hover:underline"
+            >
+              Open ↗
+            </a>
+          </div>
+        </>
+      );
+    }
+    return (
+      <div className={tab.tile.kind === "youtube" ? "max-w-4xl" : undefined}>
+        <div className="rounded border border-podio-border bg-white p-5 shadow-sm">
+          <p className="mb-3 text-xs font-medium uppercase tracking-wide text-podio-meta">
+            {tab.title}
+          </p>
+          <TileBody t={tab.tile} />
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div>
       {/* Tab bar above the dashboard canvas */}
-      <div className="flex flex-wrap items-center gap-1.5 px-4 pt-3 md:px-6">
+      <div className="flex flex-wrap items-center gap-2 px-4 pt-3 md:px-6">
         <button
           type="button"
           onClick={() => setActiveId(null)}
@@ -84,26 +126,21 @@ export function WorkspaceCanvas({
         >
           Dashboard
         </button>
-        {embeds.map((e) => (
-          <span key={e.id} className="group relative">
+        {tabs.map((t) => (
+          <span key={t.id} className="flex items-center">
             <button
               type="button"
-              onClick={() => setActiveId(e.id)}
-              className={`${active?.id === e.id ? tabActive : tabIdle} ${
-                active?.id === e.id ? "pr-6" : "group-hover:pr-6"
-              }`}
+              onClick={() => setActiveId(t.id)}
+              className={active?.id === t.id ? tabActive : tabIdle}
             >
-              {e.title}
+              {t.title}
             </button>
             <button
               type="button"
-              onClick={() => void removeEmbed(e.id)}
-              title={`Remove ${e.title}`}
-              className={`absolute right-1.5 top-1/2 -translate-y-1/2 text-xs ${
-                active?.id === e.id
-                  ? "text-white/80 hover:text-white"
-                  : "hidden text-podio-meta hover:text-red-600 group-hover:inline"
-              }`}
+              onClick={() => void removeTab(t.id)}
+              title={`Remove ${t.title}`}
+              aria-label={`Remove ${t.title}`}
+              className="ml-1 rounded px-1 text-xs text-podio-disabled hover:bg-podio-row-alt hover:text-red-600"
             >
               ✕
             </button>
@@ -111,83 +148,27 @@ export function WorkspaceCanvas({
         ))}
         <button
           type="button"
-          onClick={() => {
-            setAdding(!adding);
-            setError(null);
-          }}
-          title="Add an embed tab"
-          className="rounded border border-podio-border bg-white px-2 py-0.5 text-sm text-podio-secondary hover:bg-podio-row-alt"
+          onClick={() => setPicking(true)}
+          title="Add a tab"
+          className="ml-2 rounded border border-podio-border bg-white px-2.5 py-0.5 text-sm text-podio-secondary hover:bg-podio-row-alt"
         >
           +
         </button>
-
-        {adding && (
-          <span className="flex flex-wrap items-center gap-1.5">
-            <input
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              placeholder="Tab name"
-              className="w-32 rounded border border-podio-border bg-white px-2 py-1 text-sm text-podio-ink outline-none placeholder:text-podio-meta focus:border-podio-teal"
-            />
-            <input
-              value={url}
-              onChange={(e) => setUrl(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") void addEmbed();
-              }}
-              placeholder="https://…"
-              className="w-64 rounded border border-podio-border bg-white px-2 py-1 text-sm text-podio-ink outline-none placeholder:text-podio-meta focus:border-podio-teal"
-            />
-            <button
-              type="button"
-              onClick={() => void addEmbed()}
-              disabled={busy}
-              className="rounded bg-podio-teal px-3 py-1 text-sm font-semibold text-white hover:bg-podio-teal-dark disabled:opacity-60"
-            >
-              {busy ? "Adding…" : "Add"}
-            </button>
-            {error && <span className="text-xs text-red-600">{error}</span>}
-          </span>
-        )}
       </div>
 
-      {active && frame ? (
-        <div className="px-4 pb-8 pt-3 md:px-6">
-          {frame.url ? (
-            <>
-              <iframe
-                src={frame.url}
-                title={active.title}
-                loading="lazy"
-                referrerPolicy="no-referrer"
-                sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-presentation"
-                // Tailwind calc values need underscores for spaces — without
-                // them the CSS is invalid and the iframe collapses to 150px.
-                className="h-[calc(100dvh_-_13rem)] min-h-[420px] w-full rounded border border-podio-border bg-white"
-              />
-              <div className="mt-1 flex items-center justify-between text-xs text-podio-meta">
-                <span className="min-w-0 truncate">
-                  {new URL(frame.url).hostname}
-                </span>
-                <a
-                  href={frame.url}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="ml-2 shrink-0 text-podio-teal hover:underline"
-                >
-                  Open ↗
-                </a>
-              </div>
-            </>
-          ) : (
-            <div className="rounded border border-podio-border bg-podio-row-alt p-6 text-sm text-podio-meta">
-              {"This link can't be embedded."}
-            </div>
-          )}
-        </div>
+      {active ? (
+        <div className="px-4 pb-8 pt-3 md:px-6">{tabContent(active)}</div>
       ) : (
         children
       )}
+
+      <AddTileModal
+        open={picking}
+        onClose={() => setPicking(false)}
+        onAdd={addTab}
+        apps={apps}
+        wsName={wsName}
+      />
     </div>
   );
 }

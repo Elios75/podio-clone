@@ -96,16 +96,44 @@ export default async function WorkspacePage({
         .eq("status", "active")
     : { data: [] as any[] };
 
+  // Canvas tabs above the dashboard (workspace_embeds; any tile kind since
+  // migration 79 — legacy rows carry url only, normalized below)
+  const { data: embedRows } = await supabase
+    .from("workspace_embeds")
+    .select("id, title, url, kind, config, app_id")
+    .eq("workspace_id", ws.id)
+    .order("position")
+    .order("created_at");
+
+  // Dashboard tiles and canvas TABS share one computation pass: a tab is the
+  // same kind/config pair rendered full-canvas, so both go through the same
+  // per-kind data fetching and `emit` routes the result to the right list.
+  const tabRowsNorm = (embedRows ?? []).map((e: any) => ({
+    id: e.id,
+    title: e.title,
+    kind: e.kind ?? "iframe",
+    app_id: e.app_id,
+    config: {
+      ...(e.config ?? {}),
+      ...((e.kind ?? "iframe") === "iframe" && !e.config?.url && e.url
+        ? { url: e.url }
+        : {}),
+    },
+    _tab: true,
+  }));
   const tiles: TileData[] = [];
-  for (const t of tileRows ?? []) {
+  const tabTiles: { id: string; title: string; tile: TileData }[] = [];
+  for (const t of [...(tileRows ?? []), ...tabRowsNorm] as any[]) {
     const cfg = t.config ?? {};
+    const emit = (d: TileData) =>
+      t._tab ? tabTiles.push({ id: t.id, title: t.title, tile: d }) : tiles.push(d);
     if (t.kind === "count") {
       const { count } = await supabase
         .from("items")
         .select("id", { count: "exact", head: true })
         .eq("app_id", t.app_id)
         .eq("is_deleted", false);
-      tiles.push({ id: t.id, title: t.title, kind: t.kind, value: count ?? 0 });
+      emit({ id: t.id, title: t.title, kind: t.kind, value: count ?? 0 });
     } else if (t.kind === "sum" || t.kind === "avg") {
       // table_column_id set = the "number field" is a numeric COLUMN inside a
       // table field (e.g. Invoices → Amount): sum every row's cell across all
@@ -132,7 +160,7 @@ export default async function WorkspacePage({
         list = (nums ?? []).map((n) => Number(n.value_number));
       }
       const sum = list.reduce((a, b) => a + b, 0);
-      tiles.push({
+      emit({
         id: t.id, title: t.title, kind: t.kind,
         value: t.kind === "sum" ? sum : list.length ? sum / list.length : 0,
       });
@@ -184,7 +212,7 @@ export default async function WorkspacePage({
             : rows.length,
         };
       });
-      tiles.push({ id: t.id, title: t.title, kind: t.kind, groups });
+      emit({ id: t.id, title: t.title, kind: t.kind, groups });
     } else if (t.kind === "tasks") {
       // Workspace overview tiles (Podio's "Overviews" picker tab)
       const { data: tRows } = await supabase
@@ -194,7 +222,7 @@ export default async function WorkspacePage({
         .is("completed_at", null)
         .order("due_at", { ascending: true, nullsFirst: false })
         .limit(6);
-      tiles.push({
+      emit({
         id: t.id, title: t.title, kind: t.kind,
         tasks: (tRows ?? []).map((x) => ({ id: x.id, title: x.title, due_date: x.due_at })),
       });
@@ -207,7 +235,7 @@ export default async function WorkspacePage({
         .gte("due_at", new Date().toISOString())
         .order("due_at", { ascending: true })
         .limit(6);
-      tiles.push({
+      emit({
         id: t.id, title: t.title, kind: t.kind,
         events: (cRows ?? []).map((x) => ({
           id: x.id, title: x.title, when: x.due_at as string, href: "/tasks",
@@ -230,7 +258,7 @@ export default async function WorkspacePage({
       const fSignedBy = new Map(
         (fSigned ?? []).filter((s) => s.signedUrl).map((s) => [s.path, s.signedUrl])
       );
-      tiles.push({
+      emit({
         id: t.id, title: t.title, kind: t.kind,
         files: (fRows ?? []).map((f) => ({
           id: f.id, name: f.name, created_at: f.created_at,
@@ -240,7 +268,7 @@ export default async function WorkspacePage({
         })),
       });
     } else if (t.kind === "contacts") {
-      tiles.push({
+      emit({
         id: t.id, title: t.title, kind: t.kind,
         members: (members ?? []).map((m: any) => ({
           user_id: m.user_id,
@@ -258,7 +286,7 @@ export default async function WorkspacePage({
         .eq("is_deleted", false)
         .order("created_at", { ascending: false })
         .limit(5);
-      tiles.push({
+      emit({
         id: t.id, title: t.title, kind: t.kind,
         items: (iRows ?? []).map((i) => ({
           id: i.id,
@@ -270,7 +298,7 @@ export default async function WorkspacePage({
       });
     } else {
       // text / iframe / youtube — the config IS the content
-      tiles.push({ id: t.id, title: t.title, kind: t.kind, config: cfg });
+      emit({ id: t.id, title: t.title, kind: t.kind, config: cfg });
     }
   }
 
@@ -497,14 +525,6 @@ export default async function WorkspacePage({
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  // Embed tabs above the dashboard (workspace_embeds, migration 78)
-  const { data: embedRows } = await supabase
-    .from("workspace_embeds")
-    .select("id, title, url")
-    .eq("workspace_id", ws.id)
-    .order("position")
-    .order("created_at");
-
   // Account-synced panel layout (workspace_panel_layouts, migration 75):
   // fetched here so the very first render already uses the saved arrangement.
   let panelLayout: unknown = null;
@@ -549,7 +569,7 @@ export default async function WorkspacePage({
           corner resize) whose layout is synced to the account per workspace
           (workspace_panel_layouts). WorkspaceCanvas adds the embed tab bar
           on top — pick a saved site/Sheet to view it full-width in place. */}
-      <WorkspaceCanvas wsId={ws.id} embeds={embedRows ?? []}>
+      <WorkspaceCanvas wsId={ws.id} wsName={ws.name} apps={appInfos} tabs={tabTiles}>
       <PanelBoard
         wsId={ws.id}
         userId={user?.id ?? null}
