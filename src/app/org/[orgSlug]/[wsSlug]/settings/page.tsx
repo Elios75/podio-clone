@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { AppTabBar } from "../app-tab-bar";
 import {
   GeneralSettings,
   AppsManager,
@@ -38,6 +39,14 @@ export default async function WorkspaceSettingsPage({
     .single();
   if (!ws) notFound();
 
+  // Workspace chrome: the app tab bar must NEVER disappear on workspace pages.
+  const { data: siblingApps } = await supabase
+    .from("apps")
+    .select("id, name, slug, icon")
+    .eq("workspace_id", ws.id)
+    .eq("is_archived", false)
+    .order("name");
+
   const { data: apps } = await supabase
     .from("apps")
     .select("id, name, slug, icon, is_archived")
@@ -71,6 +80,7 @@ export default async function WorkspaceSettingsPage({
 
   return (
     <main className="min-h-screen bg-podio-page pb-10">
+      <AppTabBar orgSlug={orgSlug} wsSlug={wsSlug} apps={siblingApps ?? []} />
       <div className="mx-auto max-w-3xl px-4 pt-6 md:px-6">
         <div className="flex items-center justify-between">
           <h1 className="text-2xl font-semibold text-podio-ink">

@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { AppBuilder } from "./app-builder";
+import { AppTabBar } from "../app-tab-bar";
 
 export default async function NewAppPage({
   params,
@@ -33,6 +34,14 @@ export default async function NewAppPage({
     .single();
   if (!ws) notFound();
 
+  // Workspace chrome: the app tab bar must NEVER disappear on workspace pages.
+  const { data: siblingApps } = await supabase
+    .from("apps")
+    .select("id, name, slug, icon")
+    .eq("workspace_id", ws.id)
+    .eq("is_archived", false)
+    .order("name");
+
   // Relationship-target choices span the whole org (RLS limits to workspaces
   // the user belongs to); labels are "Workspace / App" so cross-workspace
   // targets are unambiguous.
@@ -50,7 +59,9 @@ export default async function NewAppPage({
     .sort((a, b) => a.name.localeCompare(b.name));
 
   return (
-    <main className="mx-auto max-w-2xl p-8">
+    <main className="min-h-screen bg-podio-page pb-10">
+      <AppTabBar orgSlug={orgSlug} wsSlug={wsSlug} apps={siblingApps ?? []} />
+      <div className="mx-auto max-w-2xl px-4 py-8 md:px-6">
       <h1 className="text-2xl font-semibold">New app in {ws.name}</h1>
       <p className="mt-1 text-sm text-slate-500">
         An app is a custom business object — a CRM, project tracker, ticket
@@ -70,6 +81,7 @@ export default async function NewAppPage({
           }
         />
       </div>
+    </div>
     </main>
   );
 }

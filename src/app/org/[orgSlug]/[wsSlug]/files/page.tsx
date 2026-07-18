@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { AppTabBar } from "../app-tab-bar";
 
 function fmtSize(bytes: number) {
   if (bytes < 1024) return `${bytes} B`;
@@ -23,6 +24,14 @@ export default async function WorkspaceFilesPage({
     .from("workspaces").select("id, name, slug")
     .eq("organization_id", org.id).eq("slug", wsSlug).single();
   if (!ws) notFound();
+
+  // Workspace chrome: the app tab bar must NEVER disappear on workspace pages.
+  const { data: siblingApps } = await supabase
+    .from("apps")
+    .select("id, name, slug, icon")
+    .eq("workspace_id", ws.id)
+    .eq("is_archived", false)
+    .order("name");
 
   const { data: files } = await supabase
     .from("files")
@@ -49,7 +58,9 @@ export default async function WorkspaceFilesPage({
   const total = (files ?? []).reduce((a, f) => a + Number(f.size_bytes ?? 0), 0);
 
   return (
-    <main className="mx-auto max-w-2xl p-8">
+    <main className="min-h-screen bg-podio-page pb-10">
+      <AppTabBar orgSlug={orgSlug} wsSlug={wsSlug} apps={siblingApps ?? []} />
+      <div className="mx-auto max-w-2xl px-4 py-8 md:px-6">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-semibold">Files — {ws.name}</h1>
         <Link href={`/org/${orgSlug}/${ws.slug}`}
@@ -89,6 +100,7 @@ export default async function WorkspaceFilesPage({
           </li>
         )}
       </ul>
+    </div>
     </main>
   );
 }

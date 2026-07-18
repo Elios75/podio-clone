@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { TaskToggle } from "@/app/tasks/task-toggle";
+import { AppTabBar } from "../app-tab-bar";
 
 export default async function WorkspaceTasksPage({
   params,
@@ -25,6 +26,14 @@ export default async function WorkspaceTasksPage({
     .eq("slug", wsSlug)
     .single();
   if (!ws) notFound();
+
+  // Workspace chrome: the app tab bar must NEVER disappear on workspace pages.
+  const { data: siblingApps } = await supabase
+    .from("apps")
+    .select("id, name, slug, icon")
+    .eq("workspace_id", ws.id)
+    .eq("is_archived", false)
+    .order("name");
 
   const { data: tasks } = await supabase
     .from("tasks")
@@ -81,6 +90,7 @@ export default async function WorkspaceTasksPage({
 
   return (
     <main className="min-h-screen bg-podio-page pb-10">
+      <AppTabBar orgSlug={orgSlug} wsSlug={wsSlug} apps={siblingApps ?? []} />
       <div className="mx-auto max-w-3xl px-4 pt-6 md:px-6">
         <div className="flex items-center justify-between">
           <h1 className="text-2xl font-semibold text-podio-ink">
