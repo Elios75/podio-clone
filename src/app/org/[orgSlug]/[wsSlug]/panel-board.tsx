@@ -38,9 +38,10 @@ export type WorkspacePanel = {
 };
 
 type ColumnId = "left" | "right";
-type PanelSize = { w: 1 | 2; h?: number }; // right column: 1 = half, 2 = full
+type PanelSize = { w: number; h?: number }; // right column: grid-column span (1..cols)
 type Layout = {
   leftW: 2 | 3 | 4; // sixths of the page taken by the left column
+  cols: 2 | 3; // how many columns the right dashboard grid has (user choice)
   left: string[];
   right: string[];
   sizes: Record<string, PanelSize>;
@@ -55,6 +56,7 @@ function defaultsFor(panels: WorkspacePanel[]): Layout {
   for (const p of panels) sizes[p.id] = { w: 2 };
   return {
     leftW: 3,
+    cols: 2,
     left: panels.filter((p) => p.column === "left").map((p) => p.id),
     right: panels.filter((p) => p.column === "right").map((p) => p.id),
     sizes,
@@ -81,8 +83,9 @@ function sanitizeStored(
   let right: string[] = [];
   const sizes: Record<string, PanelSize> = {};
   let leftW: 2 | 3 | 4 = 3;
+  let cols: 2 | 3 = 2;
 
-  const readSizes = (src: any, mapW: (w: number) => 1 | 2) => {
+  const readSizes = (src: any, mapW: (w: number) => number) => {
     for (const [id, sz] of Object.entries(src ?? {})) {
       if (!known.has(id)) continue;
       const w = Number((sz as any)?.w);
@@ -99,7 +102,8 @@ function sanitizeStored(
     left = strArr(s.left);
     right = strArr(s.right);
     leftW = LEFT_STOPS.includes(s.leftW) ? s.leftW : 3;
-    readSizes(s.sizes, (w) => (w === 1 ? 1 : 2));
+    cols = s.cols === 3 ? 3 : 2;
+    readSizes(s.sizes, (w) => Math.max(1, Math.min(3, Math.round(w))));
   } else if (Array.isArray(s.order)) {
     // v2 free grid: split by each panel's default column; halves stay halves.
     for (const id of strArr(s.order)) {
@@ -124,7 +128,7 @@ function sanitizeStored(
     }
     if (!sizes[p.id]) sizes[p.id] = defaults.sizes[p.id] ?? { w: 2 };
   }
-  return { leftW, left, right, sizes };
+  return { leftW, cols, left, right, sizes };
 }
 
 export function PanelBoard({
@@ -149,6 +153,10 @@ export function PanelBoard({
   const [layout, setLayout] = useState<Layout>(serverLayout ?? defaultLayout);
   const [hasStored, setHasStored] = useState(serverLayout !== null);
   const [isDesktop, setIsDesktop] = useState(false);
+  // Ephemeral by design: the activity pane is ALWAYS visible on a fresh
+  // visit; hiding it (to give the dashboard the whole canvas) lasts only for
+  // the current view and is never persisted.
+  const [activityHidden, setActivityHidden] = useState(false);
   const [dragging, setDragging] = useState<string | null>(null);
   const [over, setOver] = useState<{ column: ColumnId; index: number } | null>(null);
   const [resizing, setResizing] = useState<string | null>(null);
@@ -316,8 +324,9 @@ export function PanelBoard({
         } else {
           const rightRect = rightRef.current?.getBoundingClientRect();
           const rightW = rightRect?.width ?? rowRect.width;
+          const colUnit = rightW / prev.cols;
           const wantPx = ev.clientX - start.left;
-          const w: 1 | 2 = wantPx < rightW * 0.72 ? 1 : 2;
+          const w = Math.max(1, Math.min(prev.cols, Math.round(wantPx / colUnit)));
           next.sizes[id] = { w, h };
         }
         return next;
@@ -349,11 +358,13 @@ export function PanelBoard({
         id={`ws-panel-${id}`}
         onDragOver={(e) => handleDragOver(e, column)}
         onDrop={(e) => handleDrop(e, column)}
-        style={
-          isDesktop && column === "right" && size.w === 2
-            ? { gridColumn: "span 2 / span 2" }
-            : undefined
-        }
+        style={(() => {
+          if (!isDesktop || column !== "right") return undefined;
+          const span = Math.min(size.w, layout.cols);
+          return span > 1
+            ? { gridColumn: `span ${span} / span ${span}` }
+            : undefined;
+        })()}
         // min-w-0 is load-bearing: without it a panel narrower than its
         // content overflows into (and under) the neighboring cell.
         className={`group relative min-w-0 border-t-2 ${
@@ -439,7 +450,7 @@ export function PanelBoard({
         onDrop={(e) => handleDrop(e, column)}
         style={
           isDesktop && column === "right"
-            ? { gridColumn: "span 2 / span 2" }
+            ? { gridColumn: `span ${layout.cols} / span ${layout.cols}` }
             : undefined
         }
         className={`rounded border-2 border-dashed px-4 py-6 text-center text-sm ${
@@ -460,34 +471,83 @@ export function PanelBoard({
     <div className="px-4 pt-4 md:px-6">
       <div
         ref={rowRef}
-        className={isDesktop ? "flex items-start gap-4" : "space-y-4"}
+        className={isDesktop ? "flex items-stretch gap-3" : "space-y-4"}
       >
-        {/* LEFT: the activity column — pinned, width-adjustable. */}
-        <div
-          onDragOver={(e) => handleDragOver(e, "left")}
-          onDragLeave={(e) => clearIndicator(e, "left")}
-          onDrop={(e) => handleDrop(e, "left")}
-          style={isDesktop ? { width: `${(layout.leftW / 6) * 100}%` } : undefined}
-          className={isDesktop ? "shrink-0 space-y-4" : "space-y-4"}
-        >
-          {leftIds.map((id, i) => renderPanel(id, i, "left"))}
-          {appendZone("left", leftIds.length)}
-        </div>
+        {/* LEFT: the activity column — pinned, width-adjustable, hideable.
+            Hiding is per-visit only; every fresh load starts visible. */}
+        {isDesktop && activityHidden ? (
+          <button
+            type="button"
+            onClick={() => setActivityHidden(false)}
+            title="Show activity"
+            aria-label="Show activity"
+            className="flex w-6 shrink-0 items-center justify-center rounded border border-podio-border bg-white text-podio-meta hover:bg-podio-row-alt hover:text-podio-teal"
+          >
+            <span className="text-sm leading-none">›</span>
+          </button>
+        ) : (
+          <div
+            onDragOver={(e) => handleDragOver(e, "left")}
+            onDragLeave={(e) => clearIndicator(e, "left")}
+            onDrop={(e) => handleDrop(e, "left")}
+            style={isDesktop ? { width: `${(layout.leftW / 6) * 100}%` } : undefined}
+            className={isDesktop ? "relative shrink-0 space-y-4 pr-4" : "space-y-4"}
+          >
+            {leftIds.map((id, i) => renderPanel(id, i, "left"))}
+            {appendZone("left", leftIds.length)}
+            {/* Collapse strip on the column's right edge (views-pane style) */}
+            {isDesktop && (
+              <button
+                type="button"
+                onClick={() => setActivityHidden(true)}
+                title="Hide activity"
+                aria-label="Hide activity"
+                className="absolute inset-y-0 right-0 !mt-0 hidden w-3 items-center justify-center text-podio-disabled hover:bg-podio-row-alt hover:text-podio-secondary lg:flex"
+              >
+                <span className="text-sm leading-none">‹</span>
+              </button>
+            )}
+          </div>
+        )}
 
-        {/* RIGHT: the dashboard region — its own 2-across grid. */}
-        <div
-          ref={rightRef}
-          onDragOver={(e) => handleDragOver(e, "right")}
-          onDragLeave={(e) => clearIndicator(e, "right")}
-          onDrop={(e) => handleDrop(e, "right")}
-          className={
-            isDesktop
-              ? "grid min-w-0 flex-1 grid-cols-2 items-start gap-4"
-              : "space-y-4"
-          }
-        >
-          {rightIds.map((id, i) => renderPanel(id, i, "right"))}
-          {appendZone("right", rightIds.length)}
+        {/* RIGHT: the dashboard region — a 2- or 3-across grid (user pick). */}
+        <div className="min-w-0 flex-1">
+          {isDesktop && (
+            <div className="mb-2 flex items-center justify-end gap-1 text-xs text-podio-meta">
+              <span className="mr-1">Columns</span>
+              {([2, 3] as const).map((n) => (
+                <button
+                  key={n}
+                  type="button"
+                  onClick={() => persist({ ...layoutRef.current, cols: n })}
+                  title={`${n}-column dashboard`}
+                  className={`rounded border px-2 py-0.5 ${
+                    layout.cols === n
+                      ? "border-podio-teal bg-podio-teal font-semibold text-white"
+                      : "border-podio-border bg-white text-podio-secondary hover:bg-podio-row-alt"
+                  }`}
+                >
+                  {n}
+                </button>
+              ))}
+            </div>
+          )}
+          <div
+            ref={rightRef}
+            onDragOver={(e) => handleDragOver(e, "right")}
+            onDragLeave={(e) => clearIndicator(e, "right")}
+            onDrop={(e) => handleDrop(e, "right")}
+            className={
+              isDesktop
+                ? layout.cols === 3
+                  ? "grid grid-cols-3 items-start gap-4"
+                  : "grid grid-cols-2 items-start gap-4"
+                : "space-y-4"
+            }
+          >
+            {rightIds.map((id, i) => renderPanel(id, i, "right"))}
+            {appendZone("right", rightIds.length)}
+          </div>
         </div>
       </div>
 

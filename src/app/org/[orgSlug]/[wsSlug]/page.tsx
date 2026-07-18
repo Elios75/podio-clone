@@ -8,6 +8,7 @@ import { AppTabBar } from "./app-tab-bar";
 import { WorkspaceHeader } from "./workspace-header";
 import { FollowToggle } from "./follow-toggle";
 import { PanelBoard } from "./panel-board";
+import { WorkspaceCanvas } from "./workspace-embeds";
 import { FeedComment } from "./feed-comment";
 import { PodioIcon } from "@/components/podio-icon";
 
@@ -496,6 +497,14 @@ export default async function WorkspacePage({
   const {
     data: { user },
   } = await supabase.auth.getUser();
+  // Embed tabs above the dashboard (workspace_embeds, migration 78)
+  const { data: embedRows } = await supabase
+    .from("workspace_embeds")
+    .select("id, title, url")
+    .eq("workspace_id", ws.id)
+    .order("position")
+    .order("created_at");
+
   // Account-synced panel layout (workspace_panel_layouts, migration 75):
   // fetched here so the very first render already uses the saved arrangement.
   let panelLayout: unknown = null;
@@ -538,7 +547,9 @@ export default async function WorkspacePage({
       {/* Podio workspace landing = the Activity stream. Apps appear only in
           the tab bar above; the body is a configurable panel grid (drag +
           corner resize) whose layout is synced to the account per workspace
-          (workspace_panel_layouts). */}
+          (workspace_panel_layouts). WorkspaceCanvas adds the embed tab bar
+          on top — pick a saved site/Sheet to view it full-width in place. */}
+      <WorkspaceCanvas wsId={ws.id} embeds={embedRows ?? []}>
       <PanelBoard
         wsId={ws.id}
         userId={user?.id ?? null}
@@ -965,6 +976,7 @@ export default async function WorkspacePage({
           </a>
         }
       />
+      </WorkspaceCanvas>
     </main>
   );
 }
