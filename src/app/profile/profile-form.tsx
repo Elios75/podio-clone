@@ -64,13 +64,17 @@ export function ProfileForm({
       .from("user_profiles")
       .update({ full_name: name.trim() || null, avatar_url: avatarUrl })
       .eq("user_id", userId);
-    setSaving(false);
     if (upError) {
+      setSaving(false);
       setError(upError.message);
       return;
     }
+    // Behave like a settings dialog: confirm briefly, then close — back to
+    // wherever the user opened the menu from, with fresh data everywhere.
+    // `saving` stays true so extra clicks during the pause are no-ops.
     setMessage("Profile saved.");
     router.refresh();
+    window.setTimeout(() => router.back(), 500);
   }
 
   return (
